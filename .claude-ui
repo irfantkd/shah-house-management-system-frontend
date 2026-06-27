@@ -1,0 +1,150 @@
+# UI Design System
+
+The interface should feel like a premium SaaS dashboard.
+
+Design inspiration
+
+- Apple
+- Notion
+- Stripe
+- Linear
+- Airbnb
+- Vercel Dashboard
+
+Style
+
+- Minimal
+- Spacious
+- Professional
+- Luxury
+- Modern
+
+Never overcrowd pages.
+
+Every page should have
+
+- Header
+- Breadcrumb
+- Search
+- Filters
+- Action Buttons
+- Responsive Cards
+- Empty State
+- Loading Skeleton
+- Error State
+
+---
+
+## Colors
+
+Primary
+
+#2563EB
+
+Secondary
+
+#475569
+
+Success
+
+#22C55E
+
+Danger
+
+#EF4444
+
+Warning
+
+#F59E0B
+
+Background
+
+#F8FAFC
+
+Dark Background
+
+#0F172A
+
+---
+
+Typography
+
+Headings
+
+Bold
+
+Body
+
+Medium
+
+Use plenty of spacing.
+
+---
+
+Buttons
+
+Primary
+
+Secondary
+
+Outline
+
+Ghost
+
+Danger
+
+Icon Buttons
+
+---
+
+Cards
+
+Rounded
+
+Soft Shadow
+
+Hover Animation
+
+---
+
+Animations
+
+Framer Motion
+
+Fade
+
+Slide
+
+Scale
+
+Avoid excessive animation.
+
+---
+
+Icons
+
+Lucide React only.
+
+---
+
+Responsive
+
+Desktop
+
+Tablet
+
+Mobile
+
+All pages must be fully responsive.
+
+---
+
+Accessibility
+
+Keyboard navigation
+
+Focus states
+
+ARIA labels where appropriate
+
+Color contrast

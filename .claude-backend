@@ -1,0 +1,69 @@
+# Backend Development
+
+Backend begins only after frontend approval.
+
+Architecture
+
+MVC
+
+controllers/
+
+routes/
+
+models/
+
+middlewares/
+
+services/
+
+utils/
+
+validators/
+
+config/
+
+Use
+
+Node.js
+
+Express.js
+
+MongoDB
+
+JWT
+
+Multer
+
+Cloudinary
+
+Nodemailer
+
+bcrypt
+
+Validation
+
+Joi or Zod
+
+Use async/await.
+
+Never place business logic inside routes.
+
+Create reusable services.
+
+Follow REST API conventions.
+
+Every endpoint should return
+
+success
+
+message
+
+data
+
+errors
+
+statusCode
+
+Use centralized error handling.
+
+All APIs should be documented.

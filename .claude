@@ -1,0 +1,617 @@
+# ===========================================
+# Project: Amara Home Management System (AHMS)
+# ===========================================
+
+## Project Overview
+
+Amara Home Management System (AHMS) is a modern web application designed to manage and maintain a single luxury home or villa.
+
+The purpose of this system is to help homeowners keep track of everything related to their house, including maintenance schedules, service contracts, warranties, repair history, service companies, expenses, documents, inspections, and reminders.
+
+Instead of manually remembering maintenance dates or searching for contractor details, the system provides a centralized dashboard with automated reminders, notifications, and complete maintenance history.
+
+The goal is to digitize home management and make maintaining a luxury property simple, organized, and efficient.
+
+This is NOT a property management system for multiple properties.
+
+This system is designed for ONE home or villa.
+
+---
+
+# Tech Stack
+
+Frontend
+- React.js
+- React Router
+- Redux Toolkit
+- RTK Query (preferred)
+- Axios
+- Tailwind CSS
+- Shadcn UI
+- Lucide React Icons
+- React Hook Form
+- Zod Validation
+- Framer Motion
+- React Hot Toast
+
+Backend
+- Node.js
+- Express.js
+
+Database
+- MongoDB
+- Mongoose
+
+Authentication
+- JWT Authentication
+- Refresh Tokens
+
+Storage
+- Cloudinary
+
+Version Control
+- Git
+- GitHub
+
+Deployment
+Frontend
+- Vercel
+
+Backend
+- Render / VPS
+
+Database
+- MongoDB Atlas
+
+---
+
+# Project Goals
+
+The application should help the homeowner:
+
+• Keep track of every maintenance contract.
+
+• Know when maintenance is due.
+
+• Know when warranties expire.
+
+• Store all company information.
+
+• Store all invoices and documents.
+
+• Receive notifications before maintenance dates.
+
+• Track repair history.
+
+• Track maintenance expenses.
+
+• Keep the house in excellent condition.
+
+---
+
+# Frontend Development (Phase 1)
+
+Only frontend should be developed initially.
+
+DO NOT implement backend functionality.
+
+Use mock JSON data where required.
+
+Focus on:
+
+• Professional UI
+• Responsive Design
+• Reusable Components
+• Clean Folder Structure
+• Proper State Management
+• Beautiful UX
+• Dark/Light Theme Ready
+
+---
+
+# Frontend Pages
+
+## Authentication
+
+- Login
+- Forgot Password
+- Reset Password
+
+---
+
+## Dashboard
+
+Dashboard should display
+
+- Total Active Contracts
+- Upcoming Maintenance
+- Contracts Expiring Soon
+- Warranties Expiring
+- Pending Repairs
+- Upcoming Services
+- Monthly Expenses
+- Recent Activities
+- Notifications
+- Calendar
+
+---
+
+## Home Information
+
+Manage
+
+- Home Details
+- Owner Information
+- Address
+- Images
+- Documents
+- Insurance
+
+---
+
+## Home Areas
+
+Each area should have its own page.
+
+Examples
+
+- Living Room
+- Kitchen
+- Bedrooms
+- Bathrooms
+- Garden
+- Swimming Pool
+- Garage
+- Roof
+- Balcony
+- Outdoor Area
+- Parking
+
+---
+
+## Assets
+
+Every asset installed in the house.
+
+Examples
+
+- AC Units
+- Water Heater
+- Generator
+- Pool Pump
+- Gate Motor
+- CCTV
+- Smart Lock
+- Water Tank
+- Solar System
+- Washing Machine
+- Dishwasher
+
+Each asset page should include
+
+- Details
+- Warranty
+- Documents
+- Images
+- Service History
+- Maintenance Schedule
+
+---
+
+## Service Companies
+
+Manage service providers.
+
+Examples
+
+- AC Company
+- Pool Company
+- Garden Company
+- Electrician
+- Plumbing Company
+- Cleaning Company
+- Pest Control
+- Painting Company
+- CCTV Company
+- Gate Company
+
+Each company should include
+
+- Logo
+- Contact Person
+- Phone
+- Email
+- WhatsApp
+- Address
+- Notes
+- Contracts
+
+---
+
+## Contracts
+
+Features
+
+- Active Contracts
+- Expired Contracts
+- Upcoming Renewals
+
+Each contract includes
+
+- Company
+- Category
+- Start Date
+- End Date
+- Renewal Reminder
+- Cost
+- Included Services
+- Documents
+
+---
+
+## Maintenance Schedule
+
+Calendar View
+
+List View
+
+Cards View
+
+Examples
+
+Monthly
+
+Quarterly
+
+Yearly
+
+Upcoming
+
+Completed
+
+---
+
+## Repairs
+
+Track
+
+- Reported Issues
+- Assigned Company
+- Status
+- Images
+- Before Photos
+- After Photos
+- Repair Cost
+
+---
+
+## Maintenance History
+
+Timeline
+
+Cards
+
+Table View
+
+Search
+
+Filter
+
+---
+
+## Warranty Management
+
+Track
+
+- Warranty Status
+- Expiry Date
+- Supplier
+- Documents
+
+---
+
+## Expenses
+
+Categories
+
+- Repairs
+- Maintenance
+- Cleaning
+- Garden
+- Pool
+- Utilities
+
+Charts
+
+Monthly
+
+Yearly
+
+Category Wise
+
+---
+
+## Documents
+
+Store
+
+- Contracts
+- Invoices
+- Manuals
+- Warranty Cards
+- Certificates
+- Images
+- Videos
+
+---
+
+## Calendar
+
+Display
+
+- Maintenance Dates
+- Contract Expiry
+- Warranty Expiry
+- Repairs
+- Reminders
+
+---
+
+## Notifications
+
+Notification Center
+
+Types
+
+- Contract Reminder
+- Maintenance Reminder
+- Warranty Reminder
+- Repair Updates
+
+---
+
+## Emergency Contacts
+
+Examples
+
+Electrician
+
+Plumber
+
+Hospital
+
+Security
+
+Police
+
+Pool Company
+
+Garden Company
+
+Family
+
+---
+
+## Settings
+
+Profile
+
+Notification Settings
+
+Theme
+
+Security
+
+Password
+
+Preferences
+
+---
+
+# UI Requirements
+
+The design should feel premium and modern.
+
+Inspired by
+
+- Apple
+- Notion
+- Linear
+- Stripe Dashboard
+- Airbnb Host Dashboard
+
+Characteristics
+
+- Minimal
+- Clean
+- Spacious
+- Soft Shadows
+- Rounded Corners
+- Professional Cards
+- Smooth Animations
+- Fully Responsive
+
+---
+
+# Color Palette
+
+Primary
+
+#0F172A
+
+Secondary
+
+#334155
+
+Accent
+
+#2563EB
+
+Success
+
+#16A34A
+
+Warning
+
+#F59E0B
+
+Danger
+
+#DC2626
+
+Background
+
+#F8FAFC
+
+Cards
+
+#FFFFFF
+
+Dark Mode Supported
+
+---
+
+# Component Structure
+
+Create reusable components.
+
+Examples
+
+Buttons
+
+Cards
+
+Inputs
+
+Tables
+
+Badges
+
+Status Chips
+
+Modal
+
+Drawer
+
+Calendar
+
+Charts
+
+Timeline
+
+Upload Component
+
+Search Bar
+
+Filter Panel
+
+Navbar
+
+Sidebar
+
+Breadcrumb
+
+Notifications
+
+Empty States
+
+Loading Skeletons
+
+---
+
+# Folder Structure
+
+src/
+
+components/
+
+features/
+
+pages/
+
+layouts/
+
+hooks/
+
+services/
+
+store/
+
+utils/
+
+constants/
+
+types/
+
+assets/
+
+routes/
+
+context/
+
+---
+
+# Coding Standards
+
+- Functional Components only.
+- Use Hooks.
+- Use TypeScript-ready architecture (even if JavaScript is used initially).
+- Small reusable components.
+- Avoid duplicate code.
+- Keep components under 250 lines where possible.
+- Separate UI from business logic.
+- Use clean naming conventions.
+- Use lazy loading for pages.
+- Use absolute imports if configured.
+
+---
+
+# Development Rules
+
+- Build frontend before backend.
+- Every page should be responsive.
+- Every page should use mock data.
+- Every page should have loading states.
+- Every page should have empty states.
+- Every page should have error states.
+- Forms should include validation.
+- Components should be reusable.
+- Code should be production-ready.
+
+---
+
+# Future Backend
+
+Backend will be developed after frontend approval.
+
+Backend will provide
+
+- REST APIs
+- JWT Authentication
+- MongoDB Database
+- File Upload
+- Notifications
+- Email Service
+- Role Management
+- Activity Logs
+
+Do NOT generate backend code until frontend has been approved.
+
+---
+
+# AI Development Instructions
+
+When generating code:
+
+- Follow React best practices.
+- Prioritize reusable components.
+- Write clean, maintainable code.
+- Keep UI consistent across the application.
+- Avoid unnecessary complexity.
+- Create modular architecture.
+- Prefer composition over duplication.
+- Use Tailwind CSS utilities effectively.
+- Ensure accessibility where practical.
+- Generate production-quality code suitable for scaling.
+
+The objective is to build a premium-quality home management application that is elegant, fast, and easy to maintain.

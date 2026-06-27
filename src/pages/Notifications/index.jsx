@@ -1,0 +1,153 @@
+﻿import { useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
+import {
+  RiBellLine, RiCheckDoubleLine, RiDeleteBinLine, RiFilterLine,
+  RiAlertLine, RiInformationLine, RiCalendarLine, RiToolsLine,
+  RiShieldLine, RiMoneyDollarCircleLine, RiCheckLine,
+} from 'react-icons/ri';
+import { selectNotifications, selectUnreadCount, markRead, markAllRead, dismissNotification } from '../../store/slices/notificationsSlice';
+import { NOTIF_TYPE_CFG } from '../../data/mockNotifications';
+import { cn } from '../../utils/cn';
+
+const TYPE_ICONS = {
+  maintenance: RiToolsLine,
+  repair:      RiAlertLine,
+  warranty:    RiShieldLine,
+  contract:    RiCalendarLine,
+  payment:     RiMoneyDollarCircleLine,
+  info:        RiInformationLine,
+};
+
+function fmtAgo(iso) {
+  const ms  = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 2)  return 'Just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24)  return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
+const TYPES = ['all', 'maintenance', 'repair', 'warranty', 'contract', 'payment', 'info'];
+
+export default function NotificationsPage() {
+  const dispatch   = useDispatch();
+  const all        = useSelector(selectNotifications);
+  const unread     = useSelector(selectUnreadCount);
+  const [tab,      setTab]      = useState('all');
+  const [showRead, setShowRead] = useState(true);
+
+  const filtered = all.filter((n) => {
+    if (tab !== 'all' && n.type !== tab) return false;
+    if (!showRead && n.read) return false;
+    return true;
+  });
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="max-w-3xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-10 h-10 rounded-xl bg-navy-50 flex items-center justify-center">
+              <RiBellLine className="w-5 h-5 text-navy-700" />
+            </div>
+            {unread > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-danger-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">{unread > 9 ? '9+' : unread}</span>
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-navy-900 tracking-tight">Notifications</h1>
+            <p className="text-[13px] text-slate-400 mt-0.5">{unread > 0 ? `${unread} unread` : 'All caught up'} Â· {all.length} total</p>
+          </div>
+        </div>
+        {unread > 0 && (
+          <button onClick={() => { dispatch(markAllRead()); toast.success('All marked as read'); }}
+            className="flex items-center gap-2 px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white text-[13px] font-semibold rounded-xl transition-all">
+            <RiCheckDoubleLine className="w-4 h-4" />Mark All Read
+          </button>
+        )}
+      </div>
+
+      {/* Filter row */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
+          {TYPES.map((t) => {
+            const count = t === 'all' ? all.filter((n) => !n.read).length : all.filter((n) => n.type === t && !n.read).length;
+            return (
+              <button key={t} onClick={() => setTab(t)}
+                className={cn('flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold whitespace-nowrap border transition-all shrink-0 capitalize',
+                  tab === t ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300')}>
+                {t === 'all' ? 'All' : t}
+                {count > 0 && (
+                  <span className={cn('text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center',
+                    tab === t ? 'bg-white/20 text-white' : 'bg-danger-500 text-white')}>{count}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={() => setShowRead(!showRead)}
+          className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold border transition-all shrink-0',
+            !showRead ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-slate-500 border-slate-200')}>
+          <RiFilterLine className="w-3.5 h-3.5" />{showRead ? 'Hide Read' : 'Show Read'}
+        </button>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center" style={{ boxShadow: '0 1px 8px rgb(0 0 0/0.06)' }}>
+          <RiBellLine className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+          <p className="font-semibold text-slate-400">No notifications in this filter</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <AnimatePresence mode="popLayout">
+            {filtered.map((n, i) => (
+              <motion.div key={n.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40, scale: 0.95 }} transition={{ delay: i * 0.03 }}>
+                <NotifCard notif={n}
+                  onMarkRead={() => dispatch(markRead(n.id))}
+                  onDismiss={() => { dispatch(dismissNotification(n.id)); toast.success('Notification dismissed'); }}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+function NotifCard({ notif: n, onMarkRead, onDismiss }) {
+  const TypeIcon = TYPE_ICONS[n.type] ?? RiInformationLine;
+  const cfg = NOTIF_TYPE_CFG?.[n.type] ?? { bg: 'bg-slate-100', text: 'text-slate-600', label: n.type };
+  const priColor = { high: 'bg-danger-50 border-danger-200', medium: 'bg-warning-50 border-warning-200', low: 'bg-white border-slate-100' }[n.priority ?? 'low'] ?? 'bg-white border-slate-100';
+
+  return (
+    <div className={cn('rounded-2xl border px-5 py-4 transition-all', priColor, !n.read && 'border-l-4 border-l-accent-400')}>
+      <div className="flex items-start gap-3">
+        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5', cfg.bg)}>
+          <TypeIcon className={cn('w-4 h-4', cfg.text)} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className={cn('text-[14px] leading-snug', n.read ? 'font-medium text-slate-600' : 'font-bold text-slate-900')}>{n.title}</p>
+            <span className="text-[11px] text-slate-400 whitespace-nowrap shrink-0 mt-0.5">{fmtAgo(n.createdAt)}</span>
+          </div>
+          <p className="text-[13px] text-slate-500 mt-1 leading-relaxed">{n.message}</p>
+          <div className="flex items-center gap-2 mt-2.5">
+            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-md capitalize', cfg.bg, cfg.text)}>{cfg.label}</span>
+            {!n.read && (
+              <button onClick={onMarkRead} className="flex items-center gap-1 text-[11px] font-semibold text-accent-600 hover:text-accent-700 transition-colors">
+                <RiCheckLine className="w-3.5 h-3.5" />Mark read
+              </button>
+            )}
+            <button onClick={onDismiss} className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-danger-500 transition-colors ml-auto">
+              <RiDeleteBinLine className="w-3.5 h-3.5" />Dismiss
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
