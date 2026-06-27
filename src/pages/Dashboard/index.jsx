@@ -512,42 +512,50 @@ export default function Dashboard() {
             </div>
           </motion.div>
 
-          {/* Monthly Expenses */}
+          {/* Monthly Expenses — real data */}
           <motion.div {...fadeUp(0.24)}>
             <SectionCard
-              title="Monthly Expenses"
-              subtitle="June 2026"
-              action={<Link to="/expenses" className="text-[12px] text-blue-600 font-bold hover:text-blue-700">Details →</Link>}
+              title="Monthly Spending"
+              subtitle={curMonthLabel}
+              action={<Link to="/expenses" className="text-[12px] text-blue-600 font-bold hover:text-blue-700">Full breakdown →</Link>}
             >
-              <div className="flex items-end gap-2 mb-4">
-                <p className="text-3xl font-bold tracking-tight leading-none" style={{ color: '#0b1d3a' }}>AED 4,850</p>
-                <span className="text-[11px] text-emerald-600 font-bold mb-0.5 flex items-center gap-0.5">
-                  <RiArrowDownLine className="w-3 h-3" />8% less
-                </span>
+              <div className="mb-4">
+                <p className="text-3xl font-bold tracking-tight leading-none" style={{ color: '#0b1d3a' }}>
+                  AED {grandTotal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1">All categories combined</p>
               </div>
               {/* Stacked bar */}
-              <div className="flex rounded-full overflow-hidden h-2.5 mb-3.5">
-                {monthlyExpenses.map((e) => (
-                  <div key={e.category} style={{ width: `${e.percent}%`, background: e.color }} title={`${e.category}: AED ${e.amount}`} />
-                ))}
-              </div>
-              <div className="space-y-2">
-                {monthlyExpenses.slice(0, 5).map((e) => (
+              {grandTotal > 0 && (
+                <div className="flex rounded-full overflow-hidden h-2.5 mb-4 gap-px">
+                  {dashExpSegs.map((e, i) => (
+                    <div key={e.category}
+                      style={{ width: `${e.percent}%`, background: e.color }}
+                      className={cn(i === 0 && 'rounded-l-full', i === dashExpSegs.length - 1 && 'rounded-r-full')}
+                      title={`${e.category}: AED ${e.amount.toFixed(0)} (${e.percent}%)`} />
+                  ))}
+                </div>
+              )}
+              <div className="space-y-2.5">
+                {dashExpSegs.map((e) => (
                   <div key={e.category} className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: e.color }} />
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: e.color }} />
                       <span className="text-[12px] text-slate-600 truncate">{e.category}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <div className="w-16 bg-slate-100 rounded-full h-1 hidden sm:block">
+                      <div className="w-14 bg-slate-100 rounded-full h-1 hidden sm:block">
                         <div className="h-1 rounded-full" style={{ width: `${e.percent}%`, background: e.color }} />
                       </div>
-                      <span className="text-[12px] font-bold text-slate-700 w-16 text-right">
-                        {e.amount.toLocaleString()}
+                      <span className="text-[12px] font-bold text-slate-700 w-18 text-right tabular-nums">
+                        AED {e.amount.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
                       </span>
                     </div>
                   </div>
                 ))}
+                {grandTotal === 0 && (
+                  <p className="text-[12px] text-slate-400 text-center py-2">No expenses recorded yet</p>
+                )}
               </div>
             </SectionCard>
           </motion.div>
