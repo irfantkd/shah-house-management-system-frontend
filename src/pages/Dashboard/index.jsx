@@ -8,7 +8,7 @@ import {
   RiArrowUpLine, RiArrowDownLine, RiBellLine, RiBox3Line,
   RiShieldCheckLine, RiHome4Line, RiDropLine, RiLeafLine,
   RiBankCardLine, RiTimeLine, RiCheckboxCircleLine, RiAddLine,
-  RiUploadCloudLine, RiHammerLine,
+  RiUploadCloudLine, RiHammerLine, RiCarLine, RiGasStationLine,
 } from 'react-icons/ri';
 import { selectContracts } from '../../store/slices/contractsSlice';
 import { selectMaintenance } from '../../store/slices/maintenanceSlice';
@@ -16,9 +16,12 @@ import { selectRepairs } from '../../store/slices/repairsSlice';
 import { selectAssets } from '../../store/slices/assetsSlice';
 import { selectAreas } from '../../store/slices/areasSlice';
 import { selectAuthUser } from '../../store/slices/authSlice';
+import { selectCars, selectCarExpenses, selectFuelLogs as selectFleetFuel } from '../../store/slices/carsSlice';
+import { selectExpenses } from '../../store/slices/expensesSlice';
+import { EXPENSE_CATEGORIES, PROPERTY_CATS, HOUSEHOLD_CATS } from '../../data/mockExpenses';
 import { selectUnreadCount } from '../../store/slices/notificationsSlice';
 import {
-  upcomingSchedule, recentActivities, expiringItems, monthlyExpenses,
+  upcomingSchedule, recentActivities, expiringItems,
 } from '../../data/mockDashboard';
 import Badge from '../../components/ui/Badge';
 import { cn } from '../../utils/cn';
@@ -75,11 +78,43 @@ export default function Dashboard() {
   const assets      = useSelector(selectAssets);
   const areas       = useSelector(selectAreas);
   const unread      = useSelector(selectUnreadCount);
+  const cars        = useSelector(selectCars);
+  const fleetFuel   = useSelector(selectFleetFuel);
+  const allExpenses = useSelector(selectExpenses);
+  const carExpenses = useSelector(selectCarExpenses);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { const t = setTimeout(() => setLoading(false), 800); return () => clearTimeout(t); }, []);
 
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Fleet helpers
+  const fleetCurM     = new Date().getMonth();
+  const fleetCurY     = new Date().getFullYear();
+  const fleetFuelMo   = fleetFuel
+    .filter((f) => { const d = new Date(f.date); return d.getMonth() === fleetCurM && d.getFullYear() === fleetCurY; })
+    .reduce((s, f) => s + f.totalPrice, 0);
+  const inCurMonth  = (d) => { const dt = new Date(d); return dt.getMonth() === fleetCurM && dt.getFullYear() === fleetCurY; };
+  const propTotal   = allExpenses.filter((e) => inCurMonth(e.date) && PROPERTY_CATS.has(e.category)).reduce((s, e) => s + e.amount, 0);
+  const houseTotal  = allExpenses.filter((e) => inCurMonth(e.date) && HOUSEHOLD_CATS.has(e.category)).reduce((s, e) => s + e.amount, 0);
+  const vehicleTotal = carExpenses.filter((e) => inCurMonth(e.date)).reduce((s, e) => s + e.amount, 0);
+  const grandTotal  = propTotal + houseTotal + vehicleTotal + fleetFuelMo;
+
+  const curMonthLabel = new Date(fleetCurY, fleetCurM, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+  const dashExpSegs = [
+    { category: 'Property & Services', amount: propTotal,    color: '#2563eb' },
+    { category: 'Household & Daily',   amount: houseTotal,   color: '#16a34a' },
+    { category: 'Fleet — Vehicle',     amount: vehicleTotal, color: '#0b1d3a' },
+    { category: 'Fleet — Fuel',        amount: fleetFuelMo,  color: '#d97706' },
+  ]
+    .filter((s) => s.amount > 0)
+    .map((s) => ({ ...s, percent: grandTotal > 0 ? Math.round((s.amount / grandTotal) * 100) : 0 }));
+
+  const carsAlertCount = cars.filter((c) => {
+    const d = Math.ceil((new Date(c.registrationExpiry) - new Date()) / 86400000);
+    return d <= 30;
+  }).length;
 
   // Per-area asset count
   const areaAssetCount = assets.reduce((m, a) => {
@@ -260,6 +295,64 @@ export default function Dashboard() {
                 </Link>
               );
             })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Fleet Overview ── */}
+      {cars.length > 0 && (
+        <motion.div {...fadeUp(0.17)}>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                  <RiCarLine className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-[14px] font-bold text-slate-800">Fleet Overview</p>
+                  <p className="text-[11px] text-slate-400">{cars.length} vehicle{cars.length !== 1 ? 's' : ''} · Shah House</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                {carsAlertCount > 0 && (
+                  <span className="flex items-center gap-1.5 text-[12px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
+                    <RiAlertLine className="w-3.5 h-3.5" /> {carsAlertCount} reg. alert{carsAlertCount !== 1 ? 's' : ''}
+                  </span>
+                )}
+                <span className="flex items-center gap-1.5 text-[12px] font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
+                  <RiGasStationLine className="w-3.5 h-3.5" /> AED {fleetFuelMo.toFixed(0)} fuel/mo
+                </span>
+                <Link to="/cars" className="flex items-center gap-1 text-[12px] text-blue-600 font-bold hover:text-blue-700">
+                  Manage <RiArrowRightLine className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {cars.slice(0, 3).map((car) => {
+                const regDays = Math.ceil((new Date(car.registrationExpiry) - new Date()) / 86400000);
+                const expired  = regDays < 0;
+                const expiring = regDays >= 0 && regDays <= 30;
+                return (
+                  <Link key={car.id} to={`/cars/${car.id}`}
+                    className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all group bg-slate-50/60">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: `linear-gradient(135deg, #0b1d3a, #1e3a6e)` }}>
+                      <RiCarLine className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-bold text-slate-800 truncate leading-tight">{car.make} {car.model}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{car.plateNumber} · {car.driverName.split(' ')[0]}</p>
+                    </div>
+                    <div className="shrink-0">
+                      {expired  && <span className="text-[10px] font-bold text-white bg-red-500 px-2 py-0.5 rounded-full">Expired</span>}
+                      {expiring && <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">{regDays}d left</span>}
+                      {!expired && !expiring && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Active</span>}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </motion.div>
       )}

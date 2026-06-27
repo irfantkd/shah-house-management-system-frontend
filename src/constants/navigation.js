@@ -3,6 +3,7 @@ import {
   RiHome4Line,
   RiMapPin2Line,
   RiBox3Line,
+  RiCarLine,
   RiBuildingLine,
   RiFileList3Line,
   RiCalendarCheckLine,
@@ -31,6 +32,7 @@ export const NAV_GROUPS = [
       { label: 'Home Information', icon: RiHome4Line,    path: '/home-info' },
       { label: 'Areas & Rooms',    icon: RiMapPin2Line,  path: '/areas'     },
       { label: 'Assets',           icon: RiBox3Line,     path: '/assets'    },
+      { label: 'Fleet / Cars',     icon: RiCarLine,      path: '/cars'      },
     ],
   },
   {

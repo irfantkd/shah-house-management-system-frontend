@@ -1,247 +1,436 @@
-import { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useForm } from 'react-hook-form';
-import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
+import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { motion } from 'framer-motion';
 import {
-  RiAddLine, RiSearchLine, RiEditLine, RiDeleteBinLine,
-  RiMoneyDollarCircleLine, RiLineChartLine, RiCalendarLine, RiFilterLine,
-} from 'react-icons/ri';
-import { selectExpenses, addExpense, updateExpense, deleteExpense } from '../../store/slices/expensesSlice';
-import { selectCompanies } from '../../store/slices/companiesSlice';
-import Modal from '../../components/ui/Modal';
-import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { Field, Input, Select, Textarea, FormGrid, FormActions } from '../../components/ui/FormField';
+  Home, Car, Fuel, ShoppingCart, ChevronLeft, ChevronRight,
+  Plus, Receipt, ArrowUpRight, Wrench,
+} from 'lucide-react';
+import { selectExpenses, addExpense } from '../../store/slices/expensesSlice';
+import { selectCarExpenses, selectFuelLogs, selectCars } from '../../store/slices/carsSlice';
+import { EXPENSE_CATEGORIES } from '../../data/mockExpenses';
+import { CAR_EXPENSE_TYPES } from '../../data/mockCars';
+import Modal  from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
+import toast from 'react-hot-toast';
 
-const EXPENSE_CATS = ['Cleaning','Garden','Pool & Water','Climate / AC','Security / CCTV','Plumbing','Pest Control','Power','Repairs','Other'];
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fade = (d = 0) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.32, delay: d, ease: [0.4, 0, 0.2, 1] } });
 
-function fmtDate(s) { return s ? new Date(s+'T00:00:00').toLocaleDateString('en-AE',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
-function fmtAED(n) { return `AED ${(n ?? 0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`; }
-
-const CAT_COLORS = {
-  Cleaning:          'bg-purple-50 text-purple-700',
-  Garden:            'bg-green-50 text-green-700',
-  'Pool & Water':    'bg-cyan-50 text-cyan-700',
-  'Climate / AC':    'bg-blue-50 text-blue-700',
-  'Security / CCTV': 'bg-slate-100 text-slate-700',
-  Plumbing:          'bg-sky-50 text-sky-700',
-  'Pest Control':    'bg-orange-50 text-orange-700',
-  Power:             'bg-yellow-50 text-yellow-700',
-  Repairs:           'bg-red-50 text-red-700',
-  Other:             'bg-slate-100 text-slate-600',
+const SEG = {
+  property:  { label: 'Property & Services', color: '#2563eb', bg: '#eff6ff', icon: Home,         border: '#bfdbfe' },
+  vehicle:   { label: 'Fleet — Vehicle',      color: '#0b1d3a', bg: '#f0f5ff', icon: Wrench,       border: '#c7d7f5' },
+  fuel:      { label: 'Fleet — Fuel',         color: '#d97706', bg: '#fffbeb', icon: Fuel,         border: '#fde68a' },
+  household: { label: 'Household & Daily',    color: '#16a34a', bg: '#f0fdf4', icon: ShoppingCart, border: '#bbf7d0' },
 };
 
-const now = new Date();
-const YEARS = [now.getFullYear(), now.getFullYear()-1, now.getFullYear()-2];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const catCfg      = (cat) => EXPENSE_CATEGORIES[cat] ?? { color: '#64748b', bg: '#f8fafc', segment: 'property' };
+
+const PROP_CAT_OPTS  = Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'property').map(([k]) => k);
+const HOUSE_CAT_OPTS = Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'household').map(([k]) => k);
+const BLANK = { category: 'Cleaning', description: '', amount: '', vendor: '', date: new Date().toISOString().split('T')[0] };
 
 export default function ExpensesPage() {
   const dispatch    = useDispatch();
-  const expenses    = useSelector(selectExpenses);
-  const companies   = useSelector(selectCompanies);
-  const [search,    setSearch]    = useState('');
-  const [catFilt,   setCatFilt]   = useState('All');
-  const [yearFilt,  setYearFilt]  = useState(String(now.getFullYear()));
-  const [modal,     setModal]     = useState(null);
-  const [delTarget, setDelTarget] = useState(null);
+  const allExpenses = useSelector(selectExpenses);
+  const carExpenses = useSelector(selectCarExpenses);
+  const fuelLogs    = useSelector(selectFuelLogs);
+  const cars        = useSelector(selectCars);
 
-  const filtered = expenses.filter((e) => {
-    const q  = search.toLowerCase();
-    const ms = (e.description ?? '').toLowerCase().includes(q) || (e.company ?? '').toLowerCase().includes(q);
-    const mc = catFilt === 'All' || e.category === catFilt;
-    const my = yearFilt === 'All' || (e.date ?? '').startsWith(yearFilt);
-    return ms && mc && my;
-  });
+  const now = new Date();
+  const [period,  setPeriod]  = useState({ year: now.getFullYear(), month: now.getMonth() });
+  const [filter,  setFilter]  = useState('all');
+  const [showAdd, setShowAdd] = useState(false);
+  const [addSeg,  setAddSeg]  = useState('property');
+  const [form,    setForm]    = useState(BLANK);
 
-  const totalFiltered = filtered.reduce((s, e) => s + (e.amount ?? 0), 0);
-  const totalYear     = expenses.filter((e) => (e.date ?? '').startsWith(yearFilt !== 'All' ? yearFilt : '')).reduce((s, e) => s + (e.amount ?? 0), 0);
-  const thisMonth     = expenses.filter((e) => e.date?.startsWith(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`)).reduce((s, e) => s + (e.amount ?? 0), 0);
-  const topCat        = EXPENSE_CATS.map((cat) => ({ cat, total: expenses.filter((e) => e.category === cat).reduce((s, e) => s + (e.amount ?? 0), 0) })).sort((a, b) => b.total - a.total)[0];
+  const { year: selY, month: selM } = period;
+  const inPeriod = (d) => { const dt = new Date(d); return dt.getFullYear() === selY && dt.getMonth() === selM; };
+  const carName  = (id) => { const c = cars.find((x) => x.id === id); return c ? `${c.make} ${c.model}` : 'Vehicle'; };
 
-  const monthlyData = MONTHS.map((m, i) => ({
-    month: m,
-    total: expenses.filter((e) => e.date?.startsWith(`${yearFilt !== 'All' ? yearFilt : now.getFullYear()}-${String(i+1).padStart(2,'0')}`)).reduce((s, e) => s + (e.amount ?? 0), 0),
-  }));
-  const maxMonthly = Math.max(...monthlyData.map((m) => m.total), 1);
+  const prevMonth = () => setPeriod((p) => p.month === 0 ? { year: p.year - 1, month: 11 } : { ...p, month: p.month - 1 });
+  const nextMonth = () => setPeriod((p) => p.month === 11 ? { year: p.year + 1, month: 0 }  : { ...p, month: p.month + 1 });
+  const isCurrentMonth = selY === now.getFullYear() && selM === now.getMonth();
+
+  // ── Build unified list ────────────────────────────────────────────
+  const allItems = useMemo(() => {
+    const propHouse = allExpenses
+      .filter((e) => inPeriod(e.date))
+      .map((e) => {
+        const cfg = catCfg(e.category);
+        return { id: e.id, date: e.date, amount: e.amount, segment: cfg.segment ?? 'property',
+          category: e.category, description: e.description, source: e.vendor ?? e.company ?? '',
+          color: cfg.color, bg: cfg.bg };
+      });
+    const vehicle = carExpenses
+      .filter((e) => inPeriod(e.date))
+      .map((e) => {
+        const cfg = CAR_EXPENSE_TYPES[e.type] ?? { label: e.type, color: '#64748b', bg: '#f8fafc' };
+        return { id: e.id, date: e.date, amount: e.amount, segment: 'vehicle',
+          category: cfg.label, description: e.description, source: carName(e.carId),
+          color: cfg.color, bg: cfg.bg };
+      });
+    const fuel = fuelLogs
+      .filter((f) => inPeriod(f.date))
+      .map((f) => ({
+        id: f.id, date: f.date, amount: f.totalPrice, segment: 'fuel',
+        category: 'Fuel', description: `${f.liters}L @ AED ${f.pricePerLiter}/L`,
+        source: `${carName(f.carId)}${f.station ? ' · ' + f.station : ''}`,
+        color: '#d97706', bg: '#fffbeb',
+      }));
+    return [...propHouse, ...vehicle, ...fuel].sort((a, b) => new Date(b.date) - new Date(a.date));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allExpenses, carExpenses, fuelLogs, selY, selM]);
+
+  const totals = useMemo(() => {
+    const sum = (seg) => allItems.filter((i) => i.segment === seg).reduce((s, i) => s + i.amount, 0);
+    const property = sum('property'), vehicle = sum('vehicle'), fuel = sum('fuel'), household = sum('household');
+    return { property, vehicle, fuel, household, grand: property + vehicle + fuel + household };
+  }, [allItems]);
+
+  const catBreakdown = useMemo(() => {
+    const map = {};
+    allItems.forEach((i) => {
+      if (!map[i.category]) map[i.category] = { category: i.category, amount: 0, color: i.color, bg: i.bg };
+      map[i.category].amount += i.amount;
+    });
+    return Object.values(map)
+      .sort((a, b) => b.amount - a.amount)
+      .map((c) => ({ ...c, pct: totals.grand > 0 ? Math.round((c.amount / totals.grand) * 100) : 0 }));
+  }, [allItems, totals.grand]);
+
+  const barSegs = useMemo(() =>
+    Object.entries(SEG)
+      .map(([k, s]) => ({ ...s, key: k, amount: totals[k], pct: totals.grand > 0 ? (totals[k] / totals.grand) * 100 : 0 }))
+      .filter((s) => s.amount > 0),
+  [totals]);
+
+  const visibleItems = filter === 'all' ? allItems : allItems.filter((i) => i.segment === filter);
+
+  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const handleAdd = (e) => {
+    e.preventDefault();
+    if (!form.description || !form.amount) return toast.error('Fill description and amount');
+    dispatch(addExpense({ ...form, amount: Number(form.amount) }));
+    toast.success('Expense logged');
+    setShowAdd(false);
+    setForm(BLANK);
+  };
+  const openAdd = (seg = 'property') => {
+    setAddSeg(seg);
+    setForm({ ...BLANK, category: seg === 'household' ? 'Groceries' : 'Cleaning' });
+    setShowAdd(true);
+  };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-900 tracking-tight">Expenses</h1>
-          <p className="text-[13px] text-slate-400 mt-0.5">Track all villa expenditures and analyse spending patterns</p>
-        </div>
-        <Button variant="primary" icon={RiAddLine} onClick={() => setModal('add')}>Add Expense</Button>
-      </div>
+    <div className="space-y-6">
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label:'This Month',      value: fmtAED(thisMonth),      icon: RiCalendarLine,         color:'from-navy-600 to-navy-800'       },
-          { label:`Total ${yearFilt}`,value: fmtAED(totalYear),     icon: RiMoneyDollarCircleLine, color:'from-accent-500 to-accent-700'   },
-          { label:'Filtered Total',  value: fmtAED(totalFiltered),  icon: RiFilterLine,            color:'from-success-500 to-success-700' },
-          { label:'Top Category',    value: topCat?.cat ?? '—',     icon: RiLineChartLine,         color:'from-warning-500 to-orange-500'  },
-        ].map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-            className={cn('rounded-2xl p-5 text-white bg-linear-to-br', s.color)}>
-            <s.icon className="w-5 h-5 text-white/70 mb-3" />
-            <p className="text-xl font-bold leading-none">{s.value}</p>
-            <p className="text-[12px] text-white/70 mt-2">{s.label}</p>
+      {/* ── Header ── */}
+      <motion.div {...fade(0)} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+              <Receipt className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900">Expenses & Spending</h1>
+          </div>
+          <p className="text-slate-500 text-[13px]">Property, fleet, household & daily — all in one view</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl px-1 py-1">
+            <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors">
+              <ChevronLeft className="w-4 h-4 text-slate-500" />
+            </button>
+            <span className="text-[13px] font-bold text-slate-800 min-w-[118px] text-center px-1">
+              {MONTH_NAMES[selM]} {selY}
+            </span>
+            <button onClick={nextMonth} disabled={isCurrentMonth}
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-30">
+              <ChevronRight className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
+          <Button icon={Plus} onClick={() => openAdd('property')}>Log Expense</Button>
+        </div>
+      </motion.div>
+
+      {/* ── Summary Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Grand total */}
+        <motion.div {...fade(0.04)} className="col-span-2 lg:col-span-1">
+          <div className="rounded-2xl p-5 h-full flex flex-col justify-between"
+            style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow: '0 4px 20px rgba(11,29,58,0.3)' }}>
+            <div>
+              <Receipt className="w-6 h-6 text-blue-300 mb-2" />
+              <p className="text-blue-200/60 text-[11px] font-bold uppercase tracking-wider">Total Spending</p>
+            </div>
+            <div>
+              <p className="text-white font-bold text-2xl leading-tight mt-2">
+                AED {totals.grand.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-blue-300/50 text-[11px] mt-1">{allItems.length} transactions · {MONTH_NAMES[selM]}</p>
+            </div>
+          </div>
+        </motion.div>
+        {/* Segment cards */}
+        {Object.entries(SEG).map(([k, s], i) => (
+          <motion.div key={k} {...fade(0.06 + i * 0.04)}>
+            <button onClick={() => setFilter(filter === k ? 'all' : k)} className="w-full h-full text-left">
+              <div className={cn('bg-white rounded-2xl p-4 border h-full flex flex-col justify-between transition-all duration-200 hover:shadow-md',
+                filter === k ? 'ring-2' : '')}
+                style={{ borderColor: filter === k ? s.color : s.border, boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
+                  ...(filter === k ? { '--tw-ring-color': s.color } : {}) }}>
+                <div className="flex items-start justify-between">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: s.bg }}>
+                    <s.icon className="w-4 h-4" style={{ color: s.color }} />
+                  </div>
+                  {filter === k && <div className="w-2 h-2 rounded-full mt-1" style={{ background: s.color }} />}
+                </div>
+                <div className="mt-3">
+                  <p className="text-[20px] font-bold text-slate-900 leading-none">
+                    AED {totals[k].toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-400 mt-1 leading-tight">{s.label}</p>
+                  <p className="text-[10px] text-slate-300 mt-0.5">
+                    {totals.grand > 0 ? Math.round((totals[k] / totals.grand) * 100) : 0}% of total
+                  </p>
+                </div>
+              </div>
+            </button>
           </motion.div>
         ))}
       </div>
 
-      {/* Monthly bar chart */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 8px rgb(0 0 0/0.06)' }}>
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-[14px] font-bold text-navy-900">Monthly Spend — {yearFilt !== 'All' ? yearFilt : 'All Years'}</p>
-          <select value={yearFilt} onChange={(e) => setYearFilt(e.target.value)}
-            className="text-[12px] border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-accent-400 text-slate-600">
-            <option value="All">All Years</option>
-            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-        <div className="flex items-end gap-1 h-28">
-          {monthlyData.map((m) => (
-            <div key={m.month} className="flex-1 flex flex-col items-center gap-1 group">
-              <div className="relative w-full rounded-t-md transition-all" style={{ height: `${(m.total / maxMonthly) * 100}%`, minHeight: m.total > 0 ? '4px' : '0', background: 'linear-gradient(180deg, #3b82f6 0%, #1e40af 100%)' }}>
-                {m.total > 0 && (
-                  <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-navy-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    {fmtAED(m.total)}
-                  </div>
-                )}
-              </div>
-              <span className="text-[9px] text-slate-400 font-semibold">{m.month}</span>
+      {/* ── Breakdown ── */}
+      {totals.grand > 0 && (
+        <motion.div {...fade(0.16)}>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            <p className="text-[14px] font-bold text-slate-800 mb-4">Spending Breakdown — {MONTH_NAMES[selM]} {selY}</p>
+
+            {/* Stacked bar */}
+            <div className="flex rounded-full overflow-hidden h-3 mb-5">
+              {barSegs.map((s, idx) => (
+                <div key={s.key} style={{ width: `${s.pct}%`, background: s.color }}
+                  title={`${s.label}: AED ${s.amount.toFixed(0)} (${Math.round(s.pct)}%)`}
+                  className={cn('transition-all duration-500', idx === 0 && 'rounded-l-full', idx === barSegs.length - 1 && 'rounded-r-full')} />
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by title or vendor…"
-            className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-[13px] placeholder-slate-400 outline-none focus:ring-2 focus:ring-accent-400 transition-all" />
-        </div>
-        <select value={catFilt} onChange={(e) => setCatFilt(e.target.value)}
-          className="h-10 px-3.5 rounded-xl border border-slate-200 bg-white text-[13px] outline-none focus:ring-2 focus:ring-accent-400 text-slate-600">
-          <option value="All">All Categories</option>
-          {EXPENSE_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+              {/* Segment bars */}
+              <div className="space-y-3">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">By Segment</p>
+                {barSegs.map((s) => (
+                  <div key={s.key} className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: s.bg }}>
+                      <s.icon className="w-3.5 h-3.5" style={{ color: s.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[12px] font-semibold text-slate-700 truncate">{s.label}</span>
+                        <span className="text-[10px] text-slate-400 shrink-0 ml-2">{Math.round(s.pct)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s.pct}%`, background: s.color }} />
+                      </div>
+                    </div>
+                    <span className="text-[13px] font-bold text-slate-800 shrink-0 w-20 text-right">
+                      AED {s.amount.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                ))}
+              </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgb(0 0 0/0.06)' }}>
-        <div className="px-5 py-3.5 border-b border-slate-100 grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 text-[11px] font-bold text-slate-400 uppercase tracking-wide">
-          <span>Description</span>
-          <span className="hidden sm:block">Category</span>
-          <span className="hidden md:block">Vendor</span>
-          <span className="hidden sm:block text-right">Date</span>
-          <span className="text-right">Amount</span>
-        </div>
-        {filtered.length === 0 ? (
-          <div className="p-10 text-center">
-            <RiMoneyDollarCircleLine className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-            <p className="text-slate-400 font-semibold">No expenses match your filters</p>
-            <button onClick={() => setModal('add')} className="mt-3 text-accent-600 text-[13px] font-semibold hover:underline">+ Add first expense</button>
+              {/* Category list */}
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">By Category</p>
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                  {catBreakdown.map((c) => (
+                    <div key={c.category} className="flex items-center gap-2.5 py-0.5">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                      <span className="text-[12px] text-slate-600 flex-1 truncate">{c.category}</span>
+                      <span className="text-[10px] text-slate-400 w-8 text-right">{c.pct}%</span>
+                      <span className="text-[12px] font-bold text-slate-700 w-18 text-right">
+                        AED {c.amount.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {filtered.map((exp, i) => (
-              <motion.div key={exp.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ delay: i * 0.03 }}>
-                <ExpenseRow exp={exp} last={i === filtered.length-1} onEdit={() => setModal(exp)} onDelete={() => setDelTarget(exp)} />
-              </motion.div>
+        </motion.div>
+      )}
+
+      {/* ── Transaction List ── */}
+      <motion.div {...fade(0.22)}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+          {/* List header */}
+          <div className="p-5 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-50">
+            <div>
+              <p className="text-[14px] font-bold text-slate-800">All Transactions</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">{visibleItems.length} records · {MONTH_NAMES[selM]} {selY}</p>
+            </div>
+            <div className="flex gap-1 bg-slate-50 border border-slate-100 rounded-xl p-1">
+              {[
+                { k: 'all',       l: 'All'       },
+                { k: 'property',  l: 'Property'  },
+                { k: 'vehicle',   l: 'Vehicle'   },
+                { k: 'fuel',      l: 'Fuel'      },
+                { k: 'household', l: 'Household' },
+              ].map(({ k, l }) => (
+                <button key={k} onClick={() => setFilter(k)}
+                  className={cn('px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap',
+                    filter === k ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick add strip */}
+          <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-50/50 border-b border-slate-50">
+            <span className="text-[11px] text-slate-400 font-medium">Log expense →</span>
+            <button onClick={() => openAdd('property')}
+              className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors">
+              <Plus className="w-3 h-3" /> Property
+            </button>
+            <span className="text-slate-200">·</span>
+            <button onClick={() => openAdd('household')}
+              className="flex items-center gap-1 text-[11px] font-bold text-green-600 hover:text-green-800 transition-colors">
+              <Plus className="w-3 h-3" /> Household
+            </button>
+            <span className="text-slate-200">·</span>
+            <Link to="/cars" className="flex items-center gap-1 text-[11px] font-bold text-amber-600 hover:text-amber-800 transition-colors">
+              <ArrowUpRight className="w-3 h-3" /> Fleet (log from Cars page)
+            </Link>
+          </div>
+
+          {/* Rows */}
+          {visibleItems.length === 0 ? (
+            <div className="py-14 text-center">
+              <Receipt className="w-10 h-10 text-slate-200 mx-auto mb-3" strokeWidth={1.5} />
+              <p className="text-slate-400 text-[13px] font-medium">No {filter !== 'all' ? filter + ' ' : ''}expenses for {MONTH_NAMES[selM]} {selY}</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50/70">
+              {visibleItems.map((item) => {
+                const segCfg = SEG[item.segment];
+                const Icon   = segCfg?.icon ?? Receipt;
+                return (
+                  <div key={item.id}
+                    className="flex items-center gap-3.5 px-5 py-3 hover:bg-slate-50/60 transition-colors">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: item.bg }}>
+                      <Icon className="w-4 h-4" style={{ color: item.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">{item.description}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        {item.source && <span className="text-[11px] text-slate-400">{item.source}</span>}
+                        <span className="text-slate-200 text-[10px]">·</span>
+                        <span className="text-[11px] text-slate-300">
+                          {new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0"
+                      style={{ background: item.bg, color: item.color }}>
+                      {item.category}
+                    </span>
+                    <p className="text-[14px] font-bold text-slate-900 shrink-0 ml-1 tabular-nums">
+                      AED {item.amount.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {visibleItems.length > 0 && (
+            <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
+              <p className="text-[12px] text-slate-400">{visibleItems.length} records shown</p>
+              <p className="text-[13px] font-bold text-slate-800">
+                Total: AED {visibleItems.reduce((s, i) => s + i.amount, 0).toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+              </p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+
+      {/* ── Add Expense Modal ── */}
+      <Modal open={showAdd} onClose={() => setShowAdd(false)}
+        title="Log Expense"
+        subtitle="Property services, household & daily shopping"
+        size="md">
+        <form onSubmit={handleAdd} className="space-y-4">
+          {/* Segment toggle */}
+          <div className="flex gap-2">
+            {[
+              { k: 'property',  l: 'Property & Services', icon: Home,         c: '#2563eb' },
+              { k: 'household', l: 'Household & Daily',   icon: ShoppingCart, c: '#16a34a' },
+            ].map(({ k, l, icon: Icon, c }) => (
+              <button key={k} type="button"
+                onClick={() => { setAddSeg(k); setF('category', k === 'household' ? 'Groceries' : 'Cleaning'); }}
+                className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-[12px] font-bold transition-all')}
+                style={addSeg === k
+                  ? { borderColor: c, background: c, color: '#fff' }
+                  : { borderColor: '#e2e8f0', background: '#f8fafc', color: '#64748b' }}>
+                <Icon className="w-3.5 h-3.5" />{l}
+              </button>
             ))}
-          </AnimatePresence>
-        )}
-        {filtered.length > 0 && (
-          <div className="px-5 py-3.5 bg-navy-50 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[13px] font-bold text-navy-700">{filtered.length} entries</span>
-            <span className="text-[14px] font-bold text-navy-900">{fmtAED(totalFiltered)}</span>
           </div>
-        )}
-      </div>
-
-      <ExpenseModal open={modal !== null} expense={modal !== 'add' ? modal : null} companies={companies}
-        onClose={() => setModal(null)}
-        onSave={(data) => {
-          if (modal !== 'add') { dispatch(updateExpense({ ...modal, ...data })); toast.success('Expense updated!'); }
-          else { dispatch(addExpense({ ...data, date: data.date || new Date().toISOString().split('T')[0] })); toast.success('Expense added!'); }
-          setModal(null);
-        }}
-      />
-      <ConfirmDialog open={!!delTarget} onClose={() => setDelTarget(null)}
-        onConfirm={() => { dispatch(deleteExpense(delTarget.id)); toast.success('Expense deleted'); setDelTarget(null); }}
-        title="Delete Expense" message={`Delete "${delTarget?.description}"?`}
-      />
-    </motion.div>
-  );
-}
-
-function ExpenseRow({ exp, last, onEdit, onDelete }) {
-  const cls = CAT_COLORS[exp.category] ?? CAT_COLORS.Other;
-  return (
-    <div className={cn('grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-3.5 hover:bg-slate-50 transition-colors group', !last && 'border-b border-slate-50')}>
-      <div className="min-w-0">
-        <p className="text-[13px] font-semibold text-slate-800 truncate">{exp.description}</p>
-        {exp.notes && <p className="text-[11px] text-slate-400 truncate">{exp.notes}</p>}
-      </div>
-      <span className={cn('hidden sm:block text-[11px] font-semibold px-2.5 py-1 rounded-lg shrink-0', cls)}>{exp.category}</span>
-      <span className="hidden md:block text-[12px] text-slate-500 shrink-0 max-w-[120px] truncate">{exp.company ?? '—'}</span>
-      <span className="hidden sm:block text-[12px] text-slate-400 shrink-0">{fmtDate(exp.date)}</span>
-      <div className="flex items-center gap-2 shrink-0 justify-end">
-        <span className="text-[14px] font-bold text-navy-800">{fmtAED(exp.amount)}</span>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={onEdit}   className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-accent-600 hover:bg-accent-50 transition-all"><RiEditLine className="w-3.5 h-3.5" /></button>
-          <button onClick={onDelete} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-danger-500 hover:bg-danger-50 transition-all"><RiDeleteBinLine className="w-3.5 h-3.5" /></button>
-        </div>
-      </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Category</label>
+              <select value={form.category} onChange={(e) => setF('category', e.target.value)} className={INP}>
+                {(addSeg === 'household' ? HOUSE_CAT_OPTS : PROP_CAT_OPTS).map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Description *</label>
+              <input value={form.description} onChange={(e) => setF('description', e.target.value)} required
+                placeholder={addSeg === 'household' ? 'e.g. Weekly grocery shop' : 'e.g. Monthly pool service'}
+                className={INP} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Amount (AED) *</label>
+              <input value={form.amount} onChange={(e) => setF('amount', e.target.value)}
+                type="number" min="0" step="0.01" required placeholder="0.00" className={INP} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date</label>
+              <input value={form.date} onChange={(e) => setF('date', e.target.value)} type="date" className={INP} />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Vendor / Company</label>
+              <input value={form.vendor} onChange={(e) => setF('vendor', e.target.value)}
+                placeholder={addSeg === 'household' ? 'e.g. Lulu Hypermarket, Carrefour' : 'e.g. Clean Masters'}
+                className={INP} />
+            </div>
+          </div>
+          {/* Amount preview chip */}
+          {form.amount && form.category && (() => {
+            const cfg = EXPENSE_CATEGORIES[form.category];
+            return cfg ? (
+              <div className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: cfg.bg }}>
+                <div className="w-2 h-2 rounded-full" style={{ background: cfg.color }} />
+                <span className="text-[12px] font-bold" style={{ color: cfg.color }}>{form.category}</span>
+                <span className="ml-auto text-[16px] font-bold" style={{ color: cfg.color }}>
+                  AED {Number(form.amount).toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            ) : null;
+          })()}
+          <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
+            <Button variant="outline" type="button" onClick={() => setShowAdd(false)}>Cancel</Button>
+            <Button type="submit" icon={Plus}>Log Expense</Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
 
-function ExpenseModal({ open, onClose, expense, companies, onSave }) {
-  const { register, handleSubmit, reset } = useForm();
-  useEffect(() => {
-    if (!open) return;
-    reset(expense
-      ? { description: expense.description, category: expense.category, amount: expense.amount, date: expense.date, company: expense.company ?? '', notes: expense.notes ?? '' }
-      : { date: new Date().toISOString().split('T')[0] });
-  }, [open, expense]);
-
-  const onSubmit = (d) => {
-    onSave({ ...d, amount: parseFloat(d.amount) || 0 });
-  };
-
-  return (
-    <Modal open={open} onClose={onClose} title={expense ? 'Edit Expense' : 'Add Expense'} subtitle="Record a villa expenditure">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <Field label="Description" required>
-          <Input {...register('description', { required: 'Required' })} placeholder="e.g. AC annual service" />
-        </Field>
-        <FormGrid>
-          <Field label="Category" required>
-            <Select {...register('category', { required: 'Required' })} placeholder="Select category"
-              options={EXPENSE_CATS.map((c) => ({ value: c, label: c }))} />
-          </Field>
-          <Field label="Amount (AED)" required>
-            <Input {...register('amount', { required: 'Required' })} type="number" min="0" step="0.01" placeholder="0.00" />
-          </Field>
-        </FormGrid>
-        <FormGrid>
-          <Field label="Date" required>
-            <Input {...register('date', { required: 'Required' })} type="date" />
-          </Field>
-          <Field label="Company / Vendor">
-            <Input {...register('company')} placeholder="e.g. Cool Air LLC" />
-          </Field>
-        </FormGrid>
-        <Field label="Notes"><Textarea {...register('notes')} rows={2} placeholder="Invoice number, payment method, etc." /></Field>
-        <FormActions onCancel={onClose} submitLabel={expense ? 'Update Expense' : 'Add Expense'} />
-      </form>
-    </Modal>
-  );
-}
+const INP = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';

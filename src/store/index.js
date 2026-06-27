@@ -20,6 +20,7 @@ import notificationsReducer from './slices/notificationsSlice';
 import emergencyReducer    from './slices/emergencySlice';
 import expensesReducer     from './slices/expensesSlice';
 import settingsReducer     from './slices/settingsSlice';
+import carsReducer         from './slices/carsSlice';
 
 const rootReducer = combineReducers({
   auth:          authReducer,
@@ -35,6 +36,7 @@ const rootReducer = combineReducers({
   emergency:     emergencyReducer,
   expenses:      expensesReducer,
   settings:      settingsReducer,
+  cars:          carsReducer,
 });
 
 const persistConfig = {

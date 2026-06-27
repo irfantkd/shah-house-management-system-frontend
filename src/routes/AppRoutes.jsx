@@ -16,6 +16,8 @@ const AreasPage      = lazy(() => import('../pages/Areas'));
 const AreaDetail     = lazy(() => import('../pages/Areas/AreaDetail'));
 const AssetsPage     = lazy(() => import('../pages/Assets'));
 const AssetDetail    = lazy(() => import('../pages/Assets/AssetDetail'));
+const CarsPage       = lazy(() => import('../pages/Cars'));
+const CarDetail      = lazy(() => import('../pages/Cars/CarDetail'));
 const CompaniesPage  = lazy(() => import('../pages/Companies'));
 const CompanyDetail  = lazy(() => import('../pages/Companies/CompanyDetail'));
 const ContractsPage  = lazy(() => import('../pages/Contracts'));
@@ -56,6 +58,8 @@ export default function AppRoutes() {
             <Route path="areas/:id"  element={<AreaDetail />}  />
             <Route path="assets"     element={<AssetsPage />}  />
             <Route path="assets/:id" element={<AssetDetail />} />
+            <Route path="cars"       element={<CarsPage />}    />
+            <Route path="cars/:id"   element={<CarDetail />}   />
 
             {/* Operations */}
             <Route path="companies"     element={<CompaniesPage />}  />
