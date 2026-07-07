@@ -4,10 +4,11 @@ import { useSelector, useDispatch } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
   Home, Car, Fuel, ShoppingCart, ChevronLeft, ChevronRight,
-  Plus, Receipt, ArrowUpRight, Wrench,
+  Plus, Receipt, ArrowUpRight, Wrench, Wallet, AlertTriangle,
 } from 'lucide-react';
 import { selectExpenses, addExpense } from '../../store/slices/expensesSlice';
 import { selectCarExpenses, selectFuelLogs, selectCars } from '../../store/slices/carsSlice';
+import { selectVehicleWallet, selectHomeWallet, deductFromWallet, LOW_BALANCE_THRESHOLD } from '../../store/slices/walletSlice';
 import { EXPENSE_CATEGORIES } from '../../data/mockExpenses';
 import { CAR_EXPENSE_TYPES } from '../../data/mockCars';
 import Modal  from '../../components/ui/Modal';
@@ -25,11 +26,13 @@ const SEG = {
 };
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const catCfg      = (cat) => EXPENSE_CATEGORIES[cat] ?? { color: '#64748b', bg: '#f8fafc', segment: 'property' };
+const catCfg      = (cat) => EXPENSE_CATEGORIES[cat] ?? { color: '#64748b', bg: '#f1f5f9', segment: 'property' };
 
-const PROP_CAT_OPTS  = Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'property').map(([k]) => k);
-const HOUSE_CAT_OPTS = Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'household').map(([k]) => k);
-const BLANK = { category: 'Cleaning', description: '', amount: '', vendor: '', date: new Date().toISOString().split('T')[0] };
+const CUSTOM_KEY     = '__custom__';
+const CUSTOM_CFG     = { color: '#64748b', bg: '#f1f5f9' };
+const PROP_CAT_OPTS  = [...Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'property').map(([k]) => k),  CUSTOM_KEY];
+const HOUSE_CAT_OPTS = [...Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'household').map(([k]) => k), CUSTOM_KEY];
+const BLANK = { category: 'Cleaning', customCategory: '', description: '', amount: '', vendor: '', date: new Date().toISOString().split('T')[0], wallet: 'home' };
 
 export default function ExpensesPage() {
   const dispatch    = useDispatch();
@@ -37,6 +40,8 @@ export default function ExpensesPage() {
   const carExpenses = useSelector(selectCarExpenses);
   const fuelLogs    = useSelector(selectFuelLogs);
   const cars        = useSelector(selectCars);
+  const vehicleWallet = useSelector(selectVehicleWallet);
+  const homeWallet    = useSelector(selectHomeWallet);
 
   const now = new Date();
   const [period,  setPeriod]  = useState({ year: now.getFullYear(), month: now.getMonth() });
@@ -112,14 +117,30 @@ export default function ExpensesPage() {
   const handleAdd = (e) => {
     e.preventDefault();
     if (!form.description || !form.amount) return toast.error('Fill description and amount');
-    dispatch(addExpense({ ...form, amount: Number(form.amount) }));
-    toast.success('Expense logged');
+    if (form.category === CUSTOM_KEY && !form.customCategory.trim()) return toast.error('Enter a custom category name');
+    const amt             = Number(form.amount);
+    const selWallet       = form.wallet === 'vehicle' ? vehicleWallet : homeWallet;
+    const effectiveCat    = form.category === CUSTOM_KEY ? form.customCategory.trim() : form.category;
+    dispatch(addExpense({ ...form, category: effectiveCat, amount: amt }));
+    dispatch(deductFromWallet({
+      wallet:      form.wallet,
+      amount:      amt,
+      description: form.description,
+      date:        form.date,
+      category:    effectiveCat,
+    }));
+    const afterBal    = selWallet.balance - amt;
+    const walletLabel = form.wallet === 'vehicle' ? 'Vehicle' : 'Home';
+    if (afterBal < LOW_BALANCE_THRESHOLD)
+      toast(`${walletLabel} wallet now AED ${Math.max(0, afterBal).toLocaleString('en-AE', { maximumFractionDigits: 0 })} — top up soon`, { icon: '⚠️' });
+    else
+      toast.success(`Expense logged & deducted from ${walletLabel} Wallet`);
     setShowAdd(false);
     setForm(BLANK);
   };
   const openAdd = (seg = 'property') => {
     setAddSeg(seg);
-    setForm({ ...BLANK, category: seg === 'household' ? 'Groceries' : 'Cleaning' });
+    setForm({ ...BLANK, category: seg === 'household' ? 'Groceries' : 'Cleaning', wallet: 'home' });
     setShowAdd(true);
   };
 
@@ -365,6 +386,69 @@ export default function ExpensesPage() {
         subtitle="Property services, household & daily shopping"
         size="md">
         <form onSubmit={handleAdd} className="space-y-4">
+          {/* Wallet selector */}
+          <div>
+            <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-2">Deduct from Wallet</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { k: 'vehicle', label: 'Vehicle Wallet', icon: Car,  bal: vehicleWallet.balance, color: '#0b1d3a', bg: '#eef2fb' },
+                { k: 'home',    label: 'Home Wallet',    icon: Home, bal: homeWallet.balance,    color: '#16a34a', bg: '#f0fdf4' },
+              ].map(({ k, label, icon: Icon, bal, color, bg }) => (
+                <button key={k} type="button" onClick={() => setF('wallet', k)}
+                  className="flex flex-col gap-1.5 p-3 rounded-xl border-2 text-left transition-all"
+                  style={form.wallet === k
+                    ? { borderColor: color, background: bg }
+                    : { borderColor: '#e2e8f0', background: '#f8fafc' }}>
+                  <div className="flex items-center gap-1.5">
+                    <Icon className="w-3.5 h-3.5" style={{ color: form.wallet === k ? color : '#94a3b8' }} />
+                    <span className="text-[11px] font-bold truncate" style={{ color: form.wallet === k ? color : '#64748b' }}>{label}</span>
+                    {form.wallet === k && (
+                      <span className="ml-auto shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-black"
+                        style={{ background: color }}>✓</span>
+                    )}
+                  </div>
+                  <p className="text-[15px] font-bold" style={{ color: form.wallet === k ? color : '#94a3b8' }}>
+                    AED {bal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Selected wallet balance + after preview */}
+          {(() => {
+            const selW  = form.wallet === 'vehicle' ? vehicleWallet : homeWallet;
+            const wLbl  = form.wallet === 'vehicle' ? 'Vehicle Wallet' : 'Home Wallet';
+            const bal   = selW.balance;
+            const cost  = Number(form.amount) || 0;
+            const after = bal - cost;
+            const low   = bal < LOW_BALANCE_THRESHOLD;
+            const empty = bal <= 0;
+            return (
+              <div className={cn('flex items-center gap-3 p-3 rounded-xl border',
+                empty ? 'bg-red-50 border-red-200' : low ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
+                <Wallet className={cn('w-4 h-4 shrink-0', empty ? 'text-red-500' : low ? 'text-amber-600' : 'text-slate-400')} />
+                <div className="flex-1">
+                  <p className="text-[11px] text-slate-400">{wLbl} — deducted on submit</p>
+                  <p className={cn('text-[15px] font-bold', empty ? 'text-red-600' : low ? 'text-amber-700' : 'text-slate-800')}>
+                    AED {bal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+                {cost > 0 && (
+                  <div className="text-right shrink-0">
+                    <p className="text-[10px] text-slate-400">After</p>
+                    <p className={cn('text-[13px] font-bold', after < 0 ? 'text-red-600' : after < LOW_BALANCE_THRESHOLD ? 'text-amber-600' : 'text-emerald-600')}>
+                      AED {Math.max(0, after).toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                )}
+                {(empty || low) && (
+                  <Link to="/wallet" className={cn('shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg', empty ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
+                    {empty ? 'Deposit' : 'Top Up'}
+                  </Link>
+                )}
+              </div>
+            );
+          })()}
           {/* Segment toggle */}
           <div className="flex gap-2">
             {[
@@ -384,10 +468,25 @@ export default function ExpensesPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Category</label>
-              <select value={form.category} onChange={(e) => setF('category', e.target.value)} className={INP}>
-                {(addSeg === 'household' ? HOUSE_CAT_OPTS : PROP_CAT_OPTS).map((c) => <option key={c} value={c}>{c}</option>)}
+              <select value={form.category} onChange={(e) => { setF('category', e.target.value); setF('customCategory', ''); }} className={INP}>
+                {(addSeg === 'household' ? HOUSE_CAT_OPTS : PROP_CAT_OPTS).map((c) => (
+                  <option key={c} value={c}>{c === CUSTOM_KEY ? '✏️ Custom…' : c}</option>
+                ))}
               </select>
             </div>
+            {form.category === CUSTOM_KEY && (
+              <div className="col-span-2">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Custom Category Name *</label>
+                <input
+                  value={form.customCategory}
+                  onChange={(e) => setF('customCategory', e.target.value)}
+                  required
+                  placeholder="e.g. Internet Bill, Water Bill, Satellite TV…"
+                  className={INP}
+                  autoFocus
+                />
+              </div>
+            )}
             <div className="col-span-2">
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Description *</label>
               <input value={form.description} onChange={(e) => setF('description', e.target.value)} required
@@ -412,16 +511,18 @@ export default function ExpensesPage() {
           </div>
           {/* Amount preview chip */}
           {form.amount && form.category && (() => {
-            const cfg = EXPENSE_CATEGORIES[form.category];
-            return cfg ? (
+            const isCustom  = form.category === CUSTOM_KEY;
+            const cfg       = isCustom ? CUSTOM_CFG : (EXPENSE_CATEGORIES[form.category] ?? CUSTOM_CFG);
+            const catLabel  = isCustom ? (form.customCategory.trim() || 'Custom') : form.category;
+            return (
               <div className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: cfg.bg }}>
                 <div className="w-2 h-2 rounded-full" style={{ background: cfg.color }} />
-                <span className="text-[12px] font-bold" style={{ color: cfg.color }}>{form.category}</span>
+                <span className="text-[12px] font-bold" style={{ color: cfg.color }}>{catLabel}</span>
                 <span className="ml-auto text-[16px] font-bold" style={{ color: cfg.color }}>
                   AED {Number(form.amount).toLocaleString('en-AE', { maximumFractionDigits: 0 })}
                 </span>
               </div>
-            ) : null;
+            );
           })()}
           <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
             <Button variant="outline" type="button" onClick={() => setShowAdd(false)}>Cancel</Button>

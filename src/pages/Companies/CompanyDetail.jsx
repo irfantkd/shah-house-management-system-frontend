@@ -6,8 +6,11 @@ import {
   Clock, DollarSign, ChevronRight, Download, Eye, Trash2,
   CheckCircle2, Calendar, User, Building2, AlertCircle,
 } from 'lucide-react';
-import { getCompanyById, CATEGORY_CFG } from '../../data/mockCompanies';
-import { getContractsByCompany } from '../../data/mockContracts';
+import { useSelector } from 'react-redux';
+import { CATEGORY_CFG } from '../../data/mockCompanies';
+import { selectCompanyById } from '../../store/slices/companiesSlice';
+import { selectContractsByCompany } from '../../store/slices/contractsSlice';
+import { selectTasks } from '../../store/slices/tasksSlice';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
@@ -33,19 +36,21 @@ function StarRating({ rating }) {
 
 export default function CompanyDetail() {
   const { id } = useParams();
-  const company = getCompanyById(id);
+  const company   = useSelector(selectCompanyById(id));
+  const contracts = useSelector(selectContractsByCompany(id));
+  const allTasks  = useSelector(selectTasks);
+  const [activeTab, setActiveTab] = useState(0);
 
   if (!company) return <Navigate to="/companies" replace />;
 
-  const [activeTab, setActiveTab] = useState(0);
-  const contracts = getContractsByCompany(id);
+  const companyTasks = allTasks.filter((t) => t.companyId === id);
   const cfg = CATEGORY_CFG[company.category] ?? { avatar: 'bg-navy-600' };
 
   const tabs = [
     { label: 'Overview',        count: null },
     { label: 'Contracts',       count: contracts.length },
-    { label: 'Service History', count: company.serviceHistory.length },
-    { label: 'Documents',       count: company.documents.length },
+    { label: 'Service History', count: companyTasks.filter((t) => t.status === 'completed').length },
+    { label: 'Documents',       count: company.documents?.length ?? 0 },
   ];
 
   return (
@@ -162,7 +167,7 @@ export default function CompanyDetail() {
           >
             {activeTab === 0 && <OverviewTab company={company} />}
             {activeTab === 1 && <ContractsTab contracts={contracts} />}
-            {activeTab === 2 && <ServiceHistoryTab history={company.serviceHistory} />}
+            {activeTab === 2 && <ServiceHistoryTab tasks={companyTasks} />}
             {activeTab === 3 && <DocumentsTab docs={company.documents} />}
           </motion.div>
         </AnimatePresence>
@@ -264,8 +269,11 @@ function ContractsTab({ contracts }) {
   );
 }
 
-function ServiceHistoryTab({ history }) {
-  if (history.length === 0) {
+function ServiceHistoryTab({ tasks }) {
+  const completed = tasks
+    .filter((t) => t.status === 'completed')
+    .sort((a, b) => (b.completedDate ?? '').localeCompare(a.completedDate ?? ''));
+  if (completed.length === 0) {
     return (
       <div className="text-center py-10">
         <Clock className="w-10 h-10 text-slate-200 mx-auto mb-2" />
@@ -275,18 +283,22 @@ function ServiceHistoryTab({ history }) {
   }
   return (
     <div className="space-y-3">
-      {history.map((h) => (
-        <div key={h.id} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
-          <div className="w-9 h-9 rounded-xl bg-success-50 flex items-center justify-center flex-shrink-0">
+      {completed.map((t) => (
+        <div key={t.id} className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+          <div className="w-9 h-9 rounded-xl bg-success-50 flex items-center justify-center shrink-0">
             <CheckCircle2 className="w-4 h-4 text-success-500" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-slate-800">{h.type}</p>
-            <p className="text-[12px] text-slate-400">Asset: {h.asset}</p>
+            <p className="text-[13px] font-semibold text-slate-800">{t.title}</p>
+            <p className="text-[12px] text-slate-400">{t.type ?? t.category} · {t.areaName} › {t.assetName}</p>
           </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-[13px] font-semibold text-navy-700">AED {h.cost}</p>
-            <p className="text-[11px] text-slate-400">{new Date(h.date).toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          <div className="text-right shrink-0">
+            <p className="text-[13px] font-semibold text-navy-700">AED {(t.actualCost ?? t.estimatedCost ?? 0).toLocaleString()}</p>
+            <p className="text-[11px] text-slate-400">
+              {t.completedDate
+                ? new Date(t.completedDate + 'T00:00:00').toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' })
+                : '—'}
+            </p>
           </div>
         </div>
       ))}

@@ -17,8 +17,7 @@ import {
 } from 'react-icons/ri';
 import { selectAreaById } from '../../store/slices/areasSlice';
 import { selectAssets, updateAsset } from '../../store/slices/assetsSlice';
-import { selectMaintenance } from '../../store/slices/maintenanceSlice';
-import { selectRepairs } from '../../store/slices/repairsSlice';
+import { selectTasks } from '../../store/slices/tasksSlice';
 import Badge from '../../components/ui/Badge';
 import { cn } from '../../utils/cn';
 
@@ -82,8 +81,7 @@ export default function AreaDetail() {
 
   const area    = useSelector(selectAreaById(id));
   const allAssets = useSelector(selectAssets);
-  const maintenance = useSelector(selectMaintenance);
-  const repairs     = useSelector(selectRepairs);
+  const tasks = useSelector(selectTasks);
 
   const areaAssets    = useMemo(() => allAssets.filter((a) => a.areaId === id), [allAssets, id]);
   const otherAssets   = useMemo(() => allAssets.filter((a) => a.areaId !== id), [allAssets, id]);
@@ -100,10 +98,9 @@ export default function AreaDetail() {
 
   const filteredAssets = areaAssets.filter((a) => statusFilter === 'all' || a.status === statusFilter);
 
-  const areaHistory = [
-    ...maintenance.filter((m) => m.areaId === id || m.areaName === area.name),
-    ...repairs.filter((r) => r.areaId === id || r.areaName === area.name),
-  ].sort((a, b) => new Date(b.scheduledDate ?? b.reportedDate) - new Date(a.scheduledDate ?? a.reportedDate));
+  const areaHistory = tasks
+    .filter((t) => t.areaId === id || t.areaName === area.name)
+    .sort((a, b) => new Date(b.scheduledDate) - new Date(a.scheduledDate));
 
   const handleUnassign = (asset) => {
     dispatch(updateAsset({ ...asset, areaId: '', areaName: '' }));
@@ -423,75 +420,114 @@ export default function AreaDetail() {
 function AssetCard({ asset, onUnassign }) {
   const cm = catMeta(asset.category);
   const sm = statusMeta(asset.status);
-  const StatusIcon = sm.icon;
   const warrantyDays = daysUntil(asset.warranty?.expiryDate);
   const nextService  = asset.maintenance?.nextService;
+  const warrantyColor = warrantyDays === null ? null : warrantyDays < 0 ? '#dc2626' : warrantyDays < 90 ? '#d97706' : '#16a34a';
+  const warrantyBg    = warrantyDays === null ? null : warrantyDays < 0 ? '#fef2f2' : warrantyDays < 90 ? '#fffbeb' : '#f0fdf4';
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
-      style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+    <div
+      className="group rounded-3xl overflow-hidden bg-white flex flex-col"
+      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)' }}>
 
-      {/* Category colour strip */}
-      <div className="h-1.5 w-full" style={{ background: cm.color + '80' }} />
+      {/* ══ HEADER — dark navy ══ */}
+      <div
+        className="relative px-5 pt-4 pb-4 overflow-hidden"
+        style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
 
-      <div className="p-4">
-        <div className="flex items-start gap-3 mb-3">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: cm.bg }}>
-            <cm.icon className="w-5 h-5" style={{ color: cm.color }} />
+        {/* Category accent bar */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:cm.color, opacity:0.85 }} />
+
+        {/* Decorative rings */}
+        <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none' }} />
+
+        {/* Ghost watermark */}
+        <div style={{
+          position:'absolute', right:12, bottom:-6,
+          fontSize:68, fontWeight:900, lineHeight:1,
+          color:'rgba(255,255,255,0.04)',
+          letterSpacing:'-2px',
+          userSelect:'none', pointerEvents:'none',
+        }}>
+          {asset.name.substring(0,4).toUpperCase()}
+        </div>
+
+        {/* Status badge */}
+        <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
+          style={{ background: sm.bg, color: sm.color, zIndex:10 }}>
+          <sm.icon className="w-3 h-3" />{sm.label}
+        </div>
+
+        {/* Category icon + name — fully inside header */}
+        <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
+          <div
+            className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center"
+            style={{ background:`${cm.color}22`, border:'2.5px solid rgba(255,255,255,0.12)', boxShadow:`0 4px 16px ${cm.color}40` }}>
+            <cm.icon className="w-7 h-7" style={{ color: cm.color }} />
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-bold text-slate-900 leading-tight truncate">{asset.name}</h3>
-            <p className="text-[12px] text-slate-400 truncate mt-0.5">
-              {[asset.brand, asset.model].filter(Boolean).join(' · ') || 'No model info'}
+          <div className="min-w-0 flex-1 pr-10">
+            <p className="text-[17px] font-black text-white leading-tight truncate">{asset.name}</p>
+            <p className="text-[11px] font-semibold mt-0.5" style={{ color:'rgba(255,255,255,0.42)' }}>
+              {[asset.brand, asset.model].filter(Boolean).join(' · ') || cm.label}
             </p>
           </div>
         </div>
 
-        {/* Status */}
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold" style={{ background: sm.bg, color: sm.color }}>
-            <StatusIcon className="w-3.5 h-3.5" />{sm.label}
-          </div>
-          <span className="text-[11px] font-semibold px-2 py-1 rounded-lg" style={{ background: cm.bg, color: cm.color }}>
-            {cm.label}
-          </span>
-        </div>
-
-        {/* Info rows */}
-        <div className="space-y-1.5 border-t border-slate-50 pt-3">
-          {warrantyDays !== null && (
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-slate-400">Warranty</span>
-              <span className={cn('font-semibold',
-                warrantyDays < 0 ? 'text-red-500' : warrantyDays < 90 ? 'text-amber-600' : 'text-emerald-600')}>
-                {warrantyDays < 0 ? 'Expired' : `${warrantyDays}d left`}
-              </span>
-            </div>
-          )}
-          {nextService && (
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-slate-400">Next Service</span>
-              <span className="font-semibold text-slate-700">{fmtDate(nextService)}</span>
-            </div>
-          )}
-          {asset.purchasePrice && (
-            <div className="flex items-center justify-between text-[12px]">
-              <span className="text-slate-400">Value</span>
-              <span className="font-semibold text-slate-700">AED {asset.purchasePrice.toLocaleString()}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-50">
-          <Link to={`/assets/${asset.id}`}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all">
-            <RiArrowRightLine className="w-3.5 h-3.5" />View Details
-          </Link>
+        {/* Unassign button — hover reveal */}
+        <div className="absolute bottom-3.5 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
           <button onClick={onUnassign} title="Unassign from this area"
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 border border-slate-200 hover:border-red-200 transition-all shrink-0">
-            <RiCloseCircleLine className="w-4 h-4" />
+            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-red-300 hover:bg-red-500/25 border border-white/10 transition-all">
+            <RiCloseCircleLine className="w-3.5 h-3.5" />
           </button>
+        </div>
+      </div>
+
+      {/* ══ BODY ══ */}
+      <div className="flex-1 flex flex-col px-5 pt-4 pb-4 gap-3">
+
+        {/* Warranty pill */}
+        {warrantyDays !== null && (
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl"
+            style={{ background: warrantyBg ?? '#f8fafc', border:`1px solid ${warrantyColor ? warrantyColor + '22' : '#f1f5f9'}` }}>
+            <span className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: warrantyColor ?? '#64748b' }}>
+              <RiShieldCheckLine className="w-3.5 h-3.5" /> Warranty
+            </span>
+            <span className="text-[12px] font-bold" style={{ color: warrantyColor ?? '#64748b' }}>
+              {warrantyDays < 0 ? 'Expired' : `${warrantyDays}d left`}
+            </span>
+          </div>
+        )}
+
+        {/* Next service */}
+        {nextService && (
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl bg-slate-50"
+            style={{ border:'1px solid #f1f5f9' }}>
+            <span className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-500">
+              <RiCalendarCheckLine className="w-3.5 h-3.5" /> Next Service
+            </span>
+            <span className="text-[12px] font-bold text-slate-700">{fmtDate(nextService)}</span>
+          </div>
+        )}
+
+        <div className="flex-1" />
+
+        {/* Footer */}
+        <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+          <div>
+            {asset.purchasePrice && (
+              <>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Value</p>
+                <p className="text-[16px] font-black leading-tight" style={{ color:'#0b1d3a' }}>
+                  AED {asset.purchasePrice.toLocaleString()}
+                </p>
+              </>
+            )}
+          </div>
+          <Link to={`/assets/${asset.id}`}
+            className="flex items-center gap-1.5 text-[12px] font-bold text-slate-400 hover:text-slate-800 transition-colors">
+            View <RiArrowRightLine className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </div>
     </div>

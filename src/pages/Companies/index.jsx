@@ -19,8 +19,29 @@ import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
 
 const CATS = Object.keys(CATEGORY_CFG);
-const AVATAR_COLORS = ['bg-navy-700','bg-accent-600','bg-success-600','bg-warning-600','bg-danger-600','bg-purple-600','bg-cyan-600','bg-orange-600'];
-const avatarColor = (name) => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+
+// Hex accent colour per category — used for accent bar + avatar glow
+const CAT_HEX = {
+  'Climate / AC':      '#2563eb',
+  'Pool & Water':      '#0891b2',
+  'Garden':            '#16a34a',
+  'Cleaning':          '#9333ea',
+  'Security / CCTV':   '#1e3a6e',
+  'Electrical':        '#d97706',
+  'Plumbing':          '#1d4ed8',
+  'Pest Control':      '#ea580c',
+  'Painting':          '#e11d48',
+  'Power / Generator': '#ca8a04',
+};
+const catColor = (cat) => CAT_HEX[cat] ?? '#0b1d3a';
+
+// First two initials from company name
+const initials = (name) => {
+  const parts = name.trim().split(/\s+/);
+  return parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : name.substring(0, 2).toUpperCase();
+};
 
 function StarRow({ rating }) {
   return (
@@ -153,38 +174,120 @@ export default function CompaniesPage() {
 }
 
 function CompanyCard({ company: c, onEdit, onDelete }) {
+  const color = catColor(c.category);
+  const inits = initials(c.name);
+  const rating = c.rating ?? 0;
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-md transition-all duration-200 group" style={{ boxShadow: '0 1px 8px rgb(0 0 0/0.06)' }}>
-      <div className="h-1 bg-gradient-to-r from-navy-600 to-accent-500" />
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-[16px] flex-shrink-0', avatarColor(c.name))}>
-              {c.name.charAt(0)}
-            </div>
-            <div>
-              <h3 className="text-[14px] font-bold text-slate-900 leading-tight">{c.name}</h3>
-              <StarRow rating={c.rating ?? 0} />
-            </div>
+    <div className="group rounded-3xl overflow-hidden bg-white flex flex-col"
+      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.10)' }}>
+
+      {/* ── HEADER ── */}
+      <div className="relative px-5 pt-4 pb-4 overflow-hidden"
+        style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
+
+        {/* category accent bar */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:color, zIndex:2 }} />
+
+        {/* white sheen */}
+        <div style={{
+          position:'absolute', top:-60, right:-60, width:200, height:200,
+          borderRadius:'50%', background:'rgba(255,255,255,0.03)', pointerEvents:'none',
+        }} />
+
+        {/* decorative rings */}
+        <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none' }} />
+
+        {/* ghost watermark */}
+        <div style={{
+          position:'absolute', right:8, bottom:-6,
+          fontSize:72, fontWeight:900, lineHeight:1,
+          color:'rgba(255,255,255,0.04)', letterSpacing:'-3px',
+          userSelect:'none', pointerEvents:'none', zIndex:1,
+        }}>{inits}</div>
+
+        {/* rating badge – top right */}
+        {rating > 0 && (
+          <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
+            style={{ background:'rgba(251,191,36,0.14)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.25)', zIndex:10 }}>
+            <RiStarFill className="w-3 h-3" />
+            {rating.toFixed(1)}
+          </div>
+        )}
+
+        {/* avatar + name row – fully inside header */}
+        <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
+          <div className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center text-[17px] font-black text-white select-none"
+            style={{
+              background:`${color}28`,
+              border:`2.5px solid rgba(255,255,255,0.13)`,
+              boxShadow:`0 4px 20px ${color}40`,
+            }}>
+            {inits}
+          </div>
+          <div className="min-w-0 flex-1 pr-10">
+            <p className="text-[16px] font-black text-white leading-tight truncate">{c.name}</p>
+            <p className="text-[11px] font-semibold mt-0.5" style={{ color:'rgba(255,255,255,0.42)' }}>
+              {c.category}
+            </p>
           </div>
         </div>
-        <div className="mb-1">
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-navy-50 text-navy-700">{c.category}</span>
+
+        {/* edit / delete – reveal on hover */}
+        <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
+          <button onClick={(e) => { e.preventDefault(); onEdit(); }}
+            className="w-7 h-7 rounded-xl flex items-center justify-center border transition-all"
+            style={{ color:'rgba(255,255,255,0.6)', borderColor:'rgba(255,255,255,0.12)', background:'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background='rgba(255,255,255,0.12)'; e.currentTarget.style.color='#fff'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='rgba(255,255,255,0.6)'; }}>
+            <RiEditLine className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={(e) => { e.preventDefault(); onDelete(); }}
+            className="w-7 h-7 rounded-xl flex items-center justify-center border transition-all"
+            style={{ color:'rgba(255,255,255,0.6)', borderColor:'rgba(255,255,255,0.12)', background:'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background='rgba(239,68,68,0.22)'; e.currentTarget.style.color='#fca5a5'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background='transparent'; e.currentTarget.style.color='rgba(255,255,255,0.6)'; }}>
+            <RiDeleteBinLine className="w-3.5 h-3.5" />
+          </button>
         </div>
-        {c.tagline && <p className="text-[12px] text-slate-500 mt-2 mb-3 line-clamp-1">{c.tagline}</p>}
-        {c.contact?.person && (
-          <p className="flex items-center gap-1.5 text-[12px] text-slate-500 mb-1"><RiUserLine className="w-3.5 h-3.5 text-slate-400" />{c.contact.person}</p>
+      </div>
+
+      {/* ── BODY ── */}
+      <div className="flex-1 flex flex-col px-5 pt-4 pb-4 gap-3">
+        {c.tagline && (
+          <p className="text-[12px] text-slate-400 line-clamp-1">{c.tagline}</p>
         )}
-        {c.contact?.phone && (
-          <p className="flex items-center gap-1.5 text-[12px] text-slate-500"><RiPhoneLine className="w-3.5 h-3.5 text-slate-400" />{c.contact.phone}</p>
-        )}
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-50">
-          <span className="text-[11px] text-slate-400">{c.activeContracts ?? 0} contracts · AED {(c.totalSpent ?? 0).toLocaleString()}</span>
-          <div className="flex items-center gap-1">
-            <button onClick={onEdit}   title="Edit" className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-accent-600 hover:bg-accent-50 transition-all"><RiEditLine className="w-3.5 h-3.5" /></button>
-            <button onClick={onDelete} title="Delete" className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-danger-500 hover:bg-danger-50 transition-all"><RiDeleteBinLine className="w-3.5 h-3.5" /></button>
-            <Link to={`/companies/${c.id}`} title="Details" className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-navy-700 hover:bg-navy-50 transition-all"><RiArrowRightLine className="w-3.5 h-3.5" /></Link>
+
+        <div className="space-y-2">
+          {c.contact?.person && (
+            <div className="flex items-center gap-2 text-[12px] text-slate-600">
+              <RiUserLine className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+              <span className="font-medium truncate">{c.contact.person}</span>
+            </div>
+          )}
+          {c.contact?.phone && (
+            <div className="flex items-center gap-2 text-[12px] text-slate-500">
+              <RiPhoneLine className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+              <span className="truncate">{c.contact.phone}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1" />
+
+        {/* footer */}
+        <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Contracts · Spent</p>
+            <p className="text-[13px] font-bold" style={{ color:'#0b1d3a' }}>
+              {c.activeContracts ?? 0} · AED {(c.totalSpent ?? 0).toLocaleString()}
+            </p>
           </div>
+          <Link to={`/companies/${c.id}`}
+            className="flex items-center gap-1 text-[12px] font-bold text-slate-400 hover:text-navy-800 transition-colors">
+            View <RiArrowRightLine className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </div>
     </div>
@@ -192,9 +295,12 @@ function CompanyCard({ company: c, onEdit, onDelete }) {
 }
 
 function CompanyRow({ company: c, onEdit, onDelete, last }) {
+  const color = catColor(c.category);
+  const inits = initials(c.name);
   return (
     <div className={cn('flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors group', !last && 'border-b border-slate-50')}>
-      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-[14px] flex-shrink-0', avatarColor(c.name))}>{c.name.charAt(0)}</div>
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-[13px] flex-shrink-0 select-none"
+        style={{ background:`${color}cc` }}>{inits}</div>
       <div className="flex-1 min-w-0">
         <p className="text-[14px] font-semibold text-slate-800 truncate">{c.name}</p>
         <p className="text-[11px] text-slate-400">{c.category}</p>

@@ -8,10 +8,9 @@ import {
   RiShieldCheckLine, RiMoneyDollarCircleLine, RiCheckboxCircleLine,
   RiCloseLine,
 } from 'react-icons/ri';
-import { selectMaintenance } from '../../store/slices/maintenanceSlice';
+import { selectTasks }   from '../../store/slices/tasksSlice';
 import { selectContracts }   from '../../store/slices/contractsSlice';
 import { selectAssets }      from '../../store/slices/assetsSlice';
-import { selectRepairs }     from '../../store/slices/repairsSlice';
 import { selectExpenses }    from '../../store/slices/expensesSlice';
 import { cn } from '../../utils/cn';
 
@@ -20,7 +19,7 @@ const EVENT_CFG = {
   maintenance: { label: 'Maintenance', dot: '#3b82f6', bg: '#eff6ff', color: '#1d4ed8', icon: RiCalendarCheckLine,      link: '/maintenance' },
   overdue:     { label: 'Overdue',     dot: '#dc2626', bg: '#fef2f2', color: '#b91c1c', icon: RiAlertLine,              link: '/maintenance' },
   completed:   { label: 'Completed',   dot: '#16a34a', bg: '#f0fdf4', color: '#15803d', icon: RiCheckboxCircleLine,     link: '/maintenance' },
-  repair:      { label: 'Repair',      dot: '#ea580c', bg: '#fff7ed', color: '#c2410c', icon: RiToolsLine,              link: '/repairs'     },
+  repair:      { label: 'Repair',      dot: '#ea580c', bg: '#fff7ed', color: '#c2410c', icon: RiToolsLine,              link: '/maintenance' },
   contract:    { label: 'Contract',    dot: '#d97706', bg: '#fffbeb', color: '#b45309', icon: RiFileList3Line,          link: '/contracts'   },
   warranty:    { label: 'Warranty',    dot: '#7c3aed', bg: '#f5f3ff', color: '#6d28d9', icon: RiShieldCheckLine,        link: '/assets'      },
   expense:     { label: 'Expense',     dot: '#0891b2', bg: '#ecfeff', color: '#0e7490', icon: RiMoneyDollarCircleLine,  link: '/expenses'    },
@@ -52,10 +51,9 @@ function fmtDate(s) {
 const todayStr = toDateStr(new Date());
 
 export default function CalendarPageView() {
-  const maintenance = useSelector(selectMaintenance);
-  const contracts   = useSelector(selectContracts);
-  const assets      = useSelector(selectAssets);
-  const repairs     = useSelector(selectRepairs);
+  const tasks     = useSelector(selectTasks);
+  const contracts = useSelector(selectContracts);
+  const assets    = useSelector(selectAssets);
   const expenses    = useSelector(selectExpenses);
 
   const [viewDate,    setViewDate]    = useState(() => new Date(new Date().getFullYear(), new Date().getMonth()));
@@ -70,33 +68,19 @@ export default function CalendarPageView() {
   const allEvents = useMemo(() => {
     const evs = [];
 
-    /* Maintenance — all statuses */
-    maintenance.forEach((m) => {
-      const dateStr = m.status === 'completed' ? (m.completedDate || m.scheduledDate) : m.scheduledDate;
+    /* All tasks (maintenance + repairs + custom) */
+    tasks.forEach((t) => {
+      const dateStr = t.status === 'completed' ? (t.completedDate || t.scheduledDate) : t.scheduledDate;
       if (!dateStr) return;
+      const isRepair = t.category === 'Repair';
       evs.push({
-        id:    m.id,
-        title: m.title,
+        id:    t.id,
+        title: t.title,
         date:  dateStr,
-        type:  m.status === 'completed' ? 'completed' : m.status === 'overdue' ? 'overdue' : 'maintenance',
-        meta:  m.companyName ?? m.areaName ?? '',
+        type:  t.status === 'completed' ? 'completed' : t.status === 'overdue' ? 'overdue' : isRepair ? 'repair' : 'maintenance',
+        meta:  t.companyName ?? t.areaName ?? '',
         link:  '/maintenance',
-        sub:   m.areaName,
-      });
-    });
-
-    /* Repairs — all except archived */
-    repairs.forEach((r) => {
-      const dateStr = r.scheduledDate || r.reportedDate;
-      if (!dateStr) return;
-      evs.push({
-        id:    r.id,
-        title: r.title,
-        date:  dateStr,
-        type:  'repair',
-        meta:  r.companyName ?? '',
-        link:  '/repairs',
-        sub:   r.areaName ?? '',
+        sub:   t.areaName ?? '',
       });
     });
 
@@ -148,7 +132,7 @@ export default function CalendarPageView() {
     });
 
     return evs;
-  }, [maintenance, contracts, assets, repairs, expenses]);
+  }, [tasks, contracts, assets, expenses]);
 
   /* Apply type filter */
   const filteredEvents = useMemo(() => (

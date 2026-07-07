@@ -695,82 +695,96 @@ function ListHeader() {
 
 function AreaCard({ area, assetCount, onEdit, onDelete }) {
   const meta = typeMeta(area.type);
+  // pull the first hex from the gradient for accent chip colour
+  const accentColor = (meta.grad.match(/#[a-f0-9]{6}/gi) ?? ['#0b1d3a'])[0];
+
   return (
-    <Link
-      to={`/areas/${area.id}`}
-      className="block bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-200 group"
-      style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }}
-    >
+    <Link to={`/areas/${area.id}`} className="block group">
       <div
-        className="relative h-32 flex items-center justify-center"
-        style={{ background: meta.grad }}
-      >
-        <span className="text-4xl drop-shadow select-none">{meta.emoji}</span>
-        <span className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-bold bg-white/90 text-slate-700 px-2 py-0.5 rounded-full">
-          <RiBox3Line className="w-3 h-3" />
-          {assetCount} asset{assetCount !== 1 ? "s" : ""}
-        </span>
-        {area.floor && (
-          <span className="absolute bottom-2 left-2 text-[10px] font-bold text-white/80 bg-black/25 px-2 py-0.5 rounded-full">
-            {area.floor}
-          </span>
-        )}
-        <span className="absolute bottom-2 right-2 text-[10px] font-bold text-white/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-          View <RiArrowRightLine className="w-3 h-3" />
-        </span>
-      </div>
-      <div className="p-4">
-        <h3 className="text-[15px] font-bold text-slate-900 leading-tight mb-1.5 truncate">
-          {area.name}
-        </h3>
-        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-          {area.type && (
-            <span
-              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: meta.light, color: meta.text }}
-            >
-              {meta.emoji} {area.type}
-            </span>
+        className="rounded-3xl overflow-hidden bg-white flex flex-col"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)" }}>
+
+        {/* ══ HEADER — type gradient, emoji + name inside ══ */}
+        <div
+          className="relative px-5 pt-4 pb-4 overflow-hidden"
+          style={{ background: meta.grad }}>
+
+          {/* White sheen bar at very top */}
+          <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"rgba(255,255,255,0.25)" }} />
+
+          {/* Decorative rings */}
+          <div style={{ position:"absolute", top:-36, right:-36, width:130, height:130, borderRadius:"50%", border:"1px solid rgba(255,255,255,0.15)", pointerEvents:"none" }} />
+          <div style={{ position:"absolute", top:-18, right:-18, width:80,  height:80,  borderRadius:"50%", border:"1px solid rgba(255,255,255,0.2)",  pointerEvents:"none" }} />
+
+          {/* Ghost watermark */}
+          <div style={{
+            position:"absolute", right:10, bottom:-4,
+            fontSize:72, fontWeight:900, lineHeight:1,
+            color:"rgba(255,255,255,0.08)",
+            letterSpacing:"-3px",
+            userSelect:"none", pointerEvents:"none",
+          }}>
+            {meta.emoji}
+          </div>
+
+          {/* Asset count badge */}
+          <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
+            style={{ background:"rgba(0,0,0,0.28)", zIndex:10 }}>
+            <RiBox3Line className="w-3 h-3" />
+            {assetCount}
+          </div>
+
+          {/* Emoji + name row — fully inside header */}
+          <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
+            <div
+              className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center text-[28px] select-none"
+              style={{ background:"rgba(0,0,0,0.22)", border:"2.5px solid rgba(255,255,255,0.25)" }}>
+              {meta.emoji}
+            </div>
+            <div className="min-w-0 flex-1 pr-10">
+              <p className="text-[17px] font-black text-white leading-tight truncate">{area.name}</p>
+              <p className="text-[11px] font-semibold mt-0.5" style={{ color:"rgba(255,255,255,0.55)" }}>
+                {area.type}{area.size ? ` · ${area.size}` : ""}
+              </p>
+            </div>
+          </div>
+
+          {/* Floor badge — bottom-left */}
+          {area.floor && (
+            <div className="absolute bottom-3.5 left-5 text-[10px] font-bold text-white/75 bg-black/25 px-2.5 py-0.5 rounded-full" style={{ zIndex:5 }}>
+              {area.floor}
+            </div>
           )}
-          {area.size && (
-            <span className="flex items-center gap-1 text-[11px] text-slate-400">
-              <RiRulerLine className="w-3 h-3" />
-              {area.size}
-              {typeof area.size === "number" ? " sqm" : ""}
-            </span>
-          )}
-        </div>
-        {area.description && (
-          <p className="text-[11px] text-slate-400 line-clamp-2 mb-3">
-            {area.description}
-          </p>
-        )}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-          <span className="text-[12px] text-slate-500 flex items-center gap-1">
-            <RiBox3Line className="w-3.5 h-3.5 text-slate-400" />
-            {assetCount} asset{assetCount !== 1 ? "s" : ""}
-          </span>
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onEdit();
-              }}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
-            >
+
+          {/* Edit / delete — hover reveal */}
+          <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(); }}
+              className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 border border-white/15 transition-all">
               <RiEditLine className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
-            >
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
+              className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-red-300 hover:bg-red-500/25 border border-white/15 transition-all">
               <RiDeleteBinLine className="w-3.5 h-3.5" />
             </button>
+          </div>
+        </div>
+
+        {/* ══ BODY ══ */}
+        <div className="flex-1 flex flex-col px-5 pt-4 pb-4 gap-3">
+          {area.description && (
+            <p className="text-[12px] text-slate-400 line-clamp-2">{area.description}</p>
+          )}
+
+          <div className="flex-1" />
+
+          <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[13px] font-bold" style={{ color: accentColor }}>
+              <RiBox3Line className="w-4 h-4" />
+              {assetCount} asset{assetCount !== 1 ? "s" : ""}
+            </div>
+            <span className="flex items-center gap-1 text-[12px] font-bold text-slate-400 group-hover:text-slate-700 transition-colors">
+              View <RiArrowRightLine className="w-3.5 h-3.5" />
+            </span>
           </div>
         </div>
       </div>

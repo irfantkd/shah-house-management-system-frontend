@@ -283,64 +283,96 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
   const hasArea = !!a.areaId;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group"
-      style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+    <div
+      className="group rounded-3xl overflow-hidden bg-white flex flex-col"
+      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)' }}>
 
-      {/* Status colour strip */}
-      <div style={{ height: '3px', background: sm.strip }} />
+      {/* ══ HEADER — dark navy ══ */}
+      <div
+        className="relative px-5 pt-4 pb-4 overflow-hidden"
+        style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
 
-      <div className="p-5">
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-3">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: cm.bg }}>
-            <cm.icon className="w-5 h-5" style={{ color: cm.color }} />
+        {/* Category accent bar at very top */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:cm.color, opacity:0.85 }} />
+
+        {/* Decorative rings */}
+        <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none' }} />
+
+        {/* Ghost watermark */}
+        <div style={{
+          position:'absolute', right:12, bottom:-6,
+          fontSize:68, fontWeight:900, lineHeight:1,
+          color:'rgba(255,255,255,0.04)',
+          letterSpacing:'-2px',
+          userSelect:'none', pointerEvents:'none',
+        }}>
+          {a.name.substring(0,4).toUpperCase()}
+        </div>
+
+        {/* Status badge — top right */}
+        <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
+          style={{ background: sm.bg, color: sm.color, zIndex:10 }}>
+          <sm.icon className="w-3 h-3" />
+          {sm.label}
+        </div>
+
+        {/* Category icon + name row — fully inside header */}
+        <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
+          <div
+            className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center"
+            style={{ background:`${cm.color}22`, border:'2.5px solid rgba(255,255,255,0.12)', boxShadow:`0 4px 16px ${cm.color}40` }}>
+            <cm.icon className="w-7 h-7" style={{ color: cm.color }} />
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[14px] font-bold text-slate-900 truncate leading-tight">{a.name}</h3>
-            {(a.brand || a.model) && (
-              <p className="text-[11px] text-slate-400 truncate mt-0.5">{[a.brand, a.model].filter(Boolean).join(' · ')}</p>
+          <div className="min-w-0 flex-1 pr-10">
+            <p className="text-[17px] font-black text-white leading-tight truncate">{a.name}</p>
+            {(a.brand || a.model) ? (
+              <p className="text-[11px] font-semibold mt-0.5" style={{ color:'rgba(255,255,255,0.42)' }}>
+                {[a.brand, a.model].filter(Boolean).join(' · ')}
+              </p>
+            ) : (
+              <p className="text-[11px] font-semibold mt-0.5" style={{ color:'rgba(255,255,255,0.42)' }}>{cm.label}</p>
             )}
           </div>
-          <Link to={`/assets/${a.id}`}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all shrink-0">
-            <RiArrowRightLine className="w-3.5 h-3.5" />
-          </Link>
         </div>
 
-        {/* Status + category */}
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: sm.bg, color: sm.color }}>
-            <sm.icon className="w-3 h-3" />{sm.label}
-          </span>
-          <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: cm.bg, color: cm.color }}>
-            <cm.icon className="w-3 h-3" />{cm.label}
-          </span>
+        {/* Edit / delete — hover reveal */}
+        <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
+          <button onClick={onEdit}
+            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/15 border border-white/10 transition-all">
+            <RiEditLine className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={onDelete}
+            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-red-300 hover:bg-red-500/25 border border-white/10 transition-all">
+            <RiDeleteBinLine className="w-3.5 h-3.5" />
+          </button>
         </div>
+      </div>
 
-        {/* Area assignment section */}
-        <div className="mb-3 p-3 rounded-xl" style={{ background: hasArea ? '#f0f5ff' : '#fafafa', border: `1px solid ${hasArea ? '#c7d7f5' : '#e2e8f0'}` }}>
+      {/* ══ BODY ══ */}
+      <div className="flex-1 flex flex-col px-5 pt-4 pb-4 gap-3">
+
+        {/* Area assignment */}
+        <div className="flex items-center gap-2 p-3 rounded-2xl"
+          style={{ background: hasArea ? `${cm.color}0d` : '#f8fafc', border:`1px solid ${hasArea ? cm.color + '22' : '#f1f5f9'}` }}>
           {hasArea ? (
-            <div className="flex items-center justify-between gap-2">
+            <>
+              <RiMapPin2Line className="w-3.5 h-3.5 shrink-0" style={{ color: cm.color }} />
               <Link to={`/areas/${a.areaId}`}
-                className="flex items-center gap-1.5 text-[12px] font-bold hover:underline min-w-0"
-                style={{ color: '#0b1d3a' }}>
-                <RiMapPin2Line className="w-3.5 h-3.5 shrink-0" style={{ color: '#2563eb' }} />
-                <span className="truncate">{a.areaName}</span>
+                className="flex-1 text-[13px] font-bold truncate hover:underline"
+                style={{ color:'#0b1d3a' }}
+                onClick={(e) => e.stopPropagation()}>
+                {a.areaName}
               </Link>
               <button onClick={onAssign}
-                className="text-[11px] font-bold px-2 py-0.5 rounded-lg hover:bg-blue-100 transition-all shrink-0"
-                style={{ color: '#2563eb' }}>
+                className="text-[11px] font-bold px-2 py-0.5 rounded-lg transition-all shrink-0 hover:opacity-70"
+                style={{ color: cm.color }}>
                 Change
               </button>
-            </div>
+            </>
           ) : (
             <button onClick={onAssign}
-              className="w-full flex items-center justify-center gap-1.5 text-[12px] font-bold py-0.5 transition-all"
-              style={{ color: '#64748b' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#0b1d3a')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}>
+              className="w-full flex items-center justify-center gap-1.5 text-[12px] font-bold py-0.5 text-slate-400 hover:text-slate-700 transition-colors">
               <RiMapPin2Line className="w-3.5 h-3.5" />
               Assign to Area
             </button>
@@ -349,30 +381,31 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
 
         {/* Warranty */}
         {a.warranty?.expiryDate && (
-          <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-xl"
-            style={{ background: warrantyBg ?? '#f8fafc' }}>
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: warrantyColor ?? '#64748b' }}>
-              <RiShieldCheckLine className="w-3.5 h-3.5" />Warranty
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl"
+            style={{ background: warrantyBg ?? '#f8fafc', border:`1px solid ${warrantyColor ? warrantyColor + '22' : '#f1f5f9'}` }}>
+            <span className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: warrantyColor ?? '#64748b' }}>
+              <RiShieldCheckLine className="w-3.5 h-3.5" /> Warranty
             </span>
-            <span className="text-[11px] font-bold" style={{ color: warrantyColor ?? '#64748b' }}>
+            <span className="text-[12px] font-bold" style={{ color: warrantyColor ?? '#64748b' }}>
               {days !== null && days < 0 ? 'Expired' : days !== null ? `${days}d left` : ''} · {fmtDate(a.warranty.expiryDate)}
             </span>
           </div>
         )}
 
+        <div className="flex-1" />
+
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-50">
-          <span className="text-[13px] font-bold" style={{ color: '#0b1d3a' }}>
-            AED {(a.currentValue ?? a.purchasePrice ?? 0).toLocaleString()}
-          </span>
-          <div className="flex items-center gap-0.5">
-            <button onClick={onEdit} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
-              <RiEditLine className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={onDelete} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
-              <RiDeleteBinLine className="w-3.5 h-3.5" />
-            </button>
+        <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Value</p>
+            <p className="text-[16px] font-black leading-tight" style={{ color:'#0b1d3a' }}>
+              AED {(a.currentValue ?? a.purchasePrice ?? 0).toLocaleString()}
+            </p>
           </div>
+          <Link to={`/assets/${a.id}`}
+            className="flex items-center gap-1.5 text-[12px] font-bold text-slate-400 hover:text-slate-800 transition-colors">
+            View <RiArrowRightLine className="w-3.5 h-3.5" />
+          </Link>
         </div>
       </div>
     </div>

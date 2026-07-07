@@ -1,20 +1,22 @@
-// Segments: 'property' = home services, 'household' = grocery/daily
+// Segments: 'property' = home services & utilities, 'household' = grocery/daily
 export const EXPENSE_CATEGORIES = {
   // ── Property & Services ───────────────────────────────────────────
-  'Cleaning':         { color: '#9333ea', bg: '#f5f3ff', segment: 'property' },
-  'Garden':           { color: '#16a34a', bg: '#f0fdf4', segment: 'property' },
-  'Pool & Water':     { color: '#0891b2', bg: '#ecfeff', segment: 'property' },
-  'Climate / AC':     { color: '#2563eb', bg: '#eff6ff', segment: 'property' },
-  'Security / CCTV':  { color: '#1e3a6e', bg: '#f0f5ff', segment: 'property' },
-  'Plumbing':         { color: '#3b82f6', bg: '#dbeafe', segment: 'property' },
-  'Pest Control':     { color: '#ea580c', bg: '#fff7ed', segment: 'property' },
-  'Power':            { color: '#ca8a04', bg: '#fefce8', segment: 'property' },
-  'Repairs':          { color: '#dc2626', bg: '#fef2f2', segment: 'property' },
+  'Cleaning':          { color: '#9333ea', bg: '#f5f3ff', segment: 'property' },
+  'Garden':            { color: '#16a34a', bg: '#f0fdf4', segment: 'property' },
+  'Pool & Water':      { color: '#0891b2', bg: '#ecfeff', segment: 'property' },
+  'Climate / AC':      { color: '#2563eb', bg: '#eff6ff', segment: 'property' },
+  'Security / CCTV':   { color: '#1e3a6e', bg: '#f0f5ff', segment: 'property' },
+  'Plumbing':          { color: '#3b82f6', bg: '#dbeafe', segment: 'property' },
+  'Pest Control':      { color: '#ea580c', bg: '#fff7ed', segment: 'property' },
+  'Power':             { color: '#ca8a04', bg: '#fefce8', segment: 'property' },
+  'Electricity Bill':  { color: '#f59e0b', bg: '#fffbeb', segment: 'property' },
+  'Water Bill':        { color: '#0ea5e9', bg: '#f0f9ff', segment: 'property' },
+  'Repairs':           { color: '#dc2626', bg: '#fef2f2', segment: 'property' },
   // ── Household & Daily ────────────────────────────────────────────
-  'Groceries':        { color: '#15803d', bg: '#dcfce7', segment: 'household' },
-  'Fruits & Veg':     { color: '#059669', bg: '#d1fae5', segment: 'household' },
-  'Household Items':  { color: '#7c3aed', bg: '#ede9fe', segment: 'household' },
-  'Daily Essentials': { color: '#d97706', bg: '#fef9c3', segment: 'household' },
+  'Groceries':         { color: '#15803d', bg: '#dcfce7', segment: 'household' },
+  'Fruits & Veg':      { color: '#059669', bg: '#d1fae5', segment: 'household' },
+  'Household Items':   { color: '#7c3aed', bg: '#ede9fe', segment: 'household' },
+  'Daily Essentials':  { color: '#d97706', bg: '#fef9c3', segment: 'household' },
 };
 
 export const PROPERTY_CATS  = new Set(Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'property').map(([k]) => k));

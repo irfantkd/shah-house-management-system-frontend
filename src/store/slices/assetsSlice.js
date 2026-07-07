@@ -34,6 +34,9 @@ const assetsSlice = createSlice({
 });
 
 export const { addAsset, updateAsset, deleteAsset } = assetsSlice.actions;
-export const selectAssets  = (s) => s.assets.items;
-export const selectAssetById = (id) => (s) => s.assets.items.find((a) => a.id === id);
+
+const pid = (s) => s.properties?.currentId ?? 'prop-default';
+
+export const selectAssets    = (s) => (s.assets.items ?? []).filter((a) => (a.propertyId || 'prop-default') === pid(s));
+export const selectAssetById = (id) => (s) => (s.assets.items ?? []).find((a) => a.id === id);
 export default assetsSlice.reducer;

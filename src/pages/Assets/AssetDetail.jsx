@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Package, Info, Shield, History, CalendarClock,
@@ -8,7 +8,8 @@ import {
   Phone, Mail, FileText, Download, Eye, Trash2, Upload,
   ChevronRight, TrendingUp,
 } from 'lucide-react';
-import { getAssetById } from '../../data/mockAssets';
+import { useSelector } from 'react-redux';
+import { selectAssetById } from '../../store/slices/assetsSlice';
 import Card, { CardHeader } from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
@@ -52,6 +53,8 @@ function Row({ icon: Icon, label, value }) {
 
 export default function AssetDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const asset = useSelector(selectAssetById(id));
   const [tab, setTab]         = useState('details');
   const [loading, setLoading] = useState(true);
 
@@ -60,7 +63,6 @@ export default function AssetDetail() {
     return () => clearTimeout(t);
   }, [id]);
 
-  const asset = getAssetById(id);
   if (!asset) return <Navigate to="/assets" replace />;
 
   const sc = STATUS_CFG[asset.status] ?? STATUS_CFG.operational;
@@ -106,6 +108,7 @@ export default function AssetDetail() {
               </div>
             </div>
             <Button variant="outline" size="sm" icon={CalendarDays}
+              onClick={() => navigate('/maintenance')}
               className="!bg-white/10 !border-white/20 !text-white hover:!bg-white/20 flex-shrink-0">
               Book Service
             </Button>
@@ -293,7 +296,7 @@ export default function AssetDetail() {
                 </div>
               </Card>
               <div className="flex gap-3">
-                <Button variant="primary" size="md" icon={CalendarClock} className="flex-1">Schedule Service Now</Button>
+                <Button variant="primary" size="md" icon={CalendarClock} className="flex-1" onClick={() => navigate('/maintenance')}>Schedule Service Now</Button>
                 <Button variant="outline" size="md" icon={CalendarDays}>View in Calendar</Button>
               </div>
             </div>

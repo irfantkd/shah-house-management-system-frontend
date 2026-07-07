@@ -62,11 +62,13 @@ export const {
   addCarImage, removeCarImage,
 } = carsSlice.actions;
 
-export const selectCars               = (s) => s.cars.cars;
-export const selectCarExpenses        = (s) => s.cars.expenses;
-export const selectFuelLogs           = (s) => s.cars.fuelLogs;
-export const selectCarById            = (id) => (s) => s.cars.cars.find((c) => c.id === id);
-export const selectExpensesByCarId    = (id) => (s) => s.cars.expenses.filter((e) => e.carId === id);
-export const selectFuelLogsByCarId    = (id) => (s) => s.cars.fuelLogs.filter((f) => f.carId === id);
+const pid = (s) => s.properties?.currentId ?? 'prop-default';
+
+export const selectCars            = (s) => (s.cars.cars ?? []).filter((c) => (c.propertyId || 'prop-default') === pid(s));
+export const selectCarExpenses     = (s) => s.cars.expenses ?? [];
+export const selectFuelLogs        = (s) => s.cars.fuelLogs ?? [];
+export const selectCarById         = (id) => (s) => (s.cars.cars ?? []).find((c) => c.id === id);
+export const selectExpensesByCarId = (id) => (s) => (s.cars.expenses ?? []).filter((e) => e.carId === id);
+export const selectFuelLogsByCarId = (id) => (s) => (s.cars.fuelLogs ?? []).filter((f) => f.carId === id);
 
 export default carsSlice.reducer;

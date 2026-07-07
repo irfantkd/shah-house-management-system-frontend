@@ -1,5 +1,6 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import { propertyInjector } from './middleware/propertyInjector';
 
 const storage = {
   getItem:    (key) => Promise.resolve(localStorage.getItem(key)),
@@ -11,8 +12,7 @@ import authReducer          from './slices/authSlice';
 import uiReducer           from './slices/uiSlice';
 import companiesReducer    from './slices/companiesSlice';
 import contractsReducer    from './slices/contractsSlice';
-import maintenanceReducer  from './slices/maintenanceSlice';
-import repairsReducer      from './slices/repairsSlice';
+import tasksReducer        from './slices/tasksSlice';
 import assetsReducer       from './slices/assetsSlice';
 import areasReducer        from './slices/areasSlice';
 import documentsReducer    from './slices/documentsSlice';
@@ -21,14 +21,17 @@ import emergencyReducer    from './slices/emergencySlice';
 import expensesReducer     from './slices/expensesSlice';
 import settingsReducer     from './slices/settingsSlice';
 import carsReducer         from './slices/carsSlice';
+import walletReducer       from './slices/walletSlice';
+import employeesReducer   from './slices/employeesSlice';
+import ownersReducer      from './slices/ownersSlice';
+import propertiesReducer  from './slices/propertiesSlice';
 
 const rootReducer = combineReducers({
   auth:          authReducer,
   ui:            uiReducer,
   companies:     companiesReducer,
   contracts:     contractsReducer,
-  maintenance:   maintenanceReducer,
-  repairs:       repairsReducer,
+  tasks:         tasksReducer,
   assets:        assetsReducer,
   areas:         areasReducer,
   documents:     documentsReducer,
@@ -37,10 +40,14 @@ const rootReducer = combineReducers({
   expenses:      expensesReducer,
   settings:      settingsReducer,
   cars:          carsReducer,
+  wallet:        walletReducer,
+  employees:     employeesReducer,
+  owners:        ownersReducer,
+  properties:    propertiesReducer,
 });
 
 const persistConfig = {
-  key: 'ahms-v2',
+  key: 'ahms-v4',  // bumped — merged maintenance + repairs into tasks
   storage,
   blacklist: ['ui'],
 };
@@ -54,7 +61,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }),
+    }).concat(propertyInjector),
 });
 
 export const persistor = persistStore(store);

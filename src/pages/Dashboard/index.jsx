@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -11,20 +11,26 @@ import {
   RiUploadCloudLine, RiHammerLine, RiCarLine, RiGasStationLine,
 } from 'react-icons/ri';
 import { selectContracts } from '../../store/slices/contractsSlice';
-import { selectMaintenance } from '../../store/slices/maintenanceSlice';
-import { selectRepairs } from '../../store/slices/repairsSlice';
+import { selectTasks } from '../../store/slices/tasksSlice';
 import { selectAssets } from '../../store/slices/assetsSlice';
 import { selectAreas } from '../../store/slices/areasSlice';
 import { selectAuthUser } from '../../store/slices/authSlice';
 import { selectCars, selectCarExpenses, selectFuelLogs as selectFleetFuel } from '../../store/slices/carsSlice';
 import { selectExpenses } from '../../store/slices/expensesSlice';
+import { selectVehicleWallet, selectHomeWallet, LOW_BALANCE_THRESHOLD } from '../../store/slices/walletSlice';
 import { EXPENSE_CATEGORIES, PROPERTY_CATS, HOUSEHOLD_CATS } from '../../data/mockExpenses';
 import { selectUnreadCount } from '../../store/slices/notificationsSlice';
-import {
-  upcomingSchedule, recentActivities, expiringItems,
-} from '../../data/mockDashboard';
 import Badge from '../../components/ui/Badge';
 import { cn } from '../../utils/cn';
+
+function fmtRelative(dateStr) {
+  if (!dateStr) return '';
+  const days = Math.floor((new Date() - new Date(dateStr + 'T00:00:00')) / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-AE', { day: 'numeric', month: 'short' });
+}
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -73,15 +79,16 @@ const typeMeta = (t) => TYPE_META[t] ?? TYPE_META.Other;
 export default function Dashboard() {
   const user        = useSelector(selectAuthUser);
   const contracts   = useSelector(selectContracts);
-  const maintenance = useSelector(selectMaintenance);
-  const repairs     = useSelector(selectRepairs);
+  const tasks = useSelector(selectTasks);
   const assets      = useSelector(selectAssets);
   const areas       = useSelector(selectAreas);
   const unread      = useSelector(selectUnreadCount);
-  const cars        = useSelector(selectCars);
-  const fleetFuel   = useSelector(selectFleetFuel);
-  const allExpenses = useSelector(selectExpenses);
-  const carExpenses = useSelector(selectCarExpenses);
+  const cars          = useSelector(selectCars);
+  const fleetFuel     = useSelector(selectFleetFuel);
+  const allExpenses   = useSelector(selectExpenses);
+  const carExpenses   = useSelector(selectCarExpenses);
+  const vehicleWallet = useSelector(selectVehicleWallet);
+  const homeWallet    = useSelector(selectHomeWallet);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { const t = setTimeout(() => setLoading(false), 800); return () => clearTimeout(t); }, []);
@@ -116,6 +123,51 @@ export default function Dashboard() {
     return d <= 30;
   }).length;
 
+  // Derived schedule / activity / expiry from Redux
+  const upcomingSchedule = useMemo(() =>
+    tasks
+      .filter((t) => ['scheduled', 'overdue'].includes(t.status) && t.scheduledDate)
+      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
+      .slice(0, 6)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        date: t.scheduledDate,
+        company: t.companyName ?? '',
+        area: t.areaName ?? '',
+        type: t.category === 'Repair' ? 'repair' : 'maintenance',
+      })),
+  [tasks]);
+
+  const recentActivities = useMemo(() =>
+    tasks
+      .filter((t) => t.status === 'completed' && t.completedDate)
+      .sort((a, b) => (b.completedDate ?? '').localeCompare(a.completedDate ?? ''))
+      .slice(0, 5)
+      .map((t) => ({
+        id: t.id,
+        type: t.category === 'Repair' ? 'repair' : 'maintenance',
+        title: t.category === 'Repair' ? 'Repair Completed' : 'Maintenance Completed',
+        detail: `${t.title}${t.companyName ? ' — ' + t.companyName : ''}`,
+        time: fmtRelative(t.completedDate),
+      })),
+  [tasks]);
+
+  const expiringItems = useMemo(() =>
+    contracts
+      .filter((c) => { const d = getDaysUntil(c.endDate); return d >= 0 && d <= 60; })
+      .sort((a, b) => getDaysUntil(a.endDate) - getDaysUntil(b.endDate))
+      .slice(0, 4)
+      .map((c) => ({
+        id: c.id,
+        type: 'contract',
+        name: c.title,
+        company: c.companyName ?? '',
+        expiresIn: getDaysUntil(c.endDate),
+        status: getDaysUntil(c.endDate) <= 14 ? 'danger' : getDaysUntil(c.endDate) <= 30 ? 'warning' : 'info',
+      })),
+  [contracts]);
+
   // Per-area asset count
   const areaAssetCount = assets.reduce((m, a) => {
     if (a.areaId) m[a.areaId] = (m[a.areaId] ?? 0) + 1;
@@ -125,7 +177,7 @@ export default function Dashboard() {
   const stats = [
     {
       label: 'Active Contracts',
-      value: contracts.filter((c) => c.status === 'active').length || 12,
+      value: contracts.filter((c) => c.status === 'active').length,
       icon: RiFileList3Line,
       color: '#2563eb',
       bg: '#eff6ff',
@@ -136,7 +188,7 @@ export default function Dashboard() {
     },
     {
       label: 'Upcoming Maintenance',
-      value: maintenance.filter((m) => m.status === 'scheduled').length || 5,
+      value: tasks.filter((t) => t.category === 'Maintenance' && t.status === 'scheduled').length,
       icon: RiCalendarCheckLine,
       color: '#d97706',
       bg: '#fffbeb',
@@ -147,18 +199,18 @@ export default function Dashboard() {
     },
     {
       label: 'Open Repairs',
-      value: repairs.filter((r) => r.status !== 'completed').length || 2,
+      value: tasks.filter((t) => t.category === 'Repair' && t.status !== 'completed').length,
       icon: RiHammerLine,
       color: '#dc2626',
       bg: '#fef2f2',
       border: '#fecaca',
       trend: '1 critical',
       up: false,
-      href: '/repairs',
+      href: '/maintenance',
     },
     {
       label: 'Total Assets',
-      value: assets.length || 18,
+      value: assets.length,
       icon: RiBox3Line,
       color: '#0b1d3a',
       bg: '#f0f5ff',
@@ -219,7 +271,7 @@ export default function Dashboard() {
           <div className="relative z-10 flex flex-wrap gap-2.5 mt-6">
             {[
               { label: 'Schedule Maintenance', icon: RiCalendarCheckLine, to: '/maintenance' },
-              { label: 'Report Repair',        icon: RiHammerLine,        to: '/repairs'     },
+              { label: 'Report Repair',        icon: RiHammerLine,        to: '/maintenance' },
               { label: 'New Contract',         icon: RiFileList3Line,     to: '/contracts'   },
               { label: 'Upload Document',      icon: RiUploadCloudLine,   to: '/documents'   },
             ].map(({ label, icon: Icon, to }) => (
@@ -357,6 +409,64 @@ export default function Dashboard() {
         </motion.div>
       )}
 
+      {/* ── Wallet Summary ── */}
+      <motion.div {...fadeUp(0.19)}>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+                <RiBankCardLine className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-[14px] font-bold text-slate-800">Expense Wallets</p>
+                <p className="text-[11px] text-slate-400">Available budget from boss</p>
+              </div>
+            </div>
+            <Link to="/wallet" className="flex items-center gap-1 text-[12px] text-blue-600 font-bold hover:text-blue-700">
+              Manage <RiArrowRightLine className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { key: 'vehicle', label: 'Vehicle Wallet', wallet: vehicleWallet, color: '#0b1d3a', bg: '#f0f5ff', icon: RiCarLine },
+              { key: 'home',    label: 'Home Wallet',    wallet: homeWallet,    color: '#16a34a', bg: '#f0fdf4', icon: RiHome4Line },
+            ].map(({ key, label, wallet, color, bg, icon: Icon }) => {
+              const bal   = wallet.balance ?? 0;
+              const total = wallet.totalDeposited ?? 0;
+              const pct   = total > 0 ? Math.max(0, Math.min(100, (bal / total) * 100)) : 0;
+              const low   = bal < LOW_BALANCE_THRESHOLD;
+              const empty = bal <= 0;
+              return (
+                <Link key={key} to="/wallet"
+                  className="flex items-center gap-3.5 p-4 rounded-2xl border hover:shadow-sm transition-all group"
+                  style={{ borderColor: empty ? '#fecaca' : low ? '#fde68a' : '#e2e8f0', background: empty ? '#fff5f5' : low ? '#fffbeb' : bg }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: color }}>
+                    <Icon className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-bold text-slate-700">{label}</p>
+                    <p className="text-[18px] font-bold leading-tight" style={{ color: empty ? '#dc2626' : low ? '#d97706' : color }}>
+                      AED {bal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                    </p>
+                    <div className="h-1 bg-white/60 rounded-full overflow-hidden mt-1.5">
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, background: empty ? '#dc2626' : low ? '#d97706' : color }} />
+                    </div>
+                  </div>
+                  {(empty || low) && (
+                    <span className={cn('shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg',
+                      empty ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700')}>
+                      {empty ? 'Empty!' : 'Low'}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </motion.div>
+
       {/* ── Main Grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -465,10 +575,10 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-2.5 mb-4">
                 {[
-                  { label: 'Contracts',  value: contracts.filter((c) => c.status === 'active').length || 12, icon: RiFileList3Line,  color: '#2563eb', bg: '#eff6ff' },
-                  { label: 'Assets',     value: assets.length || 18,                                         icon: RiBox3Line,        color: '#16a34a', bg: '#f0fdf4' },
-                  { label: 'Repairs',    value: repairs.filter((r) => r.status !== 'completed').length || 2, icon: RiHammerLine,      color: '#dc2626', bg: '#fef2f2' },
-                  { label: 'Alerts',     value: unread || 3,                                                  icon: RiBellLine,        color: '#d97706', bg: '#fffbeb' },
+                  { label: 'Contracts',  value: contracts.filter((c) => c.status === 'active').length, icon: RiFileList3Line,  color: '#2563eb', bg: '#eff6ff' },
+                  { label: 'Assets',     value: assets.length,                                        icon: RiBox3Line,        color: '#16a34a', bg: '#f0fdf4' },
+                  { label: 'Repairs',    value: tasks.filter((t) => t.category === 'Repair' && t.status !== 'completed').length, icon: RiHammerLine, color: '#dc2626', bg: '#fef2f2' },
+                  { label: 'Alerts',     value: unread,                                               icon: RiBellLine,        color: '#d97706', bg: '#fffbeb' },
                 ].map((s) => (
                   <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: s.bg }}>
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-white">

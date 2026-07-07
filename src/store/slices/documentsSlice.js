@@ -25,5 +25,8 @@ const documentsSlice = createSlice({
 });
 
 export const { addDocument, updateDocument, deleteDocument } = documentsSlice.actions;
-export const selectDocuments = (s) => s.documents.items;
+
+const pid = (s) => s.properties?.currentId ?? 'prop-default';
+export const selectDocuments = (s) => (s.documents.items ?? []).filter((d) => (d.propertyId || 'prop-default') === pid(s));
+
 export default documentsSlice.reducer;

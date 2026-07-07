@@ -1,17 +1,23 @@
 import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Plus, Fuel, Droplets } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Fuel, Droplets, Wallet } from 'lucide-react';
 import { selectCars, addFuelLog } from '../../store/slices/carsSlice';
+import { selectVehicleWallet, deductFromWallet, LOW_BALANCE_THRESHOLD } from '../../store/slices/walletSlice';
 import { FUEL_STATIONS } from '../../data/mockCars';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
+import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
+
+const fmt = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
 
 const BLANK = { date: new Date().toISOString().split('T')[0], liters: '', pricePerLiter: '3.12', totalPrice: '', station: '', mileage: '' };
 
 export default function QuickFuelModal({ open, onClose }) {
-  const dispatch = useDispatch();
-  const cars     = useSelector(selectCars);
+  const dispatch      = useDispatch();
+  const cars          = useSelector(selectCars);
+  const vehicleWallet = useSelector(selectVehicleWallet);
   const [carId,  setCarId]  = useState('');
   const [form,   setForm]   = useState(BLANK);
 
@@ -40,7 +46,11 @@ export default function QuickFuelModal({ open, onClose }) {
     const pricePerLiter = Number(form.pricePerLiter);
     const totalPrice    = Number(form.totalPrice) || +(liters * pricePerLiter).toFixed(2);
     dispatch(addFuelLog({ ...form, carId: effectiveId, liters, pricePerLiter, totalPrice, mileage: form.mileage ? Number(form.mileage) : undefined }));
-    toast.success(`Fuel logged for ${selectedCar?.make} ${selectedCar?.model}`);
+    dispatch(deductFromWallet({ wallet: 'vehicle', amount: totalPrice, description: `Fuel — ${liters}L${form.station ? ' @ ' + form.station : ''}`, date: form.date }));
+    const afterBal = vehicleWallet.balance - totalPrice;
+    if (afterBal < LOW_BALANCE_THRESHOLD)
+      toast(`Vehicle wallet now AED ${fmt(Math.max(0, afterBal))} — top up soon`, { icon: '⚠️' });
+    else toast.success(`Fuel logged for ${selectedCar?.make} ${selectedCar?.model}`);
     handleClose();
   };
 
@@ -80,6 +90,30 @@ export default function QuickFuelModal({ open, onClose }) {
             ))}
           </div>
         </div>
+
+        {/* Vehicle Wallet balance */}
+        {(() => {
+          const bal   = vehicleWallet.balance;
+          const cost  = calcTotal ? Number(calcTotal) : 0;
+          const after = bal - cost;
+          const low   = bal < LOW_BALANCE_THRESHOLD;
+          const empty = bal <= 0;
+          return (
+            <div className={cn('flex items-center gap-3 p-3 rounded-xl border',
+              empty ? 'bg-red-50 border-red-200' : low ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
+              <Wallet className={cn('w-4 h-4 shrink-0', empty ? 'text-red-500' : low ? 'text-amber-600' : 'text-slate-400')} />
+              <div className="flex-1">
+                <p className="text-[11px] text-slate-400">Vehicle Wallet — auto-deducted on submit</p>
+                <p className={cn('text-[15px] font-bold', empty ? 'text-red-600' : low ? 'text-amber-700' : 'text-slate-800')}>AED {fmt(bal)}</p>
+              </div>
+              {cost > 0 && <div className="text-right shrink-0">
+                <p className="text-[10px] text-slate-400">After</p>
+                <p className={cn('text-[13px] font-bold', after < 0 ? 'text-red-600' : after < LOW_BALANCE_THRESHOLD ? 'text-amber-600' : 'text-emerald-600')}>AED {fmt(Math.max(0, after))}</p>
+              </div>}
+              {(empty || low) && <Link to="/wallet" className={cn('shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg', empty ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>{empty ? 'Deposit' : 'Top Up'}</Link>}
+            </div>
+          );
+        })()}
 
         {/* Fuel fields */}
         <div>

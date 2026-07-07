@@ -158,120 +158,18 @@ export default function CarsPage() {
           action={search ? undefined : () => setShowAdd(true)} actionLabel={search ? undefined : 'Add Vehicle'} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {filtered.map((car, i) => {
-            const reg  = regStatus(car.registrationExpiry);
-            const ins  = regStatus(car.insuranceExpiry);
-            const fuel = allFuel.filter((f) => f.carId === car.id && thisMonth(f.date)).reduce((s, f) => s + f.totalPrice, 0);
-            const exp  = allExp.filter((e)  => e.carId === car.id && thisMonth(e.date)).reduce((s, e) => s + e.amount, 0);
-            const hasImg = car.images?.[0];
-
-            return (
-              <motion.div key={car.id} {...fade(0.05 + i * 0.04)}>
-                <Link to={`/cars/${car.id}`}>
-                  <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
-
-                    {/* ── Hero ── */}
-                    <div className="relative h-32 overflow-hidden">
-                      {/* Background */}
-                      {hasImg ? (
-                        <>
-                          <img src={hasImg} alt={`${car.make} ${car.model}`} className="absolute inset-0 w-full h-full object-cover" />
-                          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(11,29,58,0.88) 0%, rgba(30,58,110,0.70) 55%, rgba(0,0,0,0.40) 100%)' }} />
-                        </>
-                      ) : (
-                        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, #0b1d3a 0%, #1e3a6e 55%, ${car.color}44 100%)` }} />
-                      )}
-                      <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-[0.08]" style={{ background: 'radial-gradient(circle, white, transparent)', transform: 'translate(30%,-30%)' }} />
-
-                      {/* Content */}
-                      <div className="absolute inset-0 flex items-center justify-between px-5">
-                        <div>
-                          <p className="text-white/35 text-[9px] font-bold uppercase tracking-widest">{car.category}</p>
-                          <p className="text-white font-bold text-[17px] leading-tight">{car.make}</p>
-                          <p className="text-blue-200/60 text-[12px]">{car.model} · {car.year}</p>
-                        </div>
-                        <div className="text-right">
-                          <div className="inline-block px-3 py-1.5 rounded-xl border border-white/20 bg-white/10 mb-1">
-                            <p className="text-white font-bold text-[12px] tracking-wider">{car.plateNumber}</p>
-                          </div>
-                          <p className="text-white/40 text-[10px]">{car.colorName}</p>
-                        </div>
-                      </div>
-
-                      {/* Camera upload button */}
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); fileRefs.current[car.id]?.click(); }}
-                        className="absolute bottom-2 right-2 z-10 w-8 h-8 rounded-xl bg-black/30 hover:bg-black/50 border border-white/20 flex items-center justify-center backdrop-blur-sm transition-all"
-                        title="Upload vehicle photo">
-                        <Camera className="w-3.5 h-3.5 text-white" />
-                      </button>
-                      <input
-                        ref={(el) => (fileRefs.current[car.id] = el)}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => handleImageUpload(car.id, e)}
-                      />
-
-                      {/* Photo count badge */}
-                      {car.images?.length > 0 && (
-                        <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-black/30 backdrop-blur-sm border border-white/10">
-                          <Camera className="w-2.5 h-2.5 text-white/70" />
-                          <span className="text-[10px] font-semibold text-white/80">{car.images.length}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ── Card Body ── */}
-                    <div className="p-4 space-y-3">
-                      {/* Driver */}
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-navy-900 flex items-center justify-center shrink-0">
-                          <User className="w-3.5 h-3.5 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-[12px] font-semibold text-slate-800 leading-tight">{car.driverName || 'No driver assigned'}</p>
-                          <p className="text-[10px] text-slate-400">{car.driverPhone}</p>
-                        </div>
-                      </div>
-
-                      {/* Reg + Insurance */}
-                      <div className="grid grid-cols-2 gap-2">
-                        {[{ label: 'Registration', s: reg }, { label: 'Insurance', s: ins }].map(({ label, s }) => (
-                          <div key={label} className="rounded-xl p-2.5" style={{ background: s.bg }}>
-                            <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: s.color }}>{label}</p>
-                            <p className="text-[12px] font-bold mt-0.5" style={{ color: s.color }}>
-                              {s.days < 0 ? 'Expired' : `${s.days}d left`}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Monthly stats */}
-                      <div className="flex items-center justify-between pt-2.5 border-t border-slate-50">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1.5">
-                            <Fuel className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="text-[12px] font-bold text-slate-700">AED {fuel.toFixed(0)}</span>
-                            <span className="text-[10px] text-slate-400">fuel</span>
-                          </div>
-                          <div className="w-px h-3 bg-slate-100" />
-                          <div className="flex items-center gap-1.5">
-                            <Gauge className="w-3.5 h-3.5 text-blue-500" />
-                            <span className="text-[12px] font-bold text-slate-700">AED {exp.toLocaleString()}</span>
-                            <span className="text-[10px] text-slate-400">exp.</span>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-200 group-hover:text-accent-600 transition-colors" />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            );
-          })}
+          {filtered.map((car, i) => (
+            <motion.div key={car.id} {...fade(0.05 + i * 0.04)}>
+              <CarCard
+                car={car}
+                allFuel={allFuel}
+                allExp={allExp}
+                thisMonth={thisMonth}
+                fileRefs={fileRefs}
+                onImageUpload={handleImageUpload}
+              />
+            </motion.div>
+          ))}
         </div>
       )}
 
@@ -329,6 +227,160 @@ export default function CarsPage() {
       <QuickExpenseModal open={showExpense} onClose={() => setShowExpense(false)} />
       <QuickFuelModal    open={showFuel}    onClose={() => setShowFuel(false)}    />
     </div>
+  );
+}
+
+function CarCard({ car, allFuel, allExp, thisMonth, fileRefs, onImageUpload }) {
+  const reg  = regStatus(car.registrationExpiry);
+  const ins  = regStatus(car.insuranceExpiry);
+  const fuel = allFuel.filter((f) => f.carId === car.id && thisMonth(f.date)).reduce((s, f) => s + f.totalPrice, 0);
+  const exp  = allExp.filter((e)  => e.carId === car.id && thisMonth(e.date)).reduce((s, e) => s + e.amount, 0);
+  const hasImg   = car.images?.[0];
+  const accent   = car.color || '#2563eb';
+  const makeInits = car.make.substring(0, 2).toUpperCase();
+  const regAlert  = reg.days < 0 || reg.days <= 30;
+
+  return (
+    <Link to={`/cars/${car.id}`} className="block group">
+      <div className="rounded-3xl overflow-hidden bg-white flex flex-col"
+        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.10)' }}>
+
+        {/* ── HEADER ── */}
+        <div className="relative px-5 pt-4 pb-4 overflow-hidden"
+          style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
+
+          {/* photo background overlay */}
+          {hasImg && (
+            <>
+              <img src={hasImg} alt="" aria-hidden
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ zIndex:0, opacity:0.18 }} />
+              <div style={{ position:'absolute', inset:0, background:'linear-gradient(150deg, rgba(10,23,46,0.96) 0%, rgba(12,31,63,0.88) 60%, rgba(14,37,80,0.80) 100%)', zIndex:1 }} />
+            </>
+          )}
+
+          {/* car-color accent bar */}
+          <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:accent, zIndex:3 }} />
+
+          {/* decorative rings */}
+          <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none', zIndex:2 }} />
+          <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none', zIndex:2 }} />
+
+          {/* ghost watermark — plate number */}
+          <div style={{
+            position:'absolute', right:8, bottom:-2,
+            fontSize:44, fontWeight:900, lineHeight:1,
+            color:'rgba(255,255,255,0.04)', letterSpacing:'3px',
+            userSelect:'none', pointerEvents:'none', zIndex:2, fontFamily:'monospace',
+          }}>{car.plateNumber}</div>
+
+          {/* registration alert badge — top right */}
+          {regAlert && (
+            <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+              style={{ background:'rgba(220,38,38,0.18)', color:'#fca5a5', border:'1px solid rgba(220,38,38,0.30)', zIndex:10 }}>
+              <AlertTriangle className="w-2.5 h-2.5" />
+              {reg.days < 0 ? 'Reg. Expired' : `${reg.days}d left`}
+            </div>
+          )}
+
+          {/* avatar (make initials in car-color tint) + name row */}
+          <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
+            <div className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center text-[15px] font-black text-white select-none"
+              style={{
+                background:`${accent}28`,
+                border:'2.5px solid rgba(255,255,255,0.13)',
+                boxShadow:`0 4px 20px ${accent}40`,
+              }}>
+              {makeInits}
+            </div>
+            <div className="min-w-0 flex-1 pr-10">
+              <p className="text-[16px] font-black text-white leading-tight truncate">
+                {car.nickname || `${car.make} ${car.model}`}
+              </p>
+              <p className="text-[11px] font-semibold mt-0.5" style={{ color:'rgba(255,255,255,0.42)' }}>
+                {car.nickname ? `${car.make} ${car.model} · ` : ''}{car.year} · {car.category}
+              </p>
+            </div>
+          </div>
+
+          {/* plate pill + camera button row */}
+          <div className="relative flex items-center justify-between mt-3" style={{ zIndex:5 }}>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl border border-white/20 bg-white/10">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: accent }} />
+              <p className="text-white font-bold text-[12px] tracking-wider">{car.plateNumber}</p>
+              {car.colorName && <p className="text-white/40 text-[10px]">· {car.colorName}</p>}
+            </div>
+            <div className="flex items-center gap-1.5">
+              {car.images?.length > 0 && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-black/25 border border-white/10">
+                  <Camera className="w-2.5 h-2.5 text-white/60" />
+                  <span className="text-[10px] font-semibold text-white/60">{car.images.length}</span>
+                </div>
+              )}
+              <button type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); fileRefs.current[car.id]?.click(); }}
+                className="w-8 h-8 rounded-xl bg-black/25 hover:bg-black/45 border border-white/15 flex items-center justify-center transition-all"
+                title="Upload vehicle photo">
+                <Camera className="w-3.5 h-3.5 text-white" />
+              </button>
+              <input ref={(el) => (fileRefs.current[car.id] = el)} type="file" accept="image/*"
+                className="hidden" onClick={(e) => e.stopPropagation()}
+                onChange={(e) => onImageUpload(car.id, e)} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── BODY ── */}
+        <div className="flex-1 flex flex-col px-5 pt-4 pb-4 gap-3">
+
+          {/* driver row */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background:'rgba(11,29,58,0.06)' }}>
+              <User className="w-4 h-4" style={{ color:'#0b1d3a' }} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold text-slate-800 truncate leading-tight">
+                {car.driverName || 'No driver assigned'}
+              </p>
+              {car.driverPhone && <p className="text-[10px] text-slate-400">{car.driverPhone}</p>}
+            </div>
+          </div>
+
+          {/* registration + insurance status pills */}
+          <div className="grid grid-cols-2 gap-2">
+            {[{ label: 'Registration', s: reg }, { label: 'Insurance', s: ins }].map(({ label, s }) => (
+              <div key={label} className="rounded-xl p-2.5" style={{ background: s.bg }}>
+                <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: s.color }}>{label}</p>
+                <p className="text-[12px] font-bold mt-0.5" style={{ color: s.color }}>
+                  {s.days < 0 ? 'Expired' : `${s.days}d left`}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex-1" />
+
+          {/* monthly fuel + expense footer */}
+          <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Fuel className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-[12px] font-bold text-slate-700">AED {fuel.toFixed(0)}</span>
+                <span className="text-[10px] text-slate-400">fuel</span>
+              </div>
+              <div className="w-px h-3 bg-slate-100" />
+              <div className="flex items-center gap-1.5">
+                <Gauge className="w-3.5 h-3.5 text-blue-500" />
+                <span className="text-[12px] font-bold text-slate-700">AED {exp.toLocaleString()}</span>
+                <span className="text-[10px] text-slate-400">exp.</span>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-200 group-hover:text-navy-700 transition-colors" />
+          </div>
+        </div>
+      </div>
+    </Link>
   );
 }
 

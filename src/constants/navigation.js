@@ -7,16 +7,18 @@ import {
   RiBuildingLine,
   RiFileList3Line,
   RiCalendarCheckLine,
-  RiHammerLine,
   RiHistoryLine,
   RiShieldCheckLine,
   RiBankCardLine,
+  RiWalletLine,
   RiFolderOpenLine,
   RiCalendarLine,
   RiBellLine,
   RiPhoneLine,
   RiSettingsLine,
   RiToolsLine,
+  RiTeamLine,
+  RiVipCrownLine,
 } from 'react-icons/ri';
 
 export const NAV_GROUPS = [
@@ -41,7 +43,8 @@ export const NAV_GROUPS = [
       { label: 'Service Companies', icon: RiBuildingLine,      path: '/companies'   },
       { label: 'Contracts',         icon: RiFileList3Line,     path: '/contracts'   },
       { label: 'Maintenance',       icon: RiCalendarCheckLine, path: '/maintenance' },
-      { label: 'Repairs',           icon: RiHammerLine,        path: '/repairs'     },
+      { label: 'Employees',         icon: RiTeamLine,          path: '/employees'   },
+      { label: 'Owners',            icon: RiVipCrownLine,      path: '/owners'      },
     ],
   },
   {
@@ -49,6 +52,7 @@ export const NAV_GROUPS = [
     items: [
       { label: 'History',    icon: RiHistoryLine,          path: '/history'    },
       { label: 'Warranties', icon: RiShieldCheckLine,      path: '/warranties' },
+      { label: 'Wallet',     icon: RiWalletLine,           path: '/wallet'     },
       { label: 'Expenses',   icon: RiBankCardLine,         path: '/expenses'   },
       { label: 'Documents',  icon: RiFolderOpenLine,       path: '/documents'  },
       { label: 'Calendar',   icon: RiCalendarLine,         path: '/calendar'   },

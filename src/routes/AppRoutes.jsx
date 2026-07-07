@@ -23,10 +23,15 @@ const CompanyDetail  = lazy(() => import('../pages/Companies/CompanyDetail'));
 const ContractsPage  = lazy(() => import('../pages/Contracts'));
 const ContractDetail = lazy(() => import('../pages/Contracts/ContractDetail'));
 const MaintenancePage  = lazy(() => import('../pages/Maintenance'));
-const RepairsPage      = lazy(() => import('../pages/Repairs'));
 const HistoryPage      = lazy(() => import('../pages/History'));
 const WarrantiesPage   = lazy(() => import('../pages/Warranties'));
 const ExpensesPage     = lazy(() => import('../pages/Expenses'));
+const WalletPage       = lazy(() => import('../pages/Wallet'));
+const WalletDetail     = lazy(() => import('../pages/Wallet/WalletDetail'));
+const EmployeesPage    = lazy(() => import('../pages/Employees'));
+const EmployeeDetail   = lazy(() => import('../pages/Employees/EmployeeDetail'));
+const OwnersPage       = lazy(() => import('../pages/Owners'));
+const OwnerDetail      = lazy(() => import('../pages/Owners/OwnerDetail'));
 const DocumentsPage    = lazy(() => import('../pages/Documents'));
 const CalendarPage     = lazy(() => import('../pages/CalendarPage'));
 const NotificationsPage = lazy(() => import('../pages/Notifications'));
@@ -67,11 +72,17 @@ export default function AppRoutes() {
             <Route path="contracts"     element={<ContractsPage />}  />
             <Route path="contracts/:id" element={<ContractDetail />} />
             <Route path="maintenance"   element={<MaintenancePage />} />
-            <Route path="repairs"       element={<RepairsPage />}     />
+            <Route path="repairs"       element={<Navigate to="/maintenance" replace />} />
 
             {/* Records */}
             <Route path="history"    element={<HistoryPage />}    />
             <Route path="warranties" element={<WarrantiesPage />} />
+            <Route path="wallet"            element={<WalletPage />}    />
+            <Route path="wallet/:walletType" element={<WalletDetail />} />
+            <Route path="employees"           element={<EmployeesPage />}  />
+            <Route path="employees/:id"      element={<EmployeeDetail />} />
+            <Route path="owners"             element={<OwnersPage />}     />
+            <Route path="owners/:id"         element={<OwnerDetail />}    />
             <Route path="expenses"   element={<ExpensesPage />}   />
             <Route path="documents"  element={<DocumentsPage />}  />
             <Route path="calendar"   element={<CalendarPage />}   />

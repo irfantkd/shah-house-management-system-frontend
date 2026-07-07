@@ -56,7 +56,7 @@ export const propertyStatus = [
 // ── Quick links ───────────────────────────────────────────────────
 export const quickLinks = [
   { label: 'Add Contract',    icon: 'FileText',     path: '/contracts',   color: 'blue'   },
-  { label: 'Log Repair',      icon: 'Wrench',       path: '/repairs',     color: 'orange' },
+  { label: 'Log Repair',      icon: 'Wrench',       path: '/maintenance', color: 'orange' },
   { label: 'Upload Document', icon: 'Upload',       path: '/documents',   color: 'green'  },
   { label: 'Add Reminder',    icon: 'BellPlus',     path: '/calendar',    color: 'purple' },
 ];

@@ -23,5 +23,8 @@ const emergencySlice = createSlice({
 });
 
 export const { addContact, updateContact, deleteContact } = emergencySlice.actions;
-export const selectEmergency = (s) => s.emergency.items;
+
+const pid = (s) => s.properties?.currentId ?? 'prop-default';
+export const selectEmergency = (s) => (s.emergency.items ?? []).filter((c) => (c.propertyId || 'prop-default') === pid(s));
+
 export default emergencySlice.reducer;

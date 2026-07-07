@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -6,8 +7,9 @@ import {
   CheckCircle2, AlertTriangle, XCircle, Bell, CheckCheck,
   Download, Eye, Trash2, Phone, Mail, MessageCircle, Clock,
 } from 'lucide-react';
-import { getContractById } from '../../data/mockContracts';
-import { getCompanyById, CATEGORY_CFG } from '../../data/mockCompanies';
+import { CATEGORY_CFG } from '../../data/mockCompanies';
+import { selectContractById } from '../../store/slices/contractsSlice';
+import { selectCompanyById } from '../../store/slices/companiesSlice';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
@@ -30,11 +32,12 @@ function fmtShort(str) {
 
 export default function ContractDetail() {
   const { id } = useParams();
-  const contract = getContractById(id);
+  const contract = useSelector(selectContractById(id));
+  const company  = useSelector(selectCompanyById(contract?.companyId));
+  const [activeTab, setActiveTab] = useState(0);
+
   if (!contract) return <Navigate to="/contracts" replace />;
 
-  const [activeTab, setActiveTab] = useState(0);
-  const company = getCompanyById(contract.companyId);
   const st   = STATUS_CFG[contract.status] ?? STATUS_CFG.active;
   const cfg  = CATEGORY_CFG[contract.category] ?? { avatar: 'bg-navy-600' };
   const days = getDays(contract.endDate);

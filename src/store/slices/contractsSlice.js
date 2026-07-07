@@ -26,7 +26,11 @@ const contractsSlice = createSlice({
 });
 
 export const { addContract, updateContract, deleteContract } = contractsSlice.actions;
-export const selectContracts          = (s) => s.contracts.items;
-export const selectContractById       = (id) => (s) => s.contracts.items.find((c) => c.id === id);
-export const selectContractsByCompany = (companyId) => (s) => s.contracts.items.filter((c) => c.companyId === companyId);
+
+const pid = (s) => s.properties?.currentId ?? 'prop-default';
+
+export const selectContracts          = (s) => (s.contracts.items ?? []).filter((c) => (c.propertyId || 'prop-default') === pid(s));
+export const selectContractById       = (id) => (s) => (s.contracts.items ?? []).find((c) => c.id === id);
+export const selectContractsByCompany = (companyId) => (s) => (s.contracts.items ?? []).filter((c) => c.companyId === companyId && (c.propertyId || 'prop-default') === pid(s));
+
 export default contractsSlice.reducer;

@@ -5,7 +5,8 @@ import {
   ShieldCheck, Shield, ShieldAlert, ShieldX,
   Phone, Package, ChevronRight, Clock, AlertTriangle,
 } from 'lucide-react';
-import { assets } from '../../data/mockAssets';
+import { useSelector } from 'react-redux';
+import { selectAssets } from '../../store/slices/assetsSlice';
 import Badge from '../../components/ui/Badge';
 import { StatCardSkeleton } from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
@@ -39,6 +40,7 @@ const FILTERS = ['All', 'Active', 'Expiring', 'Expired'];
 export default function WarrantiesPage() {
   const [loading, setLoading] = useState(true);
   const [filter,  setFilter]  = useState('All');
+  const allAssets = useSelector(selectAssets);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 750);
@@ -46,12 +48,15 @@ export default function WarrantiesPage() {
   }, []);
 
   const warranties = useMemo(() =>
-    assets.map((a) => ({
-      ...a,
-      days: getDays(a.warranty.expiryDate),
-      status: getStatus(getDays(a.warranty.expiryDate)),
-    })).sort((a, b) => a.days - b.days),
-  []);
+    allAssets
+      .filter((a) => a.warranty?.expiryDate)
+      .map((a) => ({
+        ...a,
+        days: getDays(a.warranty.expiryDate),
+        status: getStatus(getDays(a.warranty.expiryDate)),
+      }))
+      .sort((a, b) => a.days - b.days),
+  [allAssets]);
 
   const filtered = warranties.filter((w) => {
     if (filter === 'All')      return true;

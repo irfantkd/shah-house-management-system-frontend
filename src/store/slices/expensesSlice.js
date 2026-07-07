@@ -23,5 +23,8 @@ const expensesSlice = createSlice({
 });
 
 export const { addExpense, updateExpense, deleteExpense } = expensesSlice.actions;
-export const selectExpenses = (s) => s.expenses.items;
+
+const pid = (s) => s.properties?.currentId ?? 'prop-default';
+export const selectExpenses = (s) => (s.expenses.items ?? []).filter((e) => (e.propertyId || 'prop-default') === pid(s));
+
 export default expensesSlice.reducer;

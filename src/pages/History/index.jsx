@@ -4,8 +4,8 @@ import {
   History, Wrench, CalendarClock, DollarSign, CheckCircle2,
   Building2, MapPin, Filter,
 } from 'lucide-react';
-import { maintenanceItems } from '../../data/mockMaintenance';
-import { repairs } from '../../data/mockRepairs';
+import { useSelector } from 'react-redux';
+import { selectTasks } from '../../store/slices/tasksSlice';
 import Badge from '../../components/ui/Badge';
 import { StatCardSkeleton } from '../../components/ui/LoadingSkeleton';
 import { cn } from '../../utils/cn';
@@ -23,44 +23,29 @@ function fmtMonthYear(str) {
 export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [filter,  setFilter]  = useState('All');
+  const tasks = useSelector(selectTasks);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 700);
     return () => clearTimeout(t);
   }, []);
 
-  // Combine completed maintenance + completed repairs into a unified timeline
-  const allEvents = useMemo(() => {
-    const mEvents = maintenanceItems
-      .filter((m) => m.status === 'completed' && m.completedDate)
-      .map((m) => ({
-        id: m.id,
-        type: 'maintenance',
-        title: m.title,
-        asset: m.assetName,
-        area: m.areaName,
-        company: m.companyName,
-        date: m.completedDate,
-        cost: m.cost,
-        subLabel: m.type,
-      }));
-
-    const rEvents = repairs
-      .filter((r) => r.status === 'completed' && r.completedDate)
-      .map((r) => ({
-        id: r.id,
-        type: 'repair',
-        title: r.title,
-        asset: r.assetName,
-        area: r.areaName,
-        company: r.companyName,
-        date: r.completedDate,
-        cost: r.actualCost ?? r.estimatedCost,
-        subLabel: `Priority: ${r.priority.charAt(0).toUpperCase() + r.priority.slice(1)}`,
-      }));
-
-    return [...mEvents, ...rEvents].sort((a, b) => b.date.localeCompare(a.date));
-  }, []);
+  const allEvents = useMemo(() =>
+    tasks
+      .filter((t) => t.status === 'completed' && t.completedDate)
+      .map((t) => ({
+        id: t.id,
+        type: t.category === 'Repair' ? 'repair' : 'maintenance',
+        title: t.title,
+        asset: t.assetName,
+        area: t.areaName,
+        company: t.companyName,
+        date: t.completedDate,
+        cost: t.actualCost ?? t.estimatedCost ?? 0,
+        subLabel: t.type || t.category,
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date)),
+  [tasks]);
 
   const filtered = useMemo(() => {
     if (filter === 'Maintenance') return allEvents.filter((e) => e.type === 'maintenance');
@@ -86,7 +71,8 @@ export default function HistoryPage() {
 
   const totalCost  = allEvents.reduce((s, e) => s + (e.cost ?? 0), 0);
   const totalCount = allEvents.length;
-  const thisMonthEvents = allEvents.filter((e) => e.date.startsWith('2026-06'));
+  const curMonth        = new Date().toISOString().slice(0, 7);
+  const thisMonthEvents = allEvents.filter((e) => e.date.startsWith(curMonth));
   const thisMonthCost   = thisMonthEvents.reduce((s, e) => s + (e.cost ?? 0), 0);
 
   return (

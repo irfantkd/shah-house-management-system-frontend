@@ -1,15 +1,31 @@
 ﻿import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   RiBellLine, RiCheckDoubleLine, RiDeleteBinLine, RiFilterLine,
   RiAlertLine, RiInformationLine, RiCalendarLine, RiToolsLine,
-  RiShieldLine, RiMoneyDollarCircleLine, RiCheckLine,
+  RiShieldLine, RiMoneyDollarCircleLine, RiCheckLine, RiCakeLine, RiTeamLine,
+  RiVipCrownLine,
 } from 'react-icons/ri';
 import { selectNotifications, selectUnreadCount, markRead, markAllRead, dismissNotification } from '../../store/slices/notificationsSlice';
+import { selectUpcomingBirthdays } from '../../store/slices/employeesSlice';
+import { selectOwnerBirthdays }    from '../../store/slices/ownersSlice';
 import { NOTIF_TYPE_CFG } from '../../data/mockNotifications';
 import { cn } from '../../utils/cn';
+
+const PALETTES = [
+  ['#0b1d3a','#1e3a6e'], ['#16a34a','#14532d'], ['#7c3aed','#5b21b6'],
+  ['#dc2626','#991b1b'], ['#d97706','#92400e'], ['#0891b2','#155e75'],
+];
+const avatarGrad = (name = '') => {
+  const s = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  const [a, b] = PALETTES[s % PALETTES.length];
+  return `linear-gradient(135deg,${a},${b})`;
+};
+const initials = (name = '') => name.split(' ').slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase();
+const fmtBday  = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
 
 const TYPE_ICONS = {
   maintenance: RiToolsLine,
@@ -33,9 +49,11 @@ function fmtAgo(iso) {
 const TYPES = ['all', 'maintenance', 'repair', 'warranty', 'contract', 'payment', 'info'];
 
 export default function NotificationsPage() {
-  const dispatch   = useDispatch();
-  const all        = useSelector(selectNotifications);
-  const unread     = useSelector(selectUnreadCount);
+  const dispatch  = useDispatch();
+  const all       = useSelector(selectNotifications);
+  const unread    = useSelector(selectUnreadCount);
+  const birthdays      = useSelector(selectUpcomingBirthdays);
+  const ownerBirthdays = useSelector(selectOwnerBirthdays);
   const [tab,      setTab]      = useState('all');
   const [showRead, setShowRead] = useState(true);
 
@@ -94,6 +112,84 @@ export default function NotificationsPage() {
           <RiFilterLine className="w-3.5 h-3.5" />{showRead ? 'Hide Read' : 'Show Read'}
         </button>
       </div>
+
+      {/* ── Birthday Reminders ── */}
+      <AnimatePresence>
+        {birthdays.length > 0 && (
+          <motion.div key="bdayblock" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <div className="rounded-2xl border border-amber-200 overflow-hidden" style={{ background: 'linear-gradient(135deg,#fffbeb,#fef3c7)' }}>
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-amber-100">
+                <RiCakeLine className="w-4 h-4 text-amber-600" />
+                <p className="text-[13px] font-bold text-amber-900">Birthday Reminders</p>
+                <span className="ml-auto px-2 py-0.5 rounded-full bg-amber-400 text-white text-[10px] font-black">{birthdays.length}</span>
+              </div>
+              <div className="p-4 space-y-2">
+                {birthdays.map((emp) => (
+                  <div key={emp.id} className="flex items-center gap-3 p-3 bg-white/70 rounded-xl border border-amber-100">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-black shrink-0"
+                      style={{ background: avatarGrad(emp.name) }}>
+                      {initials(emp.name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-bold text-slate-800">{emp.name}</p>
+                      <p className="text-[11px] text-slate-500">{emp.role} · Birthday {fmtBday(emp.nextBirthday)}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {emp.daysUntilBirthday === 0
+                        ? <span className="text-[12px] font-black text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl">🎉 Today!</span>
+                        : emp.daysUntilBirthday === 1
+                          ? <span className="text-[12px] font-bold text-amber-700">Tomorrow</span>
+                          : <span className="text-[12px] font-bold text-amber-700">In {emp.daysUntilBirthday} days</span>}
+                    </div>
+                  </div>
+                ))}
+                <Link to="/employees" className="flex items-center gap-1.5 pt-1 text-[12px] font-bold text-amber-700 hover:text-amber-900 transition-colors">
+                  <RiTeamLine className="w-3.5 h-3.5" />View all employees →
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Owner Birthday Reminders ── */}
+      <AnimatePresence>
+        {ownerBirthdays.length > 0 && (
+          <motion.div key="ownerbdayblock" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+            <div className="rounded-2xl border border-violet-200 overflow-hidden" style={{ background: 'linear-gradient(135deg,#f5f3ff,#ede9fe)' }}>
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-violet-100">
+                <RiCakeLine className="w-4 h-4 text-violet-600" />
+                <p className="text-[13px] font-bold text-violet-900">Owner Birthdays</p>
+                <span className="ml-auto px-2 py-0.5 rounded-full bg-violet-500 text-white text-[10px] font-black">{ownerBirthdays.length}</span>
+              </div>
+              <div className="p-4 space-y-2">
+                {ownerBirthdays.map((own) => (
+                  <div key={own.id} className="flex items-center gap-3 p-3 bg-white/70 rounded-xl border border-violet-100">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-black shrink-0"
+                      style={{ background: `linear-gradient(135deg,#4c1d95,#6d28d9)` }}>
+                      {initials(own.name)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-bold text-slate-800">{own.name}</p>
+                      <p className="text-[11px] text-slate-500">{own.role} · Birthday {fmtBday(own.nextBirthday)}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {own.daysUntilBirthday === 0
+                        ? <span className="text-[12px] font-black text-violet-700 bg-violet-100 px-2.5 py-1 rounded-xl">🎉 Today!</span>
+                        : own.daysUntilBirthday === 1
+                          ? <span className="text-[12px] font-bold text-violet-700">Tomorrow</span>
+                          : <span className="text-[12px] font-bold text-violet-700">In {own.daysUntilBirthday} days</span>}
+                    </div>
+                  </div>
+                ))}
+                <Link to="/owners" className="flex items-center gap-1.5 pt-1 text-[12px] font-bold text-violet-700 hover:text-violet-900 transition-colors">
+                  <RiVipCrownLine className="w-3.5 h-3.5" />View all owners →
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center" style={{ boxShadow: '0 1px 8px rgb(0 0 0/0.06)' }}>

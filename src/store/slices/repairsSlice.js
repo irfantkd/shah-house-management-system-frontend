@@ -33,5 +33,8 @@ const repairsSlice = createSlice({
 });
 
 export const { addRepair, updateRepair, deleteRepair, updateRepairStatus } = repairsSlice.actions;
-export const selectRepairs = (s) => s.repairs.items;
+
+const pid = (s) => s.properties?.currentId ?? 'prop-default';
+export const selectRepairs = (s) => (s.repairs.items ?? []).filter((r) => (r.propertyId || 'prop-default') === pid(s));
+
 export default repairsSlice.reducer;

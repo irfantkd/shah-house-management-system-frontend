@@ -40,7 +40,10 @@ const areasSlice = createSlice({
 });
 
 export const { addArea, updateArea, deleteArea, addFloor, removeFloor, renameFloor } = areasSlice.actions;
-export const selectAreas    = (s) => s.areas.items   ?? [];
+
+const pid = (s) => s.properties?.currentId ?? 'prop-default';
+
+export const selectAreas    = (s) => (s.areas.items ?? []).filter((a) => (a.propertyId || 'prop-default') === pid(s));
 export const selectFloors   = (s) => s.areas.floors  ?? [];
 export const selectAreaById = (id) => (s) => (s.areas.items ?? []).find((a) => a.id === id);
 export default areasSlice.reducer;

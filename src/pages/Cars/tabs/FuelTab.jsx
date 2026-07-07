@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Fuel, Plus, Trash2, Droplets, TrendingUp, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Fuel, Plus, Trash2, Droplets, TrendingUp, MapPin, Wallet, AlertTriangle } from 'lucide-react';
 import { selectFuelLogsByCarId, addFuelLog, deleteFuelLog } from '../../../store/slices/carsSlice';
+import { selectVehicleWallet, deductFromWallet, LOW_BALANCE_THRESHOLD } from '../../../store/slices/walletSlice';
 import { FUEL_STATIONS } from '../../../data/mockCars';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 import EmptyState from '../../../components/ui/EmptyState';
+import { cn } from '../../../utils/cn';
 import toast from 'react-hot-toast';
+
+const fmt = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
 
 const BLANK = {
   date: new Date().toISOString().split('T')[0],
@@ -16,8 +21,9 @@ const BLANK = {
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export default function FuelTab({ carId }) {
-  const dispatch  = useDispatch();
-  const logs      = useSelector(selectFuelLogsByCarId(carId));
+  const dispatch      = useDispatch();
+  const logs          = useSelector(selectFuelLogsByCarId(carId));
+  const vehicleWallet = useSelector(selectVehicleWallet);
   const [showAdd, setShowAdd] = useState(false);
   const [form,    setForm]    = useState(BLANK);
 
@@ -55,11 +61,12 @@ export default function FuelTab({ carId }) {
     const liters        = Number(form.liters);
     const pricePerLiter = Number(form.pricePerLiter);
     const totalPrice    = Number(form.totalPrice) || +(liters * pricePerLiter).toFixed(2);
-    dispatch(addFuelLog({
-      ...form, carId, liters, pricePerLiter, totalPrice,
-      mileage: form.mileage ? Number(form.mileage) : undefined,
-    }));
-    toast.success('Fuel fill logged');
+    dispatch(addFuelLog({ ...form, carId, liters, pricePerLiter, totalPrice, mileage: form.mileage ? Number(form.mileage) : undefined }));
+    dispatch(deductFromWallet({ wallet: 'vehicle', amount: totalPrice, description: `Fuel — ${liters}L @ ${form.station || 'station'}`, date: form.date }));
+    const afterBal = vehicleWallet.balance - totalPrice;
+    if (afterBal < LOW_BALANCE_THRESHOLD)
+      toast(`Vehicle wallet now AED ${fmt(Math.max(0, afterBal))} — consider topping up`, { icon: '⚠️' });
+    else toast.success('Fuel logged & deducted from Vehicle Wallet');
     setShowAdd(false);
     setForm(BLANK);
   };
@@ -151,8 +158,41 @@ export default function FuelTab({ carId }) {
       )}
 
       {/* Add Fuel Modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Log Fuel Fill-up" subtitle="Track liters, price and total cost">
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Log Fuel Fill-up" subtitle="Track liters, price and total — deducted from Vehicle Wallet">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Vehicle Wallet balance strip */}
+          {(() => {
+            const cost  = calcTotal ? Number(calcTotal) : 0;
+            const after = vehicleWallet.balance - cost;
+            const low   = vehicleWallet.balance < LOW_BALANCE_THRESHOLD;
+            const empty = vehicleWallet.balance <= 0;
+            return (
+              <div className={cn('flex items-center gap-3 p-3 rounded-xl border',
+                empty ? 'bg-red-50 border-red-200' : low ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
+                <Wallet className={cn('w-4 h-4 shrink-0', empty ? 'text-red-500' : low ? 'text-amber-600' : 'text-slate-400')} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-semibold text-slate-500">Vehicle Wallet</p>
+                  <p className={cn('text-[14px] font-bold', empty ? 'text-red-600' : low ? 'text-amber-700' : 'text-slate-800')}>
+                    AED {fmt(vehicleWallet.balance)}
+                  </p>
+                </div>
+                {cost > 0 && (
+                  <div className="text-right shrink-0">
+                    <p className="text-[10px] text-slate-400">After fill-up</p>
+                    <p className={cn('text-[13px] font-bold', after < 0 ? 'text-red-600' : after < LOW_BALANCE_THRESHOLD ? 'text-amber-600' : 'text-emerald-600')}>
+                      AED {fmt(Math.max(0, after))}
+                    </p>
+                  </div>
+                )}
+                {(empty || low) && (
+                  <Link to="/wallet" className={cn('shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg',
+                    empty ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
+                    {empty ? 'Deposit' : 'Top Up'}
+                  </Link>
+                )}
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
