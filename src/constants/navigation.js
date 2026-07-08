@@ -1,6 +1,7 @@
 import {
   RiLayoutGridLine,
   RiHome4Line,
+  RiPrinterLine,
   RiMapPin2Line,
   RiBox3Line,
   RiCarLine,
@@ -56,6 +57,7 @@ export const NAV_GROUPS = [
       { label: 'Expenses',   icon: RiBankCardLine,         path: '/expenses'   },
       { label: 'Documents',  icon: RiFolderOpenLine,       path: '/documents'  },
       { label: 'Calendar',   icon: RiCalendarLine,         path: '/calendar'   },
+      { label: 'Letterhead', icon: RiPrinterLine,          path: '/letterhead' },
     ],
   },
   {

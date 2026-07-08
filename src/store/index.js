@@ -25,6 +25,7 @@ import walletReducer       from './slices/walletSlice';
 import employeesReducer   from './slices/employeesSlice';
 import ownersReducer      from './slices/ownersSlice';
 import propertiesReducer  from './slices/propertiesSlice';
+import letterheadsReducer from './slices/letterheadsSlice';
 
 const rootReducer = combineReducers({
   auth:          authReducer,
@@ -44,6 +45,7 @@ const rootReducer = combineReducers({
   employees:     employeesReducer,
   owners:        ownersReducer,
   properties:    propertiesReducer,
+  letterheads:   letterheadsReducer,
 });
 
 const persistConfig = {

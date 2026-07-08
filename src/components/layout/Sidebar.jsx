@@ -3,11 +3,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  RiArrowLeftSLine, RiArrowRightSLine, RiHome4Line,
+  RiArrowLeftSLine, RiArrowRightSLine,
   RiLogoutBoxRLine, RiSettings3Line, RiAddLine,
   RiCheckLine, RiArrowUpDownLine, RiBuilding2Line,
   RiCloseLine, RiMapPin2Line,
 } from 'react-icons/ri';
+import ShahHouseLogo from '../ui/ShahHouseLogo';
 import { NAV_GROUPS } from '../../constants/navigation';
 import { selectAuthUser, logoutUser } from '../../store/slices/authSlice';
 import { selectUnreadCount } from '../../store/slices/notificationsSlice';
@@ -86,19 +87,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
       >
         {/* ── Logo ── */}
         <div className="flex items-center justify-between px-4 h-14 border-b border-white/[0.07] shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-accent-600 flex items-center justify-center shrink-0 shadow-lg shadow-accent-900/50">
-              <RiHome4Line className="w-3.5 h-3.5 text-white" />
-            </div>
-            <AnimatePresence initial={false}>
-              {!collapsed && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-                  <p className="text-white font-bold text-[13px] leading-tight whitespace-nowrap">AHMS</p>
-                  <p className="text-white/35 text-[10px] whitespace-nowrap">Property Manager</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <ShahHouseLogo size={32} collapsed={collapsed} />
           <button onClick={onToggleCollapse}
             className="hidden lg:flex w-6 h-6 rounded-lg items-center justify-center text-white/30 hover:text-white hover:bg-white/10 transition-colors shrink-0">
             {collapsed ? <RiArrowRightSLine className="w-4 h-4" /> : <RiArrowLeftSLine className="w-4 h-4" />}

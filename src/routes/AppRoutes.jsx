@@ -37,6 +37,7 @@ const CalendarPage     = lazy(() => import('../pages/CalendarPage'));
 const NotificationsPage = lazy(() => import('../pages/Notifications'));
 const EmergencyPage    = lazy(() => import('../pages/Emergency'));
 const SettingsPage     = lazy(() => import('../pages/Settings'));
+const LetterheadPage   = lazy(() => import('../pages/Letterhead'));
 
 function PublicRoute({ children }) {
   const isAuth = useSelector(selectIsAuthenticated);
@@ -86,6 +87,9 @@ export default function AppRoutes() {
             <Route path="expenses"   element={<ExpensesPage />}   />
             <Route path="documents"  element={<DocumentsPage />}  />
             <Route path="calendar"   element={<CalendarPage />}   />
+
+            {/* Letterhead */}
+            <Route path="letterhead" element={<LetterheadPage />} />
 
             {/* System */}
             <Route path="notifications" element={<NotificationsPage />} />
