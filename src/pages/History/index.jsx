@@ -5,7 +5,8 @@ import {
   Building2, MapPin, Filter,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
-import { selectTasks } from '../../store/slices/tasksSlice';
+import { useGetQuery } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Badge from '../../components/ui/Badge';
 import { StatCardSkeleton } from '../../components/ui/LoadingSkeleton';
 import { cn } from '../../utils/cn';
@@ -21,9 +22,10 @@ function fmtMonthYear(str) {
 }
 
 export default function HistoryPage() {
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const { data: tasks = [] } = useGetQuery({ path: '/tasks', params: { propertyId } }, { skip: !propertyId });
   const [loading, setLoading] = useState(true);
   const [filter,  setFilter]  = useState('All');
-  const tasks = useSelector(selectTasks);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 700);

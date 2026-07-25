@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -8,8 +8,9 @@ import {
   RiAddLine, RiSearchLine, RiLayoutGridLine, RiListCheck2,
   RiEditLine, RiDeleteBinLine, RiPhoneLine, RiArrowRightLine,
   RiBuilding2Line, RiStarFill, RiStarLine, RiUserLine,
+  RiCloseLine, RiCheckLine, RiLoader4Line,
 } from 'react-icons/ri';
-import { selectCompanies, addCompany, updateCompany, deleteCompany } from '../../store/slices/companiesSlice';
+import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
 import { CATEGORY_CFG } from '../../data/mockCompanies';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -18,9 +19,7 @@ import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
 
-const CATS = Object.keys(CATEGORY_CFG);
-
-// Hex accent colour per category — used for accent bar + avatar glow
+// Hex accent colour per category (kept for card styling)
 const CAT_HEX = {
   'Climate / AC':      '#2563eb',
   'Pool & Water':      '#0891b2',
@@ -35,7 +34,6 @@ const CAT_HEX = {
 };
 const catColor = (cat) => CAT_HEX[cat] ?? '#0b1d3a';
 
-// First two initials from company name
 const initials = (name) => {
   const parts = name.trim().split(/\s+/);
   return parts.length >= 2
@@ -56,13 +54,22 @@ function StarRow({ rating }) {
 }
 
 export default function CompaniesPage() {
-  const dispatch    = useDispatch();
-  const companies   = useSelector(selectCompanies);
+  const { data: companies = [] } = useGetQuery({ path: '/companies' });
+  const { data: categoriesRaw = [], refetch: refetchCats } = useGetQuery({ path: '/company-categories' });
+
+  const [addCompanyMut]    = usePostMutation();
+  const [updateCompanyMut] = usePutMutation();
+  const [deleteCompanyMut] = useDeleteMutation();
+  const [addCatMut]        = usePostMutation();
+
   const [search,    setSearch]    = useState('');
   const [catFilter, setCatFilter] = useState('All');
   const [view,      setView]      = useState('grid');
   const [modal,     setModal]     = useState(null);
   const [delTarget, setDelTarget] = useState(null);
+
+  // Derive sorted category name list from backend
+  const categories   = categoriesRaw.map((c) => c.name);
 
   const filtered = companies.filter((c) => {
     const q = search.toLowerCase();
@@ -76,6 +83,11 @@ export default function CompaniesPage() {
     active:     companies.filter((c) => (c.activeContracts ?? 0) > 0).length,
     totalSpent: companies.reduce((s, c) => s + (c.totalSpent ?? 0), 0),
     avgRating:  (() => { const rated = companies.filter((c) => c.rating > 0); return rated.length ? rated.reduce((s,c)=>s+c.rating,0)/rated.length : 0; })(),
+  };
+
+  const handleAddCategory = async (name) => {
+    await addCatMut({ path: '/company-categories', body: { name } }).unwrap();
+    await refetchCats();
   };
 
   return (
@@ -92,10 +104,10 @@ export default function CompaniesPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Companies',   value: stats.total,                                          color: 'from-navy-600 to-navy-800'       },
-          { label: 'Active Contracts',  value: stats.active,                                         color: 'from-accent-500 to-accent-700'   },
-          { label: 'Total Spent',       value: `AED ${stats.totalSpent.toLocaleString()}`,           color: 'from-success-500 to-success-700' },
-          { label: 'Avg Rating',        value: stats.avgRating > 0 ? stats.avgRating.toFixed(1)+' ★':'—', color: 'from-amber-500 to-orange-500' },
+          { label: 'Total Companies',   value: stats.total,                                               color: 'from-navy-600 to-navy-800'       },
+          { label: 'Active Contracts',  value: stats.active,                                              color: 'from-accent-500 to-accent-700'   },
+          { label: 'Total Spent',       value: `AED ${stats.totalSpent.toLocaleString()}`,                color: 'from-success-500 to-success-700' },
+          { label: 'Avg Rating',        value: stats.avgRating > 0 ? stats.avgRating.toFixed(1)+' ★':'—', color: 'from-amber-500 to-orange-500'  },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
             className={cn('rounded-2xl p-5 text-white bg-gradient-to-br', s.color)}>
@@ -122,9 +134,9 @@ export default function CompaniesPage() {
         </div>
       </div>
 
-      {/* Category filter */}
+      {/* Category filter — from backend */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {['All', ...CATS].map((cat) => (
+        {['All', ...categories].map((cat) => (
           <button key={cat} onClick={() => setCatFilter(cat)}
             className={cn('px-3.5 py-2 rounded-xl text-[12px] font-semibold whitespace-nowrap border transition-all flex-shrink-0',
               catFilter === cat ? 'bg-navy-900 text-white border-navy-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300')}>
@@ -158,56 +170,54 @@ export default function CompaniesPage() {
         </div>
       )}
 
-      <CompanyModal open={modal !== null} company={modal !== 'add' ? modal : null} onClose={() => setModal(null)}
-        onSave={(data) => {
-          if (modal !== 'add') { dispatch(updateCompany({ ...modal, ...data })); toast.success('Company updated!'); }
-          else { dispatch(addCompany(data)); toast.success('Company added!'); }
-          setModal(null);
+      <CompanyModal
+        open={modal !== null}
+        company={modal !== 'add' ? modal : null}
+        categories={categories}
+        onAddCategory={handleAddCategory}
+        onClose={() => setModal(null)}
+        onSave={async (data) => {
+          try {
+            if (modal !== 'add') {
+              await updateCompanyMut({ path: `/companies/${modal.id}`, body: data }).unwrap();
+              toast.success('Company updated!');
+            } else {
+              await addCompanyMut({ path: '/companies', body: data }).unwrap();
+              toast.success('Company added!');
+            }
+            setModal(null);
+          } catch (err) { toast.error(err.data?.error || 'Failed to save'); }
         }}
       />
       <ConfirmDialog open={!!delTarget} onClose={() => setDelTarget(null)}
-        onConfirm={() => { dispatch(deleteCompany(delTarget.id)); toast.success('Company deleted'); setDelTarget(null); }}
+        onConfirm={async () => {
+          try { await deleteCompanyMut({ path: `/companies/${delTarget.id}` }).unwrap(); toast.success('Company deleted'); }
+          catch { toast.error('Failed to delete'); }
+          setDelTarget(null);
+        }}
         title="Delete Company" message={`Delete "${delTarget?.name}"? This cannot be undone.`}
       />
     </motion.div>
   );
 }
 
+// ─── COMPANY CARD ─────────────────────────────────────────────────────────────
 function CompanyCard({ company: c, onEdit, onDelete }) {
-  const color = catColor(c.category);
-  const inits = initials(c.name);
+  const color  = catColor(c.category);
+  const inits  = initials(c.name);
   const rating = c.rating ?? 0;
 
   return (
     <div className="group rounded-3xl overflow-hidden bg-white flex flex-col"
       style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.10)' }}>
 
-      {/* ── HEADER ── */}
       <div className="relative px-5 pt-4 pb-4 overflow-hidden"
         style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
-
-        {/* category accent bar */}
         <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:color, zIndex:2 }} />
-
-        {/* white sheen */}
-        <div style={{
-          position:'absolute', top:-60, right:-60, width:200, height:200,
-          borderRadius:'50%', background:'rgba(255,255,255,0.03)', pointerEvents:'none',
-        }} />
-
-        {/* decorative rings */}
         <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
         <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', right:8, bottom:-6, fontSize:72, fontWeight:900, lineHeight:1, color:'rgba(255,255,255,0.04)', letterSpacing:'-3px', userSelect:'none', pointerEvents:'none', zIndex:1 }}>{inits}</div>
 
-        {/* ghost watermark */}
-        <div style={{
-          position:'absolute', right:8, bottom:-6,
-          fontSize:72, fontWeight:900, lineHeight:1,
-          color:'rgba(255,255,255,0.04)', letterSpacing:'-3px',
-          userSelect:'none', pointerEvents:'none', zIndex:1,
-        }}>{inits}</div>
-
-        {/* rating badge – top right */}
         {rating > 0 && (
           <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
             style={{ background:'rgba(251,191,36,0.14)', color:'#fbbf24', border:'1px solid rgba(251,191,36,0.25)', zIndex:10 }}>
@@ -216,25 +226,17 @@ function CompanyCard({ company: c, onEdit, onDelete }) {
           </div>
         )}
 
-        {/* avatar + name row – fully inside header */}
         <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
           <div className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center text-[17px] font-black text-white select-none"
-            style={{
-              background:`${color}28`,
-              border:`2.5px solid rgba(255,255,255,0.13)`,
-              boxShadow:`0 4px 20px ${color}40`,
-            }}>
+            style={{ background:`${color}28`, border:'2.5px solid rgba(255,255,255,0.13)', boxShadow:`0 4px 20px ${color}40` }}>
             {inits}
           </div>
           <div className="min-w-0 flex-1 pr-10">
             <p className="text-[16px] font-black text-white leading-tight truncate">{c.name}</p>
-            <p className="text-[11px] font-semibold mt-0.5" style={{ color:'rgba(255,255,255,0.42)' }}>
-              {c.category}
-            </p>
+            <p className="text-[11px] font-semibold mt-0.5" style={{ color:'rgba(255,255,255,0.42)' }}>{c.category}</p>
           </div>
         </div>
 
-        {/* edit / delete – reveal on hover */}
         <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
           <button onClick={(e) => { e.preventDefault(); onEdit(); }}
             className="w-7 h-7 rounded-xl flex items-center justify-center border transition-all"
@@ -253,12 +255,8 @@ function CompanyCard({ company: c, onEdit, onDelete }) {
         </div>
       </div>
 
-      {/* ── BODY ── */}
       <div className="flex-1 flex flex-col px-5 pt-4 pb-4 gap-3">
-        {c.tagline && (
-          <p className="text-[12px] text-slate-400 line-clamp-1">{c.tagline}</p>
-        )}
-
+        {c.tagline && <p className="text-[12px] text-slate-400 line-clamp-1">{c.tagline}</p>}
         <div className="space-y-2">
           {c.contact?.person && (
             <div className="flex items-center gap-2 text-[12px] text-slate-600">
@@ -273,10 +271,7 @@ function CompanyCard({ company: c, onEdit, onDelete }) {
             </div>
           )}
         </div>
-
         <div className="flex-1" />
-
-        {/* footer */}
         <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
           <div>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Contracts · Spent</p>
@@ -294,6 +289,7 @@ function CompanyCard({ company: c, onEdit, onDelete }) {
   );
 }
 
+// ─── COMPANY ROW (list view) ──────────────────────────────────────────────────
 function CompanyRow({ company: c, onEdit, onDelete, last }) {
   const color = catColor(c.category);
   const inits = initials(c.name);
@@ -316,20 +312,26 @@ function CompanyRow({ company: c, onEdit, onDelete, last }) {
   );
 }
 
-function CompanyModal({ open, onClose, company, onSave }) {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+// ─── COMPANY MODAL ────────────────────────────────────────────────────────────
+function CompanyModal({ open, onClose, company, onSave, categories, onAddCategory }) {
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm();
+
   useEffect(() => {
     if (!open) return;
     reset(company ? {
       name: company.name, category: company.category, tagline: company.tagline ?? '',
+      rating: company.rating ?? 0, yearsActive: company.yearsActive ?? 0, status: company.status ?? 'active',
       person: company.contact?.person ?? '', phone: company.contact?.phone ?? '',
       mobile: company.contact?.mobile ?? '', email: company.contact?.email ?? '',
       whatsapp: company.contact?.whatsapp ?? '', address: company.address ?? '', notes: company.notes ?? '',
-    } : {});
+    } : { rating: 0, yearsActive: 0, status: 'active' });
   }, [open, company]);
 
   const onSubmit = (d) => onSave({
     name: d.name, category: d.category, tagline: d.tagline ?? '',
+    rating: parseFloat(d.rating) || 0,
+    yearsActive: parseInt(d.yearsActive) || 0,
+    status: d.status ?? 'active',
     contact: { person: d.person ?? '', phone: d.phone ?? '', mobile: d.mobile ?? '', email: d.email ?? '', whatsapp: d.whatsapp ?? '' },
     address: d.address ?? '', notes: d.notes ?? '',
   });
@@ -343,13 +345,37 @@ function CompanyModal({ open, onClose, company, onSave }) {
             <Input {...register('name', { required: 'Required' })} placeholder="e.g. Cool Air LLC" />
           </Field>
           <Field label="Category" required error={errors.category?.message}>
-            <Select {...register('category', { required: 'Required' })} placeholder="Select category"
-              options={CATS.map((c) => ({ value: c, label: c }))} />
+            <CategoryCombobox
+              value={watch('category') ?? ''}
+              onChange={(v) => setValue('category', v, { shouldValidate: true })}
+              hasError={!!errors.category}
+              categories={categories}
+              onAddCategory={onAddCategory}
+            />
+            <input type="hidden" {...register('category', { required: 'Required' })} />
           </Field>
         </FormGrid>
+
         <Field label="Tagline / Short Description">
           <Input {...register('tagline')} placeholder="e.g. Premium AC maintenance specialists" />
         </Field>
+
+        <FormGrid>
+          <Field label="Rating (0–5)">
+            <Input {...register('rating')} type="number" min="0" max="5" step="0.1" placeholder="e.g. 4.5" />
+          </Field>
+          <Field label="Years Active">
+            <Input {...register('yearsActive')} type="number" min="0" placeholder="e.g. 8" />
+          </Field>
+          <Field label="Status">
+            <Select {...register('status')} options={[
+              { value: 'active',   label: 'Active'   },
+              { value: 'inactive', label: 'Inactive' },
+              { value: 'paused',   label: 'Paused'   },
+            ]} />
+          </Field>
+        </FormGrid>
+
         <FormSection title="Contact Details">
           <FormGrid>
             <Field label="Contact Person"><Input {...register('person')} placeholder="Full name" /></Field>
@@ -359,6 +385,7 @@ function CompanyModal({ open, onClose, company, onSave }) {
             <Field label="WhatsApp"><Input {...register('whatsapp')} placeholder="+971 5X XXX XXXX" /></Field>
           </FormGrid>
         </FormSection>
+
         <Field label="Address">
           <Input {...register('address')} placeholder="Street, area, Dubai" />
         </Field>
@@ -368,5 +395,171 @@ function CompanyModal({ open, onClose, company, onSave }) {
         <FormActions onCancel={onClose} submitLabel={company ? 'Update Company' : 'Add Company'} />
       </form>
     </Modal>
+  );
+}
+
+// ─── CATEGORY COMBOBOX ────────────────────────────────────────────────────────
+function CategoryCombobox({ value, onChange, hasError, categories, onAddCategory }) {
+  const [open,    setOpen]    = useState(false);
+  const [input,   setInput]   = useState(value ?? '');
+  const [addMode, setAddMode] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [saving,  setSaving]  = useState(false);
+  const ref     = useRef(null);
+  const addRef  = useRef(null);
+
+  useEffect(() => { setInput(value ?? ''); }, [value]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setAddMode(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    if (addMode && addRef.current) addRef.current.focus();
+  }, [addMode]);
+
+  const lowerCats = categories.map((c) => c.toLowerCase());
+  const filtered  = categories.filter((c) => c.toLowerCase().includes(input.toLowerCase()));
+
+  const select = (cat) => {
+    onChange(cat);
+    setInput(cat);
+    setOpen(false);
+    setAddMode(false);
+  };
+
+  const handleInput = (e) => {
+    setInput(e.target.value);
+    onChange(e.target.value);
+    setOpen(true);
+    setAddMode(false);
+  };
+
+  const handleSaveNewCategory = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    if (lowerCats.includes(name.toLowerCase())) {
+      // already exists — just select it
+      const existing = categories.find((c) => c.toLowerCase() === name.toLowerCase());
+      select(existing);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onAddCategory(name);
+      toast.success(`Category "${name}" created`);
+      select(name);
+      setNewName('');
+      setAddMode(false);
+    } catch (err) {
+      toast.error(err.data?.error || 'Failed to create category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Text input */}
+      <input
+        type="text"
+        value={input}
+        onChange={handleInput}
+        onFocus={() => setOpen(true)}
+        placeholder="Select or type a category…"
+        autoComplete="off"
+        className={cn(
+          'w-full h-10 px-3 pr-8 rounded-xl border text-[13px] outline-none focus:ring-2 focus:ring-accent-400 transition-all',
+          hasError ? 'border-danger-400 ring-1 ring-danger-400' : 'border-slate-200',
+        )}
+      />
+      {/* Chevron */}
+      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400">
+        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+        </svg>
+      </span>
+
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
+
+          {/* Category list */}
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length > 0 ? filtered.map((cat) => (
+              <button key={cat} type="button" onClick={() => select(cat)}
+                className={cn(
+                  'w-full text-left px-3.5 py-2.5 text-[13px] hover:bg-slate-50 transition-colors flex items-center justify-between',
+                  value === cat ? 'bg-accent-50 text-accent-700 font-semibold' : 'text-slate-700',
+                )}>
+                {cat}
+                {value === cat && <RiCheckLine className="w-3.5 h-3.5 text-accent-600 shrink-0" />}
+              </button>
+            )) : (
+              <p className="px-3.5 py-3 text-[12px] text-slate-400 italic">No categories match "{input}"</p>
+            )}
+          </div>
+
+          {/* Divider + Add new category */}
+          <div className="border-t border-slate-100">
+            {!addMode ? (
+              <button
+                type="button"
+                onClick={() => { setAddMode(true); setNewName(input || ''); }}
+                className="w-full text-left px-3.5 py-2.5 text-[13px] font-semibold text-accent-600 hover:bg-accent-50 transition-colors flex items-center gap-2"
+              >
+                <div className="w-5 h-5 rounded-md bg-accent-100 flex items-center justify-center shrink-0">
+                  <RiAddLine className="w-3 h-3 text-accent-600" />
+                </div>
+                Add new category
+              </button>
+            ) : (
+              <div className="p-2.5 space-y-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-0.5">New category name</p>
+                <div className="flex gap-2">
+                  <input
+                    ref={addRef}
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleSaveNewCategory(); }
+                      if (e.key === 'Escape') { setAddMode(false); setNewName(''); }
+                    }}
+                    placeholder="e.g. Landscaping, IT Services…"
+                    className="flex-1 h-9 px-2.5 rounded-lg border border-slate-200 text-[12px] outline-none focus:ring-2 focus:ring-accent-400 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveNewCategory}
+                    disabled={!newName.trim() || saving}
+                    className="h-9 px-3 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-[11px] font-bold disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                  >
+                    {saving
+                      ? <RiLoader4Line className="w-3.5 h-3.5 animate-spin" />
+                      : <RiCheckLine className="w-3.5 h-3.5" />
+                    }
+                    {saving ? 'Saving' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAddMode(false); setNewName(''); }}
+                    className="h-9 w-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <RiCloseLine className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

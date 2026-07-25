@@ -1,15 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UserPlus, Cake, Phone, Mail, ArrowRight,
   Pencil, Trash2, BadgeCheck, Home, X,
 } from 'lucide-react';
-import {
-  selectOwners, selectOwnerBirthdays,
-  addOwner, updateOwner, deleteOwner,
-} from '../../store/slices/ownersSlice';
+import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import toast from 'react-hot-toast';
 
 const AVATAR_COLORS = [
@@ -83,7 +81,7 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
           <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
             style={{ background: '#f59e0b', boxShadow: '0 2px 8px rgba(245,158,11,0.5)', zIndex: 10 }}>
             <Cake className="w-3 h-3" />
-            {bday.daysUntilBirthday === 0 ? '🎉 Today!' : `${bday.daysUntilBirthday} days`}
+            {bday.daysUntilBirthday === 0 ? 'Today!' : `${bday.daysUntilBirthday} days`}
           </div>
         )}
 
@@ -182,9 +180,25 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function OwnersPage() {
-  const dispatch  = useDispatch();
-  const owners    = useSelector(selectOwners);
-  const birthdays = useSelector(selectOwnerBirthdays);
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const { data: owners = [] } = useGetQuery({ path: '/owners', params: { propertyId } }, { skip: !propertyId });
+  const [addOwnerMut]    = usePostMutation();
+  const [updateOwnerMut] = usePutMutation();
+  const [deleteOwnerMut] = useDeleteMutation();
+
+  const birthdays = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return owners
+      .filter((o) => o.dateOfBirth)
+      .map((o) => {
+        const dob = new Date(o.dateOfBirth); const yr = today.getFullYear();
+        let next = new Date(yr, dob.getMonth(), dob.getDate());
+        if (next < today) next = new Date(yr + 1, dob.getMonth(), dob.getDate());
+        return { ...o, daysUntilBirthday: Math.round((next - today) / 86_400_000), nextBirthday: next.toISOString().split('T')[0] };
+      })
+      .filter((o) => o.daysUntilBirthday <= 7)
+      .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
+  }, [owners]);
 
   const [drawer,     setDrawer]     = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
@@ -194,23 +208,27 @@ export default function OwnersPage() {
   const openAdd  = ()     => { setForm(BLANK); setDrawer('add'); };
   const openEdit = (own)  => { setForm({ ...BLANK, ...own }); setDrawer(own); };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Name is required');
     if (!form.dateOfBirth) return toast.error('Date of birth is required');
-    if (drawer === 'add') {
-      dispatch(addOwner(form));
-      toast.success(`${form.name} added`);
-    } else {
-      dispatch(updateOwner({ ...form, id: drawer.id }));
-      toast.success('Owner updated');
-    }
-    setDrawer(null);
+    try {
+      if (drawer === 'add') {
+        await addOwnerMut({ path: '/owners', body: { ...form, propertyId } }).unwrap();
+        toast.success(`${form.name} added`);
+      } else {
+        await updateOwnerMut({ path: `/owners/${drawer.id}`, body: form }).unwrap();
+        toast.success('Owner updated');
+      }
+      setDrawer(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to save'); }
   };
 
-  const handleDelete = () => {
-    dispatch(deleteOwner(delConfirm.id));
-    toast.success(`${delConfirm.name} removed`);
+  const handleDelete = async () => {
+    try {
+      await deleteOwnerMut({ path: `/owners/${delConfirm.id}` }).unwrap();
+      toast.success(`${delConfirm.name} removed`);
+    } catch { toast.error('Failed to delete'); }
     setDelConfirm(null);
   };
 
@@ -264,7 +282,7 @@ export default function OwnersPage() {
                       </div>
                       <span className="text-[14px] font-bold text-amber-950">{o.name}</span>
                       <span className="text-[12px] text-amber-600">
-                        {o.daysUntilBirthday === 0 ? '— 🎉 Today!' : o.daysUntilBirthday === 1 ? '— Tomorrow' : `— in ${o.daysUntilBirthday} days`}
+                        {o.daysUntilBirthday === 0 ? '— Today!' : o.daysUntilBirthday === 1 ? '— Tomorrow' : `— in ${o.daysUntilBirthday} days`}
                       </span>
                     </div>
                   ))}

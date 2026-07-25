@@ -1,28 +1,28 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
-  Wallet, Car, Home, Plus, ArrowDownLeft, ArrowUpRight,
+  Wallet, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
   AlertTriangle, Download, ChevronRight,
 } from 'lucide-react';
 import { downloadCombinedWalletPDF } from '../../utils/pdfReport';
-import {
-  selectVehicleWallet, selectHomeWallet,
-  depositToWallet, LOW_BALANCE_THRESHOLD,
-} from '../../store/slices/walletSlice';
-import { selectCurrentProperty } from '../../store/slices/propertiesSlice';
+import { useGetQuery, usePostMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
 import Modal  from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
+const LOW_BALANCE_THRESHOLD = 5000;
+
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.32, delay: d, ease: [0.4, 0, 0.2, 1] } });
 const BLANK = { wallet: 'vehicle', amount: '', note: '', date: new Date().toISOString().split('T')[0] };
 
 const WALLETS = {
-  vehicle: { label: 'Vehicle Wallet', desc: 'Fuel, maintenance, repairs & fleet costs', icon: Car,  color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-  home:    { label: 'Home Wallet',    desc: 'Property services, grocery & household',   icon: Home, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
+  vehicle: { label: 'Vehicle Wallet', desc: 'Fuel, maintenance, repairs & fleet costs',  icon: Car,     color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+  home:    { label: 'Home Wallet',    desc: 'Property services, grocery & household',    icon: Home,    color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
+  salary:  { label: 'Salary Wallet',  desc: 'Employee salary payments only',             icon: Banknote, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
 };
 
 const PERIODS = [
@@ -50,10 +50,18 @@ function periodLabel(period) {
 }
 
 export default function WalletPage() {
-  const dispatch  = useDispatch();
-  const vWallet   = useSelector(selectVehicleWallet);
-  const hWallet   = useSelector(selectHomeWallet);
-  const property  = useSelector(selectCurrentProperty);
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const property   = useSelector(selectCurrentProperty);
+
+  const { data: walletData, refetch: refetchWallets } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const { data: rawTxns = [], refetch: refetchTxns  } = useGetQuery({ path: '/wallet/transactions', params: { propertyId } }, { skip: !propertyId });
+
+  const EMPTY_W = { balance: 0, totalDeposited: 0 };
+  const vWallet = { ...EMPTY_W, ...walletData?.vehicle };
+  const hWallet = { ...EMPTY_W, ...walletData?.home    };
+  const sWallet = { ...EMPTY_W, ...walletData?.salary  };
+
+  const [depositMut] = usePostMutation();
 
   const [showDeposit, setShowDeposit] = useState(false);
   const [form,        setForm]        = useState(BLANK);
@@ -61,34 +69,35 @@ export default function WalletPage() {
   const [txnPeriod,   setTxnPeriod]   = useState('month');
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const walletsMap = { vehicle: vWallet, home: hWallet };
+  const walletsMap = { vehicle: vWallet, home: hWallet, salary: sWallet };
 
-  const allTransactions = useMemo(() => {
-    const vTxns = (vWallet.transactions ?? []).map((t) => ({ ...t, wallet: 'vehicle' }));
-    const hTxns = (hWallet.transactions ?? []).map((t) => ({ ...t, wallet: 'home' }));
-    return [...vTxns, ...hTxns].sort((a, b) => {
+  const allTransactions = useMemo(() =>
+    [...rawTxns].sort((a, b) => {
       const diff = new Date(b.date) - new Date(a.date);
-      return diff !== 0 ? diff : b.id.localeCompare(a.id);
-    });
-  }, [vWallet.transactions, hWallet.transactions]);
+      return diff !== 0 ? diff : String(b.id).localeCompare(String(a.id));
+    }),
+  [rawTxns]);
 
   const periodFiltered = useMemo(() => applyPeriod(allTransactions, txnPeriod), [allTransactions, txnPeriod]);
 
   const visible = useMemo(() => {
     if (filter === 'all')      return periodFiltered;
-    if (filter === 'deposits') return periodFiltered.filter((t) => t.type === 'deposit');
-    if (filter === 'expenses') return periodFiltered.filter((t) => t.type === 'expense');
-    return periodFiltered.filter((t) => t.wallet === filter);
+    if (filter === 'deposits') return periodFiltered.filter((t) => t.type === 'credit');
+    if (filter === 'expenses') return periodFiltered.filter((t) => t.type === 'debit');
+    return periodFiltered.filter((t) => t.walletType === filter);
   }, [periodFiltered, filter]);
 
-  const handleDeposit = (e) => {
+  const handleDeposit = async (e) => {
     e.preventDefault();
     const amt = Number(form.amount);
     if (!amt || amt <= 0) return toast.error('Enter a valid amount');
-    dispatch(depositToWallet({ wallet: form.wallet, amount: amt, note: form.note, date: form.date }));
-    toast.success(`AED ${fmt(amt)} deposited to ${WALLETS[form.wallet].label}`);
-    setShowDeposit(false);
-    setForm(BLANK);
+    try {
+      await depositMut({ path: '/wallet/deposit', body: { propertyId, walletType: form.wallet, amount: amt, description: form.note, note: form.note, date: form.date } }).unwrap();
+      await Promise.all([refetchWallets(), refetchTxns()]);
+      toast.success(`AED ${fmt(amt)} deposited to ${WALLETS[form.wallet].label}`);
+      setShowDeposit(false);
+      setForm(BLANK);
+    } catch (err) { toast.error(err.data?.error || 'Failed to deposit'); }
   };
 
   const openDeposit = (wallet = 'vehicle') => { setForm({ ...BLANK, wallet }); setShowDeposit(true); };
@@ -122,7 +131,7 @@ export default function WalletPage() {
       </motion.div>
 
       {/* ── Wallet Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {Object.entries(WALLETS).map(([key, w], i) => {
           const wallet  = walletsMap[key];
           const balance = wallet.balance ?? 0;
@@ -194,7 +203,7 @@ export default function WalletPage() {
       </div>
 
       {/* ── Low balance alerts ── */}
-      {(vWallet.balance < LOW_BALANCE_THRESHOLD || hWallet.balance < LOW_BALANCE_THRESHOLD) && (
+      {(vWallet.balance < LOW_BALANCE_THRESHOLD || hWallet.balance < LOW_BALANCE_THRESHOLD || sWallet.balance < LOW_BALANCE_THRESHOLD) && (
         <motion.div {...fade(0.14)}>
           <div className="space-y-2">
             {vWallet.balance <= 0 && (
@@ -249,6 +258,32 @@ export default function WalletPage() {
                 </button>
               </div>
             )}
+            {sWallet.balance <= 0 && (
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-red-700">Salary Wallet is empty</p>
+                  <p className="text-[11px] text-red-500">Employee salaries cannot be paid until you deposit funds.</p>
+                </div>
+                <button onClick={() => openDeposit('salary')}
+                  className="shrink-0 text-[12px] font-bold text-red-700 bg-red-100 px-3 py-1.5 rounded-xl hover:bg-red-200 transition-colors">
+                  Deposit Now
+                </button>
+              </div>
+            )}
+            {sWallet.balance > 0 && sWallet.balance < LOW_BALANCE_THRESHOLD && (
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-amber-700">Salary Wallet running low — AED {fmt(sWallet.balance)} left</p>
+                  <p className="text-[11px] text-amber-600">Consider topping up before next salary payment.</p>
+                </div>
+                <button onClick={() => openDeposit('salary')}
+                  className="shrink-0 text-[12px] font-bold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-xl hover:bg-amber-200 transition-colors">
+                  Top Up
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
@@ -266,7 +301,7 @@ export default function WalletPage() {
               </p>
             </div>
             <button
-              onClick={() => downloadCombinedWalletPDF({ vWallet, hWallet, transactions: visible, periodLabel: periodLabel(txnPeriod), propertyName: property?.name, propertyType: property?.type })}
+              onClick={() => downloadCombinedWalletPDF({ vWallet, hWallet, transactions: visible.filter((t) => t.walletType !== 'salary'), periodLabel: periodLabel(txnPeriod), propertyName: property?.name, propertyType: property?.type })}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all">
               <Download className="w-3.5 h-3.5" /> Download PDF
             </button>
@@ -290,6 +325,7 @@ export default function WalletPage() {
                 { k: 'all',      l: 'All'      },
                 { k: 'vehicle',  l: 'Vehicle'  },
                 { k: 'home',     l: 'Home'     },
+                { k: 'salary',   l: 'Salary'   },
                 { k: 'deposits', l: 'Deposits' },
                 { k: 'expenses', l: 'Expenses' },
               ].map(({ k, l }) => (
@@ -311,8 +347,8 @@ export default function WalletPage() {
             <>
               <div className="divide-y divide-slate-50">
                 {visible.map((txn) => {
-                  const wCfg   = WALLETS[txn.wallet];
-                  const isDepo = txn.type === 'deposit';
+                  const wCfg   = WALLETS[txn.walletType] ?? WALLETS.vehicle;
+                  const isDepo = txn.type === 'credit';
                   const WIcon  = wCfg.icon;
                   return (
                     <div key={txn.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
@@ -349,10 +385,10 @@ export default function WalletPage() {
                 <p className="text-[11px] text-slate-400">{visible.length} transactions</p>
                 <div className="flex items-center gap-4">
                   <span className="text-[12px] text-emerald-600 font-bold">
-                    +AED {fmt(visible.filter((t) => t.type === 'deposit').reduce((s, t) => s + t.amount, 0))}
+                    +AED {fmt(visible.filter((t) => t.type === 'credit' || t.type === 'deposit').reduce((s, t) => s + t.amount, 0))}
                   </span>
                   <span className="text-[12px] text-red-500 font-bold">
-                    −AED {fmt(visible.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0))}
+                    −AED {fmt(visible.filter((t) => t.type === 'debit').reduce((s, t) => s + t.amount, 0))}
                   </span>
                 </div>
               </div>

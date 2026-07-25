@@ -14,6 +14,7 @@ const Dashboard      = lazy(() => import('../pages/Dashboard'));
 const HomeInfo       = lazy(() => import('../pages/HomeInfo'));
 const AreasPage      = lazy(() => import('../pages/Areas'));
 const AreaDetail     = lazy(() => import('../pages/Areas/AreaDetail'));
+const FloorsPage     = lazy(() => import('../pages/Floors'));
 const AssetsPage     = lazy(() => import('../pages/Assets'));
 const AssetDetail    = lazy(() => import('../pages/Assets/AssetDetail'));
 const CarsPage       = lazy(() => import('../pages/Cars'));
@@ -23,6 +24,7 @@ const CompanyDetail  = lazy(() => import('../pages/Companies/CompanyDetail'));
 const ContractsPage  = lazy(() => import('../pages/Contracts'));
 const ContractDetail = lazy(() => import('../pages/Contracts/ContractDetail'));
 const MaintenancePage  = lazy(() => import('../pages/Maintenance'));
+const TaskDetail       = lazy(() => import('../pages/Maintenance/TaskDetail'));
 const HistoryPage      = lazy(() => import('../pages/History'));
 const WarrantiesPage   = lazy(() => import('../pages/Warranties'));
 const ExpensesPage     = lazy(() => import('../pages/Expenses'));
@@ -32,12 +34,13 @@ const EmployeesPage    = lazy(() => import('../pages/Employees'));
 const EmployeeDetail   = lazy(() => import('../pages/Employees/EmployeeDetail'));
 const OwnersPage       = lazy(() => import('../pages/Owners'));
 const OwnerDetail      = lazy(() => import('../pages/Owners/OwnerDetail'));
-const DocumentsPage    = lazy(() => import('../pages/Documents'));
 const CalendarPage     = lazy(() => import('../pages/CalendarPage'));
 const NotificationsPage = lazy(() => import('../pages/Notifications'));
-const EmergencyPage    = lazy(() => import('../pages/Emergency'));
-const SettingsPage     = lazy(() => import('../pages/Settings'));
-const LetterheadPage   = lazy(() => import('../pages/Letterhead'));
+const SettingsPage       = lazy(() => import('../pages/Settings'));
+const LetterheadPage     = lazy(() => import('../pages/Letterhead'));
+const TransactionsPage   = lazy(() => import('../pages/Transactions'));
+const PropertiesPage   = lazy(() => import('../pages/Properties'));
+const UsersPage        = lazy(() => import('../pages/Users'));
 
 function PublicRoute({ children }) {
   const isAuth = useSelector(selectIsAuthenticated);
@@ -59,7 +62,9 @@ export default function AppRoutes() {
             <Route index element={<Dashboard />} />
 
             {/* Property */}
+            <Route path="properties" element={<PropertiesPage />} />
             <Route path="home-info"  element={<HomeInfo />}    />
+            <Route path="floors"     element={<FloorsPage />}  />
             <Route path="areas"      element={<AreasPage />}   />
             <Route path="areas/:id"  element={<AreaDetail />}  />
             <Route path="assets"     element={<AssetsPage />}  />
@@ -72,7 +77,8 @@ export default function AppRoutes() {
             <Route path="companies/:id" element={<CompanyDetail />}  />
             <Route path="contracts"     element={<ContractsPage />}  />
             <Route path="contracts/:id" element={<ContractDetail />} />
-            <Route path="maintenance"   element={<MaintenancePage />} />
+            <Route path="maintenance"        element={<MaintenancePage />} />
+            <Route path="maintenance/:id"   element={<TaskDetail />} />
             <Route path="repairs"       element={<Navigate to="/maintenance" replace />} />
 
             {/* Records */}
@@ -84,17 +90,17 @@ export default function AppRoutes() {
             <Route path="employees/:id"      element={<EmployeeDetail />} />
             <Route path="owners"             element={<OwnersPage />}     />
             <Route path="owners/:id"         element={<OwnerDetail />}    />
-            <Route path="expenses"   element={<ExpensesPage />}   />
-            <Route path="documents"  element={<DocumentsPage />}  />
-            <Route path="calendar"   element={<CalendarPage />}   />
+            <Route path="expenses"      element={<ExpensesPage />}      />
+            <Route path="transactions"  element={<TransactionsPage />}  />
+            <Route path="calendar"      element={<CalendarPage />}      />
 
             {/* Letterhead */}
             <Route path="letterhead" element={<LetterheadPage />} />
 
             {/* System */}
             <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="emergency"     element={<EmergencyPage />}     />
             <Route path="settings"      element={<SettingsPage />}      />
+            <Route path="users"         element={<UsersPage />}         />
           </Route>
         </Route>
 

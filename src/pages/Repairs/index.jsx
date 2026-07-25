@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -9,12 +9,10 @@ import {
   RiArrowDownSLine, RiArrowUpSLine, RiLoader4Line, RiWalletLine,
   RiBuilding2Line, RiCheckLine, RiLayoutGridLine, RiListCheck2,
 } from 'react-icons/ri';
-import { selectRepairs, addRepair, updateRepair, deleteRepair, updateRepairStatus } from '../../store/slices/repairsSlice';
-import { selectCompanies } from '../../store/slices/companiesSlice';
-import { selectAreas } from '../../store/slices/areasSlice';
-import { selectAssets } from '../../store/slices/assetsSlice';
-import { selectHomeWallet, deductFromWallet } from '../../store/slices/walletSlice';
-import { PRIORITY_CFG, REPAIR_STATUS_CFG } from '../../data/mockRepairs';
+import { Wrench } from 'lucide-react';
+import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, usePatchMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
+import { REPAIR_STATUS_CFG } from '../../data/mockRepairs';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { Field, Input, Select, Textarea, FormGrid, FormSection, FormActions } from '../../components/ui/FormField';
@@ -43,12 +41,23 @@ const STATUS_BADGE = {
 function fmtDate(s) { return s ? new Date(s+'T00:00:00').toLocaleDateString('en-AE',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
 
 export default function RepairsPage() {
-  const dispatch   = useDispatch();
-  const repairs    = useSelector(selectRepairs);
-  const companies  = useSelector(selectCompanies);
-  const areas      = useSelector(selectAreas);
-  const assets     = useSelector(selectAssets);
-  const homeWallet = useSelector(selectHomeWallet);
+  const propertyId = useSelector(selectCurrentPropertyId);
+
+  const { data: allTasks   = [] }             = useGetQuery({ path: '/tasks',    params: { propertyId, category: 'Repair' } }, { skip: !propertyId });
+  const { data: companies  = [] }             = useGetQuery({ path: '/companies' });
+  const { data: areas      = [] }             = useGetQuery({ path: '/areas',    params: { propertyId } }, { skip: !propertyId });
+  const { data: assets     = [] }             = useGetQuery({ path: '/assets',   params: { propertyId } }, { skip: !propertyId });
+  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const homeWallet    = { balance: walletData?.home?.balance    ?? 0 };
+  const vehicleWallet = { balance: walletData?.vehicle?.balance ?? 0 };
+
+  const repairs = allTasks.filter((t) => t.category === 'Repair');
+
+  const [addRepairMut]    = usePostMutation();
+  const [updateRepairMut] = usePutMutation();
+  const [deleteRepairMut] = useDeleteMutation();
+  const [patchRepairMut]  = usePatchMutation();
+  const [deductWalletMut] = usePostMutation();
 
   const [view,      setView]      = useState('grid');
   const [tab,       setTab]       = useState('all');
@@ -68,23 +77,20 @@ export default function RepairsPage() {
     completed:  repairs.filter((r) => r.status === 'completed').length,
   };
 
-  const handleStatusChange = (repair, status) => {
-    dispatch(updateRepairStatus({ id: repair.id, status }));
-    if (status === 'completed') {
-      const cost = repair.actualCost > 0 ? repair.actualCost : repair.estimatedCost ?? 0;
-      if (cost > 0) {
-        dispatch(deductFromWallet({
-          wallet: 'home',
-          amount: cost,
-          description: `Repair: ${repair.title}`,
-          category: 'Repairs',
-          date: new Date().toISOString().split('T')[0],
-        }));
-        toast.success(`✓ Completed — AED ${cost.toLocaleString()} deducted from Home Wallet`);
-        return;
+  const handleStatusChange = async (repair, status) => {
+    const cost = repair.actualCost > 0 ? repair.actualCost : repair.estimatedCost ?? 0;
+    const walletType = repair.walletType ?? 'home';
+    const walletLabel = walletType === 'vehicle' ? 'Vehicle' : 'Home';
+    try {
+      await patchRepairMut({ path: `/tasks/${repair.id}`, body: { status, ...(status === 'completed' && cost > 0 ? { actualCost: cost } : {}) } }).unwrap();
+      if (status === 'completed' && cost > 0) {
+        await deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType, amount: cost, description: `Repair: ${repair.title}`, category: 'Repairs', date: new Date().toISOString().split('T')[0] } }).unwrap();
+        await refetchWallet();
+        toast.success(`Completed — AED ${cost.toLocaleString()} deducted from ${walletLabel} Wallet`);
+      } else {
+        toast.success('Status updated!');
       }
-    }
-    toast.success('Status updated!');
+    } catch { toast.error('Failed to update status'); }
   };
 
   return (
@@ -210,15 +216,18 @@ export default function RepairsPage() {
 
       <RepairModal open={modal !== null} repair={modal !== 'add' ? modal : null}
         companies={companies} areas={areas} assets={assets}
+        homeWallet={homeWallet} vehicleWallet={vehicleWallet}
         onClose={() => setModal(null)}
-        onSave={(data) => {
-          if (modal !== 'add') { dispatch(updateRepair({ ...modal, ...data })); toast.success('Repair updated!'); }
-          else { dispatch(addRepair(data)); toast.success('Issue reported!'); }
-          setModal(null);
+        onSave={async (data) => {
+          try {
+            if (modal !== 'add') { await updateRepairMut({ path: `/tasks/${modal.id}`, body: { ...modal, ...data } }).unwrap(); toast.success('Repair updated!'); }
+            else { await addRepairMut({ path: '/tasks', body: { ...data, propertyId, category: 'Repair', status: data.status || 'reported' } }).unwrap(); toast.success('Issue reported!'); }
+            setModal(null);
+          } catch { toast.error('Failed to save repair'); }
         }}
       />
       <ConfirmDialog open={!!delTarget} onClose={() => setDelTarget(null)}
-        onConfirm={() => { dispatch(deleteRepair(delTarget.id)); toast.success('Repair deleted'); setDelTarget(null); }}
+        onConfirm={async () => { try { await deleteRepairMut({ path: `/tasks/${delTarget.id}` }).unwrap(); toast.success('Repair deleted'); setDelTarget(null); } catch { toast.error('Failed to delete'); } }}
         title="Delete Repair" message={`Delete "${delTarget?.title}"? This cannot be undone.`}
       />
     </motion.div>
@@ -250,7 +259,7 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
         <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none', zIndex:1 }} />
 
         {/* ghost watermark */}
-        <div style={{ position:'absolute', right:8, bottom:-4, fontSize:70, lineHeight:1, opacity:0.06, userSelect:'none', pointerEvents:'none', zIndex:1 }}>🔧</div>
+        <Wrench style={{ position:'absolute', right:8, bottom:-4, width:70, height:70, color:'rgba(255,255,255,0.06)', userSelect:'none', pointerEvents:'none', zIndex:1 }} />
 
         {/* priority badge top-right */}
         <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full text-[11px] font-bold"
@@ -260,9 +269,9 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
 
         {/* icon + title */}
         <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
-          <div className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center text-[26px] select-none"
+          <div className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center"
             style={{ background:`${accent}28`, border:'2.5px solid rgba(255,255,255,0.13)', boxShadow:`0 4px 20px ${accent}40` }}>
-            🔧
+            <Wrench className="w-7 h-7 text-white" strokeWidth={1.5} />
           </div>
           <div className="min-w-0 flex-1 pr-10">
             <p className="text-[15px] font-black text-white leading-snug line-clamp-2">{r.title}</p>
@@ -434,14 +443,16 @@ function RepairRow({ repair: r, expanded, onToggle, onEdit, onDelete, onStatusCh
   );
 }
 
-function RepairModal({ open, onClose, repair, companies, areas, assets, onSave }) {
+function RepairModal({ open, onClose, repair, companies, areas, assets, onSave, homeWallet, vehicleWallet }) {
   const { register, handleSubmit, reset, watch, setValue } = useForm();
+  const [walletType, setWalletType] = useState('home');
   useEffect(() => {
     if (!open) return;
+    setWalletType(repair?.walletType ?? 'home');
     reset(repair ? {
       title: repair.title, description: repair.description ?? '',
       areaId: repair.areaId ?? '', assetId: repair.assetId ?? '',
-      companyId: repair.companyId ?? '', reportedDate: repair.reportedDate,
+      companyId: repair.companyId ?? '', reportedDate: repair.scheduledDate || repair.reportedDate || '',
       priority: repair.priority, status: repair.status,
       completedDate: repair.completedDate ?? '',
       estimatedCost: repair.estimatedCost ?? '', actualCost: repair.actualCost ?? '',
@@ -462,12 +473,18 @@ function RepairModal({ open, onClose, repair, companies, areas, assets, onSave }
     const comp  = companies.find((c) => c.id === d.companyId);
     const area  = areas.find((a) => a.id === d.areaId);
     const asset = assets.find((a) => a.id === d.assetId);
-    onSave({ ...d,
+    const { reportedDate, ...rest } = d;
+    onSave({
+      ...rest,
+      scheduledDate: reportedDate,
+      areaId:   d.areaId  || null,
+      assetId:  d.assetId || null,
       estimatedCost: parseFloat(d.estimatedCost) || 0,
       actualCost: d.actualCost ? parseFloat(d.actualCost) : null,
       companyName: comp?.name  ?? repair?.companyName ?? '',
       areaName:    area?.name  ?? repair?.areaName    ?? '',
       assetName:   asset?.name ?? repair?.assetName   ?? '',
+      walletType,
     });
   };
 
@@ -509,16 +526,39 @@ function RepairModal({ open, onClose, repair, companies, areas, assets, onSave }
             {status === 'completed' && <Field label="Completed Date"><Input {...register('completedDate')} type="date" /></Field>}
             <Field label="Estimated Cost (AED)"><Input {...register('estimatedCost')} type="number" min="0" step="0.01" placeholder="0.00" /></Field>
             {status === 'completed' && (
-              <Field label="Actual Cost (AED)" hint="Will be deducted from Home Wallet">
+              <Field label="Actual Cost (AED)">
                 <Input {...register('actualCost')} type="number" min="0" step="0.01" placeholder="0.00" />
               </Field>
             )}
           </FormGrid>
+          {status === 'completed' && (
+            <div className="mt-3">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Deduct cost from</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { k: 'home',    label: 'Home Wallet',    bal: homeWallet?.balance    ?? 0, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+                  { k: 'vehicle', label: 'Vehicle Wallet', bal: vehicleWallet?.balance ?? 0, color: '#0b1d3a', bg: '#eef2fb', border: '#c7d2f0' },
+                ].map(({ k, label, bal, color, bg, border }) => (
+                  <button key={k} type="button" onClick={() => setWalletType(k)}
+                    className="flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border-2 text-left transition-all"
+                    style={walletType === k
+                      ? { background: bg, borderColor: color }
+                      : { background: '#f8fafc', borderColor: '#e2e8f0' }}>
+                    <span className="text-[11px] font-bold" style={{ color: walletType === k ? color : '#64748b' }}>{label}</span>
+                    <span className="text-[13px] font-black" style={{ color: walletType === k ? color : '#1e293b' }}>
+                      AED {bal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {displayCost > 0 && (
-            <div className="flex items-center gap-2 mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-              <RiWalletLine className="w-4 h-4 text-emerald-600 shrink-0" />
-              <p className="text-[12px] text-emerald-700 font-medium">
-                AED {displayCost.toLocaleString()} will be deducted from Home Wallet on completion.
+            <div className="flex items-center gap-2 mt-3 p-3 rounded-xl"
+              style={{ background: walletType === 'vehicle' ? '#eef2fb' : '#f0fdf4', border: `1px solid ${walletType === 'vehicle' ? '#c7d2f0' : '#bbf7d0'}` }}>
+              <RiWalletLine className="w-4 h-4 shrink-0" style={{ color: walletType === 'vehicle' ? '#0b1d3a' : '#16a34a' }} />
+              <p className="text-[12px] font-medium" style={{ color: walletType === 'vehicle' ? '#1e3a8a' : '#15803d' }}>
+                AED {displayCost.toLocaleString()} will be deducted from {walletType === 'vehicle' ? 'Vehicle' : 'Home'} Wallet on completion.
               </p>
             </div>
           )}

@@ -8,10 +8,8 @@ import {
   RiShieldCheckLine, RiMoneyDollarCircleLine, RiCheckboxCircleLine,
   RiCloseLine,
 } from 'react-icons/ri';
-import { selectTasks }   from '../../store/slices/tasksSlice';
-import { selectContracts }   from '../../store/slices/contractsSlice';
-import { selectAssets }      from '../../store/slices/assetsSlice';
-import { selectExpenses }    from '../../store/slices/expensesSlice';
+import { useGetQuery } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { cn } from '../../utils/cn';
 
 /* ── Event type config ── */
@@ -51,10 +49,11 @@ function fmtDate(s) {
 const todayStr = toDateStr(new Date());
 
 export default function CalendarPageView() {
-  const tasks     = useSelector(selectTasks);
-  const contracts = useSelector(selectContracts);
-  const assets    = useSelector(selectAssets);
-  const expenses    = useSelector(selectExpenses);
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const { data: tasks     = [] } = useGetQuery({ path: '/tasks',     params: { propertyId } }, { skip: !propertyId });
+  const { data: contracts = [] } = useGetQuery({ path: '/contracts', params: { propertyId } }, { skip: !propertyId });
+  const { data: assets    = [] } = useGetQuery({ path: '/assets',    params: { propertyId } }, { skip: !propertyId });
+  const { data: expenses  = [] } = useGetQuery({ path: '/expenses',  params: { propertyId } }, { skip: !propertyId });
 
   const [viewDate,    setViewDate]    = useState(() => new Date(new Date().getFullYear(), new Date().getMonth()));
   const [selectedDay, setSelectedDay] = useState(null);
@@ -73,13 +72,14 @@ export default function CalendarPageView() {
       const dateStr = t.status === 'completed' ? (t.completedDate || t.scheduledDate) : t.scheduledDate;
       if (!dateStr) return;
       const isRepair = t.category === 'Repair';
+      const locationParts = [t.floor, t.areaName, t.assetName].filter(Boolean);
       evs.push({
         id:    t.id,
         title: t.title,
         date:  dateStr,
         type:  t.status === 'completed' ? 'completed' : t.status === 'overdue' ? 'overdue' : isRepair ? 'repair' : 'maintenance',
-        meta:  t.companyName ?? t.areaName ?? '',
-        link:  '/maintenance',
+        meta:  t.companyName || locationParts.join(' › ') || '',
+        link:  `/maintenance/${t.id}`,
         sub:   t.areaName ?? '',
       });
     });
@@ -343,7 +343,7 @@ export default function CalendarPageView() {
                       initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, x: 20 }} transition={{ delay: idx * 0.025 }}>
                       <Link to={ev.link}
-                        className="flex items-start gap-3 p-3 rounded-xl border transition-all group block"
+                        className="flex items-start gap-3 p-3 rounded-xl border transition-all group"
                         style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = cfg.bg; e.currentTarget.style.borderColor = cfg.dot+'66'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#e2e8f0'; }}>

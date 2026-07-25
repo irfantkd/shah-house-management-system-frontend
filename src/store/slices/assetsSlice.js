@@ -1,42 +1,45 @@
-import { createSlice, nanoid } from '@reduxjs/toolkit';
-import { assets as initial } from '../../data/mockAssets';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '../../services/api';
+
+export const fetchAssets = createAsyncThunk('assets/fetchAll', async (params) => {
+  const { data } = await api.get('/assets', { params });
+  return data.data;
+});
+
+export const addAsset = createAsyncThunk('assets/add', async (payload, { getState }) => {
+  const pid = getState().properties?.currentId;
+  const { data } = await api.post('/assets', { ...payload, propertyId: pid });
+  return data.data;
+});
+
+export const updateAsset = createAsyncThunk('assets/update', async ({ id, ...payload }) => {
+  const { data } = await api.put(`/assets/${id}`, payload);
+  return data.data;
+});
+
+export const deleteAsset = createAsyncThunk('assets/delete', async (id) => {
+  await api.delete(`/assets/${id}`);
+  return id;
+});
 
 const assetsSlice = createSlice({
   name: 'assets',
-  initialState: { items: initial },
-  reducers: {
-    addAsset: (state, { payload }) => {
-      state.items.push({
-        id: `ast-${nanoid(6)}`,
-        documents: [],
-        serviceHistory: [],
-        ...payload,
-        warranty: {
-          provider: '',
-          phone: '',
-          policyNumber: '',
-          type: 'Parts & Labor',
-          coverage: '',
-          startDate: '',
-          expiryDate: '',
-          ...(payload.warranty ?? {}),
-        },
-      });
-    },
-    updateAsset: (state, { payload }) => {
-      const i = state.items.findIndex((a) => a.id === payload.id);
-      if (i !== -1) state.items[i] = { ...state.items[i], ...payload };
-    },
-    deleteAsset: (state, { payload }) => {
-      state.items = state.items.filter((a) => a.id !== payload);
-    },
+  initialState: { items: [], status: 'idle' },
+  reducers: {},
+  extraReducers: (b) => {
+    b.addCase(fetchAssets.fulfilled, (state, { payload }) => { state.items = payload; })
+     .addCase(addAsset.fulfilled,    (state, { payload }) => { state.items.push(payload); })
+     .addCase(updateAsset.fulfilled, (state, { payload }) => {
+       const i = state.items.findIndex((a) => a.id === payload.id);
+       if (i !== -1) state.items[i] = payload;
+     })
+     .addCase(deleteAsset.fulfilled, (state, { payload: id }) => {
+       state.items = state.items.filter((a) => a.id !== id);
+     });
   },
 });
 
-export const { addAsset, updateAsset, deleteAsset } = assetsSlice.actions;
-
-const pid = (s) => s.properties?.currentId ?? 'prop-default';
-
-export const selectAssets    = (s) => (s.assets.items ?? []).filter((a) => (a.propertyId || 'prop-default') === pid(s));
+const pid = (s) => s.properties?.currentId;
+export const selectAssets    = (s) => (s.assets.items ?? []).filter((a) => a.propertyId === pid(s));
 export const selectAssetById = (id) => (s) => (s.assets.items ?? []).find((a) => a.id === id);
 export default assetsSlice.reducer;

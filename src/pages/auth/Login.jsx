@@ -4,15 +4,13 @@ import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import {
   RiMailLine,
-  RiLockLine,
   RiEyeLine,
   RiEyeOffLine,
   RiHome4Line,
-  RiShieldCheckLine,
   RiCalendarCheckLine,
+  RiShieldCheckLine,
   RiHammerLine,
   RiArrowRightLine,
-  RiCheckLine,
 } from "react-icons/ri";
 import {
   loginUser,
@@ -22,7 +20,7 @@ import {
 } from "../../store/slices/authSlice";
 import heroImg from "../../assets/hero.png";
 
-/* ─── tiny decorative rule ─── */
+/* ─── decorative divider ─── */
 function Divider({ color = "rgba(255,255,255,0.15)" }) {
   return (
     <div className="flex items-center gap-2.5 my-6">
@@ -48,7 +46,7 @@ function FloatField({
   autoComplete,
 }) {
   const [focus, setFocus] = useState(false);
-  const lifted = focus || (value && value.length > 0);
+  const lifted = focus || value.length > 0;
 
   return (
     <div className="relative">
@@ -93,11 +91,6 @@ function FloatField({
   );
 }
 
-const DEMO = [
-  { label: "Owner", email: "admin@shahhouse.ae", password: "shah2026" },
-  { label: "Manager", email: "manager@shahhouse.ae", password: "manager123" },
-];
-
 const FEATURES = [
   {
     icon: RiCalendarCheckLine,
@@ -114,10 +107,10 @@ export default function Login() {
   const isAuth = useSelector(selectIsAuthenticated);
   const authError = useSelector(selectAuthError);
 
-  const [email, setEmail] = useState("admin@villa.ae");
-  const [pass, setPass] = useState("villa2026");
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [status, setStatus] = useState("idle"); // idle | loading | success | error
+  const [busy, setBusy] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -141,33 +134,23 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    if (!pass.trim()) return;
-
-    setStatus("loading");
+    if (!email.trim() || !pass.trim()) return;
+    setBusy(true);
     dispatch(clearAuthError());
-    await new Promise((r) => setTimeout(r, 700));
-    dispatch(loginUser({ email: email.trim(), password: pass }));
-    setStatus("idle");
+    await dispatch(loginUser({ email: email.trim(), password: pass }));
+    setBusy(false);
   };
 
-  const fillDemo = (cred) => {
-    setEmail(cred.email);
-    setPass(cred.password);
-    dispatch(clearAuthError());
-    setStatus("idle");
-  };
-
-  const busy = status === "loading";
+  const hasError = !!authError;
 
   return (
     <>
-      {/* ── authenticating overlay ── */}
+      {/* ── Signing-in overlay ── */}
       {busy && (
         <div
           className="fixed inset-0 z-[999] flex flex-col items-center justify-center"
           style={{
-            background: "rgba(7,16,34,0.8)",
+            background: "rgba(7,16,34,0.82)",
             backdropFilter: "blur(6px)",
           }}
         >
@@ -208,15 +191,14 @@ export default function Login() {
       )}
 
       <div className="fixed inset-0 flex overflow-hidden">
-        {/* ════ LEFT PANEL — Villa Image ════ */}
+        {/* ════ LEFT PANEL — Villa image ════ */}
         <div
           className="hidden lg:block relative flex-shrink-0 overflow-hidden"
           style={{ width: "46%", minWidth: 300 }}
         >
-          {/* Hero photo */}
           <img
             src={heroImg}
-            alt="Luxury villa"
+            alt="Shah House"
             className="absolute inset-0 w-full h-full object-cover object-center"
           />
 
@@ -304,7 +286,6 @@ export default function Login() {
                 Contracts, maintenance, warranties, repairs, and expenses — all
                 in one elegant dashboard.
               </p>
-
               <div className="mt-6 space-y-3.5">
                 {FEATURES.map(({ icon: Icon, text }) => (
                   <div key={text} className="flex items-center gap-3">
@@ -341,7 +322,7 @@ export default function Login() {
             style={{
               background:
                 "radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)",
-              transform: "translate(30%, -30%)",
+              transform: "translate(30%,-30%)",
             }}
           />
           <div
@@ -349,7 +330,7 @@ export default function Login() {
             style={{
               background:
                 "radial-gradient(circle, rgba(11,29,58,0.06) 0%, transparent 70%)",
-              transform: "translate(-30%, 30%)",
+              transform: "translate(-30%,30%)",
             }}
           />
 
@@ -376,7 +357,7 @@ export default function Login() {
             </div>
 
             {/* Heading */}
-            <div className="mb-7">
+            <div className="mb-8">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-5 h-px bg-blue-400 opacity-70" />
                 <span className="text-[10px] tracking-[0.22em] font-bold text-blue-500 uppercase">
@@ -395,38 +376,8 @@ export default function Login() {
                 </em>
               </h2>
               <p className="mt-1.5 text-[13px] text-slate-400">
-                Sign in to access your home management dashboard
+                Sign in with your email and password
               </p>
-            </div>
-
-            {/* Demo accounts */}
-            <div
-              className="mb-6 p-4 rounded-2xl border"
-              style={{
-                background: "rgba(219,234,254,0.4)",
-                borderColor: "rgba(147,197,253,0.5)",
-              }}
-            >
-              <p className="text-[11px] font-bold text-blue-700 mb-2.5 uppercase tracking-wide">
-                Demo accounts — click to fill
-              </p>
-              <div className="flex gap-2">
-                {DEMO.map((c) => (
-                  <button
-                    key={c.label}
-                    type="button"
-                    onClick={() => fillDemo(c)}
-                    className="flex-1 py-2.5 rounded-xl border border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-300 transition-all text-center shadow-sm"
-                  >
-                    <p className="font-bold text-navy-800 text-[12px]">
-                      {c.label}
-                    </p>
-                    <p className="text-slate-400 text-[10px] mt-0.5 truncate px-1">
-                      {c.email}
-                    </p>
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Error banner */}
@@ -434,7 +385,7 @@ export default function Login() {
               <motion.div
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2.5 px-3.5 py-3 mb-4 rounded-xl"
+                className="flex items-center gap-2.5 px-3.5 py-3 mb-5 rounded-xl"
                 style={{
                   background: "#fef2f2",
                   border: "1.5px solid #fca5a5",
@@ -451,24 +402,29 @@ export default function Login() {
             )}
 
             <form onSubmit={handleSubmit} noValidate className="space-y-3">
+              {/* Email */}
               <FloatField
                 id="email"
-                label="Email address"
+                label="Email"
                 type="email"
                 value={email}
                 autoComplete="email"
+                hasError={hasError}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   dispatch(clearAuthError());
                 }}
                 suffix={<RiMailLine className="w-4 h-4 text-slate-400" />}
               />
+
+              {/* Password */}
               <FloatField
                 id="pass"
                 label="Password"
                 type={showPw ? "text" : "password"}
                 value={pass}
                 autoComplete="current-password"
+                hasError={hasError}
                 onChange={(e) => {
                   setPass(e.target.value);
                   dispatch(clearAuthError());
@@ -493,7 +449,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full py-3.5 flex items-center justify-center gap-2 font-bold text-[13px] uppercase tracking-[0.22em] text-white transition-all duration-200 rounded-xl mt-2"
+                className="w-full py-3.5 mt-2 flex items-center justify-center gap-2 font-bold text-[13px] uppercase tracking-[0.22em] text-white rounded-xl transition-all duration-200"
                 style={{
                   background:
                     "linear-gradient(135deg, #0b1d3a 0%, #1e3a6e 100%)",
@@ -524,23 +480,18 @@ export default function Login() {
                   </>
                 ) : (
                   <>
-                    Sign in to AHMS <RiArrowRightLine className="w-4 h-4" />
+                    Sign in <RiArrowRightLine className="w-4 h-4" />
                   </>
                 )}
               </button>
             </form>
 
-            {/* Footer */}
-            <p className="mt-7 text-center text-[11px] text-slate-400 tracking-wide">
+            <p className="mt-8 text-center text-[11px] text-slate-400 tracking-wide">
               Shah House Management · Private &amp; Secure
             </p>
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes shimmer { 0%{left:-100%} 100%{left:200%} }
-      `}</style>
     </>
   );
 }

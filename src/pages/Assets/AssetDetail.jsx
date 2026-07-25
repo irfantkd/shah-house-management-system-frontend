@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,8 +8,7 @@ import {
   Phone, Mail, FileText, Download, Eye, Trash2, Upload,
   ChevronRight, TrendingUp,
 } from 'lucide-react';
-import { useSelector } from 'react-redux';
-import { selectAssetById } from '../../store/slices/assetsSlice';
+import { useGetQuery } from '../../api/apiSlice';
 import Card, { CardHeader } from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
@@ -37,6 +36,12 @@ const STATUS_SVC  = {
   cancelled: { label: 'Cancelled', variant: 'default' },
 };
 
+function fmtDate(d, opts = { day: 'numeric', month: 'long', year: 'numeric' }) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('en-GB', opts);
+}
+
 function Row({ icon: Icon, label, value }) {
   return (
     <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
@@ -54,22 +59,21 @@ function Row({ icon: Icon, label, value }) {
 export default function AssetDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const asset = useSelector(selectAssetById(id));
-  const [tab, setTab]         = useState('details');
-  const [loading, setLoading] = useState(true);
+  const { data: asset, isLoading } = useGetQuery({ path: `/assets/${id}` });
+  const [tab, setTab] = useState('details');
 
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
-  }, [id]);
-
+  if (isLoading) return null;
   if (!asset) return <Navigate to="/assets" replace />;
 
   const sc = STATUS_CFG[asset.status] ?? STATUS_CFG.operational;
   const StatusIcon = sc.icon;
-  const warrantyOk = new Date(asset.warranty.expiryDate) > new Date();
-  const daysToService = Math.ceil((new Date(asset.maintenance.nextService) - new Date()) / (1000 * 60 * 60 * 24));
-  const totalSpend = asset.serviceHistory.reduce((s, i) => s + i.cost, 0);
+  const warranty    = asset.warranty    ?? {};
+  const maintenance = asset.maintenance ?? {};
+  const warrantyOk    = warranty.expiryDate ? new Date(warranty.expiryDate) > new Date() : false;
+  const daysToService = maintenance.nextService
+    ? Math.ceil((new Date(maintenance.nextService) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
+  const totalSpend = (asset.serviceHistory ?? []).reduce((s, i) => s + i.cost, 0);
 
   return (
     <motion.div
@@ -117,10 +121,10 @@ export default function AssetDetail() {
           {/* Quick stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: 'Purchased',       value: new Date(asset.purchaseDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) },
-              { label: 'Services logged', value: asset.serviceHistory.length },
+              { label: 'Purchased',       value: fmtDate(asset.purchaseDate, { month: 'short', year: 'numeric' }) },
+              { label: 'Services logged', value: (asset.serviceHistory ?? []).length },
               { label: 'Total spend',     value: `AED ${totalSpend.toLocaleString()}` },
-              { label: 'Next service',    value: daysToService < 0 ? 'Overdue' : `${daysToService}d` },
+              { label: 'Next service',    value: daysToService === null ? '—' : daysToService < 0 ? 'Overdue' : `${daysToService}d` },
             ].map((s) => (
               <div key={s.label} className="bg-white/[0.07] border border-white/10 rounded-xl px-3 py-2.5">
                 <p className="text-[10px] text-white/40 font-medium uppercase tracking-wide">{s.label}</p>
@@ -162,9 +166,9 @@ export default function AssetDetail() {
               </Card>
               <Card>
                 <CardHeader title="Purchase & install" />
-                <Row icon={CalendarDays} label="Purchase date"   value={new Date(asset.purchaseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} />
-                <Row icon={DollarSign}   label="Purchase price"  value={`AED ${asset.purchasePrice.toLocaleString()}`} />
-                <Row icon={CalendarDays} label="Install date"    value={new Date(asset.installDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} />
+                <Row icon={CalendarDays} label="Purchase date"   value={fmtDate(asset.purchaseDate)} />
+                <Row icon={DollarSign}   label="Purchase price"  value={`AED ${(asset.purchasePrice ?? 0).toLocaleString()}`} />
+                <Row icon={CalendarDays} label="Install date"    value={fmtDate(asset.installDate)} />
                 <Row icon={User}         label="Installer"       value={asset.installer}      />
                 <Row icon={Info}         label="Condition"       value={asset.condition}      />
               </Card>
@@ -190,27 +194,27 @@ export default function AssetDetail() {
                     <Badge size="sm" className={cn('!border-0 mb-2', warrantyOk ? '!bg-success-500/20 !text-success-300' : '!bg-slate-500/20 !text-slate-300')}>
                       {warrantyOk ? 'Active Warranty' : 'Warranty Expired'}
                     </Badge>
-                    <p className="text-white font-bold text-xl">{asset.warranty.type}</p>
-                    <p className="text-white/50 text-[13px] mt-0.5">{asset.warranty.provider}</p>
+                    <p className="text-white font-bold text-xl">{warranty.type}</p>
+                    <p className="text-white/50 text-[13px] mt-0.5">{warranty.provider}</p>
                   </div>
                 </div>
                 <div className="mt-5 pt-5 border-t border-white/10 grid grid-cols-2 gap-4 relative z-10">
                   <div>
                     <p className="text-white/40 text-[11px]">Policy Number</p>
-                    <p className="text-white font-semibold text-[13px] mt-0.5">{asset.warranty.policyNumber}</p>
+                    <p className="text-white font-semibold text-[13px] mt-0.5">{warranty.policyNumber}</p>
                   </div>
                   <div>
                     <p className="text-white/40 text-[11px]">Coverage</p>
-                    <p className="text-white font-semibold text-[13px] mt-0.5">{asset.warranty.coverage}</p>
+                    <p className="text-white font-semibold text-[13px] mt-0.5">{warranty.coverage}</p>
                   </div>
                 </div>
               </div>
               <Card>
                 <CardHeader title="Warranty details" />
-                <Row icon={CalendarDays} label="Start date"   value={new Date(asset.warranty.startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} />
-                <Row icon={CalendarDays} label="Expiry date"  value={new Date(asset.warranty.expiryDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} />
-                <Row icon={Building2}    label="Provider"     value={asset.warranty.provider}  />
-                <Row icon={Phone}        label="Contact"      value={asset.warranty.phone}     />
+                <Row icon={CalendarDays} label="Start date"   value={fmtDate(warranty.startDate)}  />
+                <Row icon={CalendarDays} label="Expiry date"  value={fmtDate(warranty.expiryDate)} />
+                <Row icon={Building2}    label="Provider"     value={warranty.provider}  />
+                <Row icon={Phone}        label="Contact"      value={warranty.phone}     />
               </Card>
             </div>
           )}
@@ -219,10 +223,10 @@ export default function AssetDetail() {
           {tab === 'history' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-[13px] text-slate-500 font-medium">{asset.serviceHistory.length} service records · Total: AED {totalSpend.toLocaleString()}</p>
+                <p className="text-[13px] text-slate-500 font-medium">{(asset.serviceHistory ?? []).length} service records · Total: AED {totalSpend.toLocaleString()}</p>
                 <Button variant="outline" size="sm" icon={Upload}>Add Record</Button>
               </div>
-              {asset.serviceHistory.map((svc, i) => {
+              {(asset.serviceHistory ?? []).map((svc, i) => {
                 const ssc = STATUS_SVC[svc.status] ?? STATUS_SVC.completed;
                 return (
                   <motion.div key={svc.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
@@ -238,9 +242,7 @@ export default function AssetDetail() {
                           </div>
                           <div>
                             <p className="text-[14px] font-bold text-slate-800">{svc.type}</p>
-                            <p className="text-[12px] text-slate-400">
-                              {new Date(svc.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                            </p>
+                            <p className="text-[12px] text-slate-400">{fmtDate(svc.date)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -278,9 +280,9 @@ export default function AssetDetail() {
                 <CardHeader title="Maintenance schedule" />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
-                    { label: 'Frequency',     value: asset.maintenance.frequency,                                                                     icon: CalendarClock  },
-                    { label: 'Last service',  value: new Date(asset.maintenance.lastService).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }), icon: CheckCircle2 },
-                    { label: 'Next service',  value: new Date(asset.maintenance.nextService).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }), icon: daysToService < 0 ? AlertTriangle : Clock },
+                    { label: 'Frequency',    value: maintenance.frequency ?? '—', icon: CalendarClock },
+                    { label: 'Last service', value: fmtDate(maintenance.lastService, { day: 'numeric', month: 'short', year: 'numeric' }), icon: CheckCircle2 },
+                    { label: 'Next service', value: daysToService === null ? '—' : daysToService < 0 ? 'Overdue' : fmtDate(maintenance.nextService, { day: 'numeric', month: 'short', year: 'numeric' }), icon: daysToService !== null && daysToService < 0 ? AlertTriangle : Clock },
                   ].map((s) => (
                     <div key={s.label} className={cn('rounded-xl p-4 border', daysToService < 0 && s.label === 'Next service' ? 'bg-danger-50 border-danger-100' : 'bg-slate-50 border-slate-100')}>
                       <div className="flex items-center gap-2 mb-2">
@@ -292,7 +294,7 @@ export default function AssetDetail() {
                   ))}
                 </div>
                 <div className="mt-4 pt-4 border-t border-slate-100">
-                  <Row icon={Building2} label="Service company" value={asset.maintenance.company} />
+                  <Row icon={Building2} label="Service company" value={maintenance.company} />
                 </div>
               </Card>
               <div className="flex gap-3">
@@ -308,18 +310,18 @@ export default function AssetDetail() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                 <div>
                   <p className="text-[15px] font-bold text-slate-800">Documents</p>
-                  <p className="text-[12px] text-slate-400">{asset.documents.length} files</p>
+                  <p className="text-[12px] text-slate-400">{(asset.documents ?? []).length} files</p>
                 </div>
                 <Button variant="primary" size="sm" icon={Upload}>Upload</Button>
               </div>
-              {asset.documents.map((doc, i) => (
+              {(asset.documents ?? []).map((doc, i) => (
                 <div key={doc.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 group">
                   <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-[11px]', TYPE_COLORS[doc.type] ?? 'bg-slate-100 text-slate-500')}>
                     {doc.type.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold text-slate-800 truncate">{doc.name}</p>
-                    <p className="text-[11px] text-slate-400">{doc.size} · {new Date(doc.uploaded).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    <p className="text-[11px] text-slate-400">{doc.size} · {fmtDate(doc.uploaded, { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"><Eye className="w-3.5 h-3.5" /></button>

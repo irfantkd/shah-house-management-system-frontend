@@ -1,91 +1,129 @@
 import { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { Fuel, Plus, Trash2, Droplets, TrendingUp, MapPin, Wallet, AlertTriangle } from 'lucide-react';
-import { selectFuelLogsByCarId, addFuelLog, deleteFuelLog } from '../../../store/slices/carsSlice';
-import { selectVehicleWallet, deductFromWallet, LOW_BALANCE_THRESHOLD } from '../../../store/slices/walletSlice';
-import { FUEL_STATIONS } from '../../../data/mockCars';
+import { useSelector } from 'react-redux';
+import { Fuel, Plus, Trash2, Droplets, TrendingUp, Hash, Wallet, Edit2, ChevronRight } from 'lucide-react';
+import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../../store/slices/propertiesSlice';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 import EmptyState from '../../../components/ui/EmptyState';
 import { cn } from '../../../utils/cn';
 import toast from 'react-hot-toast';
 
-const fmt = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
+const LOW_THRESHOLD = 5000;
 
-const BLANK = {
-  date: new Date().toISOString().split('T')[0],
-  liters: '', pricePerLiter: '3.12', totalPrice: '', station: '', mileage: '',
-};
-
+const fmt     = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
+const BLANK = {
+  date:       new Date().toISOString().split('T')[0],
+  liters:     '',
+  totalPrice: '',
+  mileage:    '',
+};
+
 export default function FuelTab({ carId }) {
-  const dispatch      = useDispatch();
-  const logs          = useSelector(selectFuelLogsByCarId(carId));
-  const vehicleWallet = useSelector(selectVehicleWallet);
-  const [showAdd, setShowAdd] = useState(false);
-  const [form,    setForm]    = useState(BLANK);
+  const propertyId = useSelector(selectCurrentPropertyId);
 
-  const sorted    = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const totalL    = logs.reduce((s, f) => s + f.liters, 0);
-  const totalAED  = logs.reduce((s, f) => s + f.totalPrice, 0);
-  const avgFill   = logs.length ? totalAED / logs.length : 0;
-  const avgPPL    = logs.length ? logs.reduce((s, f) => s + f.pricePerLiter, 0) / logs.length : 0;
+  const { data: logs = [], refetch } = useGetQuery({ path: `/cars/${carId}/fuel-logs` }, { skip: !carId });
+  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const vehicleBalance = walletData?.vehicle?.balance ?? 0;
 
-  // Group by month
+  const [addFuelMut]      = usePostMutation();
+  const [updateFuelMut]   = usePutMutation();
+  const [deductWalletMut] = usePostMutation();
+  const [deleteFuelMut]   = useDeleteMutation();
+
+  const [showAdd,    setShowAdd]    = useState(false);
+  const [editingLog, setEditingLog] = useState(null);
+  const [form,       setForm]       = useState(BLANK);
+
+  const sorted   = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const totalL   = logs.reduce((s, f) => s + (f.liters || 0), 0);
+  const totalAED = logs.reduce((s, f) => s + (f.totalPrice || 0), 0);
+  const avgFill  = logs.length ? totalAED / logs.length : 0;
+
   const byMonth = sorted.reduce((acc, f) => {
     const key = new Date(f.date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     if (!acc[key]) acc[key] = { logs: [], totalL: 0, totalAED: 0 };
     acc[key].logs.push(f);
-    acc[key].totalL   += f.liters;
-    acc[key].totalAED += f.totalPrice;
+    acc[key].totalL   += f.liters || 0;
+    acc[key].totalAED += f.totalPrice || 0;
     return acc;
   }, {});
 
-  const setField = (k, v) => {
-    setForm((prev) => {
-      const next = { ...prev, [k]: v };
-      if (k === 'liters' || k === 'pricePerLiter') {
-        const l = parseFloat(k === 'liters' ? v : prev.liters) || 0;
-        const p = parseFloat(k === 'pricePerLiter' ? v : prev.pricePerLiter) || 0;
-        if (l && p) next.totalPrice = (l * p).toFixed(2);
-      }
-      return next;
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const openAdd = () => { setEditingLog(null); setForm(BLANK); setShowAdd(true); };
+  const openEdit = (log) => {
+    setEditingLog(log);
+    setForm({
+      date:       log.date       ? log.date.split('T')[0] : new Date().toISOString().split('T')[0],
+      liters:     log.liters     ?? '',
+      totalPrice: log.totalPrice ?? '',
+      mileage:    log.mileage    ?? '',
     });
+    setShowAdd(true);
   };
 
-  const handleSubmit = (ev) => {
+  const handleSubmit = async (ev) => {
     ev.preventDefault();
-    if (!form.liters || !form.pricePerLiter) return toast.error('Enter liters and price per liter');
-    const liters        = Number(form.liters);
-    const pricePerLiter = Number(form.pricePerLiter);
-    const totalPrice    = Number(form.totalPrice) || +(liters * pricePerLiter).toFixed(2);
-    dispatch(addFuelLog({ ...form, carId, liters, pricePerLiter, totalPrice, mileage: form.mileage ? Number(form.mileage) : undefined }));
-    dispatch(deductFromWallet({ wallet: 'vehicle', amount: totalPrice, description: `Fuel — ${liters}L @ ${form.station || 'station'}`, date: form.date }));
-    const afterBal = vehicleWallet.balance - totalPrice;
-    if (afterBal < LOW_BALANCE_THRESHOLD)
-      toast(`Vehicle wallet now AED ${fmt(Math.max(0, afterBal))} — consider topping up`, { icon: '⚠️' });
-    else toast.success('Fuel logged & deducted from Vehicle Wallet');
-    setShowAdd(false);
-    setForm(BLANK);
+    if (!form.totalPrice) return toast.error('Enter total price');
+    const totalPrice = Number(form.totalPrice);
+    const liters     = form.liters  ? Number(form.liters)  : undefined;
+    const mileage    = form.mileage ? Number(form.mileage) : undefined;
+    try {
+      if (editingLog) {
+        await updateFuelMut({
+          path: `/cars/${carId}/fuel-logs/${editingLog.id ?? editingLog._id}`,
+          body: { date: form.date, totalPrice, liters, mileage },
+        }).unwrap();
+        toast.success('Fuel log updated');
+      } else {
+        await Promise.all([
+          addFuelMut({
+            path: `/cars/${carId}/fuel-logs`,
+            body: { date: form.date, totalPrice, liters, mileage },
+          }).unwrap(),
+          deductWalletMut({
+            path: '/wallet/deduct',
+            body: { propertyId, walletType: 'vehicle', amount: totalPrice, description: `Fuel${liters ? ` — ${liters}L` : ''}`, date: form.date, category: 'Fuel', carId },
+          }).unwrap(),
+        ]);
+        await refetchWallet();
+        toast.success('Fuel logged & deducted from Vehicle Wallet');
+      }
+      await refetch();
+      setShowAdd(false);
+      setEditingLog(null);
+      setForm(BLANK);
+    } catch (err) { toast.error(err.data?.error || 'Failed to save fuel log'); }
   };
 
-  const handleDelete = (id) => { dispatch(deleteFuelLog(id)); toast.success('Fuel log removed'); };
+  const handleDelete = async (log) => {
+    try {
+      await deleteFuelMut({ path: `/cars/${carId}/fuel-logs/${log.id ?? log._id}` }).unwrap();
+      await refetch();
+      toast.success('Fuel log removed');
+    } catch { toast.error('Failed to remove fuel log'); }
+  };
 
-  const calcTotal = Number(form.liters) && Number(form.pricePerLiter)
-    ? (Number(form.liters) * Number(form.pricePerLiter)).toFixed(2) : null;
+  const cost  = Number(form.totalPrice) || 0;
+  const after = vehicleBalance - cost;
 
   return (
     <div className="space-y-5">
 
-      {/* Summary */}
+      {/* Vehicle Wallet Banner */}
+      <VehicleWalletBanner balance={vehicleBalance} transactions={walletData?.vehicle?.transactions} />
+
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Liters',    value: `${totalL.toFixed(1)} L`,          icon: Droplets,   color: '#0891b2', bg: '#ecfeff' },
-          { label: 'Total Cost',      value: `AED ${totalAED.toFixed(0)}`,       icon: Fuel,       color: '#d97706', bg: '#fffbeb' },
-          { label: 'Avg per Fill-up', value: `AED ${avgFill.toFixed(0)}`,        icon: TrendingUp, color: '#16a34a', bg: '#f0fdf4' },
-          { label: 'Avg Price / L',   value: `AED ${avgPPL.toFixed(2)}`,         icon: MapPin,     color: '#7c3aed', bg: '#f5f3ff' },
+          { label: 'Total Liters',  value: totalL > 0 ? `${totalL.toFixed(1)} L` : '—',  icon: Droplets,   color: '#0891b2', bg: '#ecfeff' },
+          { label: 'Total Spent',   value: `AED ${fmt(totalAED)}`,                          icon: Fuel,       color: '#d97706', bg: '#fffbeb' },
+          { label: 'Avg per Fill',  value: `AED ${avgFill.toFixed(0)}`,                    icon: TrendingUp, color: '#16a34a', bg: '#f0fdf4' },
+          { label: 'Fill-ups',      value: logs.length,                                     icon: Hash,       color: '#0b1d3a', bg: '#f0f5ff' },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5" style={{ background: s.bg }}>
@@ -99,57 +137,56 @@ export default function FuelTab({ carId }) {
 
       {/* Add button */}
       <div className="flex justify-end">
-        <Button icon={Plus} size="sm" onClick={() => setShowAdd(true)}>Log Fuel Fill</Button>
+        <Button icon={Plus} size="sm" onClick={openAdd}>Log Fuel Fill</Button>
       </div>
 
       {/* Fuel logs grouped by month */}
       {sorted.length === 0 ? (
         <EmptyState icon={Fuel} title="No fuel logs yet"
-          description="Log your first fuel fill-up to track consumption and monthly cost."
-          action={() => setShowAdd(true)} actionLabel="Log Fuel Fill" />
+          description="Log your first fuel fill-up to track monthly cost."
+          action={openAdd} actionLabel="Log Fuel Fill" />
       ) : (
         Object.entries(byMonth).map(([month, data]) => (
           <div key={month}>
-            {/* Month header */}
             <div className="flex items-center justify-between mb-3">
               <p className="text-[13px] font-bold text-slate-800">{month}</p>
               <div className="flex items-center gap-4">
-                <span className="flex items-center gap-1.5 text-[12px] text-slate-500">
-                  <Droplets className="w-3.5 h-3.5 text-cyan-500" />{data.totalL.toFixed(1)} L
-                </span>
-                <span className="text-[12px] font-bold text-slate-800">AED {data.totalAED.toFixed(0)}</span>
+                {data.totalL > 0 && (
+                  <span className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                    <Droplets className="w-3.5 h-3.5 text-cyan-500" />{data.totalL.toFixed(1)} L
+                  </span>
+                )}
+                <span className="text-[12px] font-bold text-slate-800">AED {fmt(data.totalAED)}</span>
               </div>
             </div>
-
-            {/* Log entries */}
             <div className="space-y-2">
               {data.logs.map((log) => (
-                <div key={log.id}
+                <div key={log.id ?? log._id}
                   className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-4"
                   style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
                   <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                     <Fuel className="w-4 h-4 text-amber-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[15px] font-bold text-slate-800">{log.liters} L</span>
-                      <span className="text-[12px] text-slate-400">@ AED {log.pricePerLiter}/L</span>
-                      {log.station && (
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">{log.station}</span>
-                      )}
+                    <p className="text-[13px] font-semibold text-slate-700">{fmtDate(log.date)}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap text-[11px] text-slate-400">
+                      {log.liters  ? <span>{log.liters} L filled</span> : null}
+                      {log.mileage ? <span>{Number(log.mileage).toLocaleString()} km</span> : null}
                     </div>
-                    {log.mileage && (
-                      <p className="text-[11px] text-slate-400 mt-0.5">{log.mileage.toLocaleString()} km odometer</p>
-                    )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[14px] font-bold text-slate-900">AED {log.totalPrice.toFixed(1)}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(log.date)}</p>
+                    <p className="text-[15px] font-bold text-amber-700">AED {Number(log.totalPrice).toFixed(0)}</p>
                   </div>
-                  <button onClick={() => handleDelete(log.id)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all shrink-0">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => openEdit(log)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => handleDelete(log)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -157,91 +194,47 @@ export default function FuelTab({ carId }) {
         ))
       )}
 
-      {/* Add Fuel Modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Log Fuel Fill-up" subtitle="Track liters, price and total — deducted from Vehicle Wallet">
+      {/* Add / Edit Fuel Modal */}
+      <Modal
+        open={showAdd}
+        onClose={() => { setShowAdd(false); setEditingLog(null); setForm(BLANK); }}
+        title={editingLog ? 'Edit Fuel Log' : 'Log Fuel Fill-up'}
+        subtitle={editingLog ? 'Update fill-up details' : 'Total price deducted from Vehicle Wallet'}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Vehicle Wallet balance strip */}
-          {(() => {
-            const cost  = calcTotal ? Number(calcTotal) : 0;
-            const after = vehicleWallet.balance - cost;
-            const low   = vehicleWallet.balance < LOW_BALANCE_THRESHOLD;
-            const empty = vehicleWallet.balance <= 0;
-            return (
-              <div className={cn('flex items-center gap-3 p-3 rounded-xl border',
-                empty ? 'bg-red-50 border-red-200' : low ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
-                <Wallet className={cn('w-4 h-4 shrink-0', empty ? 'text-red-500' : low ? 'text-amber-600' : 'text-slate-400')} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-semibold text-slate-500">Vehicle Wallet</p>
-                  <p className={cn('text-[14px] font-bold', empty ? 'text-red-600' : low ? 'text-amber-700' : 'text-slate-800')}>
-                    AED {fmt(vehicleWallet.balance)}
-                  </p>
-                </div>
-                {cost > 0 && (
-                  <div className="text-right shrink-0">
-                    <p className="text-[10px] text-slate-400">After fill-up</p>
-                    <p className={cn('text-[13px] font-bold', after < 0 ? 'text-red-600' : after < LOW_BALANCE_THRESHOLD ? 'text-amber-600' : 'text-emerald-600')}>
-                      AED {fmt(Math.max(0, after))}
-                    </p>
-                  </div>
-                )}
-                {(empty || low) && (
-                  <Link to="/wallet" className={cn('shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg',
-                    empty ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
-                    {empty ? 'Deposit' : 'Top Up'}
-                  </Link>
-                )}
-              </div>
-            );
-          })()}
+
+          {/* Wallet panel — only for new entry */}
+          {!editingLog && <VehicleWalletPanel balance={vehicleBalance} deduction={Number(form.totalPrice) || 0} />}
+
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
+            <input value={form.date} onChange={(e) => setField('date', e.target.value)} type="date" required className={INPUT} />
+          </div>
+
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Total Price (AED) *</label>
+            <input value={form.totalPrice} onChange={(e) => setField('totalPrice', e.target.value)}
+              type="number" min="0" step="0.01" required placeholder="e.g. 220" className={INPUT} />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
-              <input value={form.date} onChange={(e) => setField('date', e.target.value)} type="date" required className={INPUT} />
-            </div>
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Station</label>
-              <select value={form.station} onChange={(e) => setField('station', e.target.value)} className={INPUT}>
-                <option value="">Select station…</option>
-                {FUEL_STATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Liters Filled *</label>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Liters Filled <span className="font-normal text-slate-400">(optional)</span></label>
               <input value={form.liters} onChange={(e) => setField('liters', e.target.value)}
-                type="number" min="0" step="0.01" required placeholder="65.5" className={INPUT} />
+                type="number" min="0" step="0.01" placeholder="e.g. 65" className={INPUT} />
             </div>
             <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Price per Liter (AED) *</label>
-              <input value={form.pricePerLiter} onChange={(e) => setField('pricePerLiter', e.target.value)}
-                type="number" min="0" step="0.001" required placeholder="3.12" className={INPUT} />
-            </div>
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Total Price (AED)</label>
-              <input value={form.totalPrice} onChange={(e) => setField('totalPrice', e.target.value)}
-                type="number" min="0" step="0.01" placeholder="Auto-calculated"
-                className={`${INPUT} bg-slate-50`} />
-            </div>
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Odometer (km)</label>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Odometer (km) <span className="font-normal text-slate-400">(optional)</span></label>
               <input value={form.mileage} onChange={(e) => setField('mileage', e.target.value)}
                 type="number" min="0" placeholder="e.g. 45200" className={INPUT} />
             </div>
           </div>
 
-          {/* Live calculation preview */}
-          {calcTotal && (
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-100">
-              <Fuel className="w-4 h-4 text-amber-600 shrink-0" />
-              <div className="flex items-baseline gap-2">
-                <p className="text-[13px] text-amber-800 font-semibold">Calculated Total:</p>
-                <p className="text-[18px] font-bold text-amber-700">AED {calcTotal}</p>
-              </div>
-            </div>
-          )}
-
           <div className="flex justify-end gap-2.5 pt-1">
-            <Button variant="outline" type="button" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button type="submit" icon={Plus}>Log Fill-up</Button>
+            <Button variant="outline" type="button"
+              onClick={() => { setShowAdd(false); setEditingLog(null); setForm(BLANK); }}>Cancel</Button>
+            <Button type="submit" icon={editingLog ? Edit2 : Plus}>
+              {editingLog ? 'Save Changes' : 'Log Fill-up'}
+            </Button>
           </div>
         </form>
       </Modal>
@@ -250,3 +243,113 @@ export default function FuelTab({ carId }) {
 }
 
 const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+
+function VehicleWalletBanner({ balance, transactions }) {
+  const isNeg = balance < 0;
+  const isLow = !isNeg && balance < LOW_THRESHOLD;
+  const txns  = (transactions ?? []).slice(0, 5);
+
+  const txDate = (d) => {
+    const s = String(d ?? '').substring(0, 10);
+    const dt = new Date(s + 'T00:00:00');
+    return isNaN(dt) ? s : dt.toLocaleDateString('en-AE', { day: 'numeric', month: 'short' });
+  };
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1d3a 0%, #152d5e 100%)', boxShadow: '0 4px 20px rgba(11,29,58,0.22)' }}>
+      {/* Balance row */}
+      <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+            <Wallet className="w-3.5 h-3.5 text-white/40 shrink-0" />
+            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Vehicle Wallet</span>
+            {isNeg && (
+              <span className="text-[10px] font-bold text-red-300 bg-red-500/20 border border-red-400/20 px-2 py-0.5 rounded-full">Overdraft</span>
+            )}
+            {isLow && (
+              <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 border border-amber-400/20 px-2 py-0.5 rounded-full">Low Balance</span>
+            )}
+          </div>
+          <p className={cn('text-[34px] font-black leading-none tracking-tight', isNeg ? 'text-red-300' : 'text-white')}>
+            {isNeg ? `− AED ${fmt(Math.abs(balance))}` : `AED ${fmt(balance)}`}
+          </p>
+          <p className="text-[11px] text-white/35 mt-1.5">Current Balance</p>
+        </div>
+        <Link to="/wallet"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold text-white/70 hover:text-white transition-colors shrink-0 mt-1"
+          style={{ background: 'rgba(255,255,255,0.08)' }}>
+          <ChevronRight className="w-3.5 h-3.5" />
+          Wallet
+        </Link>
+      </div>
+
+      {/* Recent transactions */}
+      <div className="border-t border-white/8">
+        {txns.length === 0 ? (
+          <p className="px-5 py-4 text-[11px] text-white/30 text-center">No transactions yet — log a fuel fill-up to get started</p>
+        ) : (
+          <div className="divide-y divide-white/5">
+            {txns.map((t, i) => {
+              const credit = t.type === 'credit' || t.type === 'deposit';
+              return (
+                <div key={t.id ?? i} className="flex items-center gap-3 px-5 py-2.5">
+                  <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: credit ? '#4ade80' : '#f87171' }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-white/55 truncate font-medium">{t.description || t.category || 'Transaction'}</p>
+                    <p className="text-[10px] text-white/25">{txDate(t.date)}</p>
+                  </div>
+                  <p className="text-[12px] font-bold shrink-0" style={{ color: credit ? '#4ade80' : '#f87171' }}>
+                    {credit ? '+' : '−'} AED {fmt(t.amount)}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VehicleWalletPanel({ balance, deduction }) {
+  const isNeg = balance < 0;
+  const isLow = !isNeg && balance < LOW_THRESHOLD;
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1d3a 0%, #152d5e 100%)', boxShadow: '0 4px 20px rgba(11,29,58,0.25)' }}>
+      <div className="px-5 py-4">
+        {/* Label row */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Wallet className="w-3.5 h-3.5 text-white/40" />
+            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Vehicle Wallet</span>
+          </div>
+          {isNeg ? (
+            <span className="text-[10px] font-bold text-red-300 bg-red-500/20 border border-red-400/20 px-2.5 py-0.5 rounded-full">
+              Overdraft
+            </span>
+          ) : isLow ? (
+            <Link to="/wallet"
+              className="text-[10px] font-bold text-amber-300 bg-amber-500/20 border border-amber-400/20 px-2.5 py-0.5 rounded-full hover:bg-amber-500/30 transition-colors">
+              Low · Top Up
+            </Link>
+          ) : null}
+        </div>
+
+        {/* Balance */}
+        <p className={cn('text-[32px] font-black leading-none tracking-tight', isNeg ? 'text-red-300' : 'text-white')}>
+          {isNeg ? `− AED ${fmt(Math.abs(balance))}` : `AED ${fmt(balance)}`}
+        </p>
+        <p className="text-[11px] text-white/35 mt-1.5 font-medium">Current Balance</p>
+      </div>
+
+      {/* Deduction row — only shown when amount is entered */}
+      {deduction > 0 && (
+        <div className="px-5 py-3 border-t border-white/8 bg-black/12 flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-white/45">This fill-up</span>
+          <span className="text-[13px] font-bold text-red-300">− AED {fmt(deduction)}</span>
+        </div>
+      )}
+    </div>
+  );
+}

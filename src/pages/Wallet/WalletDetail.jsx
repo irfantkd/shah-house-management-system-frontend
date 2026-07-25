@@ -1,30 +1,30 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, Car, Home, Plus, ArrowDownLeft, ArrowUpRight,
+  ArrowLeft, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
   Download, AlertTriangle, Wallet, TrendingUp, TrendingDown,
 } from 'lucide-react';
 import { downloadSingleWalletPDF } from '../../utils/pdfReport';
-import {
-  selectVehicleWallet, selectHomeWallet,
-  depositToWallet, LOW_BALANCE_THRESHOLD,
-} from '../../store/slices/walletSlice';
-import { selectCurrentProperty } from '../../store/slices/propertiesSlice';
+import { useGetQuery, usePostMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
 import Modal  from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
+const LOW_BALANCE_THRESHOLD = 5000;
+
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.32, delay: d, ease: [0.4, 0, 0.2, 1] } });
 
 const WALLET_CFG = {
-  vehicle: { label: 'Vehicle Wallet', desc: 'Fuel, maintenance, repairs & fleet costs', icon: Car,  color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-  home:    { label: 'Home Wallet',    desc: 'Property services, grocery & household',   icon: Home, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
+  vehicle: { label: 'Vehicle Wallet', desc: 'Fuel, maintenance, repairs & fleet costs',  icon: Car,     color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+  home:    { label: 'Home Wallet',    desc: 'Property services, grocery & household',    icon: Home,    color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
+  salary:  { label: 'Salary Wallet',  desc: 'Employee salary payments only',             icon: Banknote, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
 };
 
-const PDF_COLORS = { vehicle: [11, 29, 58], home: [20, 83, 45] };
+const PDF_COLORS = { vehicle: [11, 29, 58], home: [20, 83, 45], salary: [76, 29, 149] };
 
 const PERIODS = [
   { k: 'week',   l: 'This Week'    },
@@ -68,30 +68,35 @@ const BLANK = { amount: '', note: '', date: new Date().toISOString().split('T')[
 export default function WalletDetail() {
   const { walletType } = useParams();
   const navigate       = useNavigate();
-  const dispatch       = useDispatch();
-  const vWallet        = useSelector(selectVehicleWallet);
-  const hWallet        = useSelector(selectHomeWallet);
+  const propertyId     = useSelector(selectCurrentPropertyId);
+  const property       = useSelector(selectCurrentProperty);
 
-  const property = useSelector(selectCurrentProperty);
-  const type   = walletType === 'home' ? 'home' : 'vehicle';
-  const cfg    = WALLET_CFG[type];
-  const wallet = type === 'vehicle' ? vWallet : hWallet;
-  const Icon   = cfg.icon;
+  const type = walletType === 'home' ? 'home' : walletType === 'salary' ? 'salary' : 'vehicle';
+  const cfg  = WALLET_CFG[type];
+  const Icon = cfg.icon;
+
+  const emptyWallet = { balance: 0, totalDeposited: 0 };
+  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const { data: rawTxns = [], refetch: refetchTxns  } = useGetQuery({ path: '/wallet/transactions', params: { propertyId, walletType: type } }, { skip: !propertyId });
+  const wallet = walletData?.[type] ?? emptyWallet;
+  const [depositMut] = usePostMutation();
 
   const [period,      setPeriod]      = useState('month');
   const [showDeposit, setShowDeposit] = useState(false);
   const [form,        setForm]        = useState(BLANK);
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const allTxns = useMemo(() => [...(wallet.transactions ?? [])].sort((a, b) => {
+  const allTxns = useMemo(() => [...rawTxns].sort((a, b) => {
     const d = new Date(b.date) - new Date(a.date);
-    return d !== 0 ? d : b.id.localeCompare(a.id);
-  }), [wallet.transactions]);
+    return d !== 0 ? d : String(b.id).localeCompare(String(a.id));
+  }), [rawTxns]);
 
   const filtered = useMemo(() => applyPeriod(allTxns, period), [allTxns, period]);
 
-  const periodDeposited = filtered.filter((t) => t.type === 'deposit').reduce((s, t) => s + t.amount, 0);
-  const periodSpent     = filtered.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const isCredit = (t) => t.type === 'credit';
+  const isDebit  = (t) => t.type === 'debit';
+  const periodDeposited = filtered.filter(isCredit).reduce((s, t) => s + t.amount, 0);
+  const periodSpent     = filtered.filter(isDebit).reduce((s, t) => s + t.amount, 0);
   const periodNet       = periodDeposited - periodSpent;
 
   // Monthly breakdown for chart (all-time, max 6 months)
@@ -100,8 +105,8 @@ export default function WalletDetail() {
     allTxns.forEach((t) => {
       const key = t.date.slice(0, 7);
       if (!map[key]) map[key] = { key, deposited: 0, spent: 0 };
-      if (t.type === 'deposit') map[key].deposited += t.amount;
-      else                      map[key].spent      += t.amount;
+      if (isCredit(t)) map[key].deposited += t.amount;
+      else             map[key].spent      += t.amount;
     });
     return Object.values(map).sort((a, b) => b.key.localeCompare(a.key)).slice(0, 6).reverse();
   }, [allTxns]);
@@ -115,14 +120,17 @@ export default function WalletDetail() {
   const low     = balance < LOW_BALANCE_THRESHOLD;
   const empty   = balance <= 0;
 
-  const handleDeposit = (e) => {
+  const handleDeposit = async (e) => {
     e.preventDefault();
     const amt = Number(form.amount);
     if (!amt || amt <= 0) return toast.error('Enter a valid amount');
-    dispatch(depositToWallet({ wallet: type, amount: amt, note: form.note, date: form.date }));
-    toast.success(`AED ${fmt(amt)} deposited to ${cfg.label}`);
-    setShowDeposit(false);
-    setForm(BLANK);
+    try {
+      await depositMut({ path: '/wallet/deposit', body: { propertyId, walletType: type, amount: amt, description: form.note, note: form.note, date: form.date } }).unwrap();
+      await Promise.all([refetchWallet(), refetchTxns()]);
+      toast.success(`AED ${fmt(amt)} deposited to ${cfg.label}`);
+      setShowDeposit(false);
+      setForm(BLANK);
+    } catch (err) { toast.error(err.data?.error || 'Failed to deposit'); }
   };
 
   return (
@@ -216,7 +224,7 @@ export default function WalletDetail() {
 
       {/* ── Period stats ── */}
       <motion.div {...fade(0.13)}>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { l: 'Received',     v: periodDeposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft },
             { l: 'Spent',        v: periodSpent,     c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight  },
@@ -308,7 +316,7 @@ export default function WalletDetail() {
             <>
               <div className="divide-y divide-slate-50">
                 {filtered.map((txn) => {
-                  const isDepo = txn.type === 'deposit';
+                  const isDepo = isCredit(txn);
                   return (
                     <div key={txn.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
                       <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',

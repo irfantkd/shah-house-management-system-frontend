@@ -1,46 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSelector } from 'react-redux';
 import {
-  LayoutGrid, User, MapPin, Image, FolderOpen, Shield,
-  BedDouble, Bath, Car, Ruler, Pencil, CheckCircle2,
+  LayoutGrid, User, MapPin, Shield,
+  BedDouble, Bath, Car, Ruler,
 } from 'lucide-react';
-import { homeInfo } from '../../data/mockHomeInfo';
-import Button from '../../components/ui/Button';
+import { useGetQuery } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Badge from '../../components/ui/Badge';
-import { CardSkeleton } from '../../components/ui/LoadingSkeleton';
-import OverviewTab   from './tabs/OverviewTab';
-import OwnerTab      from './tabs/OwnerTab';
-import AddressTab    from './tabs/AddressTab';
-import ImagesTab     from './tabs/ImagesTab';
-import DocumentsTab  from './tabs/DocumentsTab';
-import InsuranceTab  from './tabs/InsuranceTab';
 import { cn } from '../../utils/cn';
+import OverviewTab  from './tabs/OverviewTab';
+import OwnerTab     from './tabs/OwnerTab';
+import AddressTab   from './tabs/AddressTab';
+import InsuranceTab from './tabs/InsuranceTab';
 
 const TABS = [
-  { id: 'overview',   label: 'Overview',   icon: LayoutGrid  },
-  { id: 'owner',      label: 'Owner',      icon: User        },
-  { id: 'address',    label: 'Address',    icon: MapPin      },
-  { id: 'images',     label: 'Images',     icon: Image       },
-  { id: 'documents',  label: 'Documents',  icon: FolderOpen  },
-  { id: 'insurance',  label: 'Insurance',  icon: Shield      },
+  { id: 'overview',  label: 'Overview',  icon: LayoutGrid },
+  { id: 'owner',     label: 'Owner',     icon: User       },
+  { id: 'address',   label: 'Address',   icon: MapPin     },
+  { id: 'insurance', label: 'Insurance', icon: Shield     },
 ];
 
 const HERO_STATS = [
-  { icon: BedDouble, label: 'Beds',     value: (h) => h.bedrooms  },
-  { icon: Bath,      label: 'Baths',    value: (h) => h.bathrooms },
-  { icon: Ruler,     label: 'Sq.m',     value: (h) => h.size      },
-  { icon: Car,       label: 'Parking',  value: (h) => h.parking   },
+  { icon: BedDouble, label: 'Bedrooms',  key: 'bedrooms'  },
+  { icon: Bath,      label: 'Bathrooms', key: 'bathrooms' },
+  { icon: Ruler,     label: 'Sq. m',     key: 'size'      },
+  { icon: Car,       label: 'Parking',   key: 'parking'   },
 ];
 
 export default function HomeInfo() {
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const { data: home = {}, isLoading } = useGetQuery({ path: '/home-info', params: { propertyId } }, { skip: !propertyId });
   const [activeTab, setActiveTab] = useState('overview');
-  const [loading,   setLoading]   = useState(true);
-  const [editMode,  setEditMode]  = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 700);
-    return () => clearTimeout(t);
-  }, []);
 
   return (
     <motion.div
@@ -49,63 +40,48 @@ export default function HomeInfo() {
       transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
       className="space-y-5"
     >
-
-      {/* ── Hero header ── */}
+      {/* ── Hero ── */}
       <div className="relative rounded-3xl overflow-hidden">
-        {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800" />
-        {/* Decorative circles */}
-        <div className="absolute -top-12 -right-12 w-64 h-64 bg-accent-600/10 rounded-full" />
-        <div className="absolute -bottom-8 -left-8  w-48 h-48 bg-white/[0.02] rounded-full" />
-        {/* Grid texture */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
-          }}
-        />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#060f1e] via-[#0b1d3a] to-[#0d2449]" />
+        <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full opacity-10" style={{ background: 'radial-gradient(circle, #C9A227 0%, transparent 70%)' }} />
+        <div className="absolute -bottom-12 -left-12 w-56 h-56 rounded-full opacity-5" style={{ background: 'white' }} />
+        <div className="absolute inset-0 opacity-[0.035]"
+          style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+        {/* Gold top line */}
+        <div className="absolute top-0 left-0 right-0 h-0.5" style={{ background: 'linear-gradient(90deg, transparent, #C9A227 40%, #C9A227 60%, transparent)' }} />
 
-        <div className="relative z-10 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="primary" size="sm" className="!bg-accent-600/20 !text-accent-300 !border-0">
-                  {homeInfo.type}
+        <div className="relative z-10 p-7 sm:p-9">
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              {home.type && (
+                <Badge variant="primary" size="sm" className="bg-white/10! text-white/70! border-white/20!">
+                  {home.type}
                 </Badge>
-                <Badge variant="success" size="sm" dot className="!bg-success-600/20 !text-success-300 !border-0">
-                  {homeInfo.status}
+              )}
+              {home.status && (
+                <Badge variant="success" size="sm" dot className="bg-emerald-500/15! text-emerald-300! border-emerald-500/20!">
+                  {home.status}
                 </Badge>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">{homeInfo.name}</h1>
-              <p className="text-white/50 text-[13px] mt-1.5 flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5" />
-                {homeInfo.address.villa}, {homeInfo.address.district}, {homeInfo.address.city}
-              </p>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                icon={editMode ? CheckCircle2 : Pencil}
-                onClick={() => setEditMode((v) => !v)}
-                className="!bg-white/10 !border-white/20 !text-white hover:!bg-white/20"
-              >
-                {editMode ? 'Save changes' : 'Edit property'}
-              </Button>
-            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mb-1.5">
+              {isLoading ? <span className="opacity-40">Loading…</span> : (home.name || 'Shah Villa')}
+            </h1>
+            <p className="text-white/45 text-[13px] flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              {[home.address?.villa, home.address?.district, home.address?.city, 'UAE'].filter(Boolean).join(', ') || 'Dubai, UAE'}
+            </p>
           </div>
 
-          {/* Stats row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {HERO_STATS.map((stat) => (
-              <div key={stat.label} className="bg-white/[0.07] border border-white/10 rounded-2xl px-4 py-3 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
-                  <stat.icon className="w-4 h-4 text-white/70" strokeWidth={1.8} />
+            {HERO_STATS.map((s) => (
+              <div key={s.key} className="rounded-2xl px-4 py-3.5 flex items-center gap-3" style={{ background: 'rgba(255,255,255,0.065)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(201,162,39,0.15)', border: '1px solid rgba(201,162,39,0.25)' }}>
+                  <s.icon className="w-4 h-4 text-[#C9A227]" strokeWidth={1.8} />
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-white leading-none">{stat.value(homeInfo)}</p>
-                  <p className="text-white/40 text-[11px] mt-0.5">{stat.label}</p>
+                  <p className="text-[19px] font-black text-white leading-none">{home[s.key] ?? '—'}</p>
+                  <p className="text-white/38 text-[10.5px] mt-0.5 font-medium">{s.label}</p>
                 </div>
               </div>
             ))}
@@ -113,57 +89,43 @@ export default function HomeInfo() {
         </div>
       </div>
 
-      {/* ── Tab navigation ── */}
+      {/* ── Tabs ── */}
       <div className="bg-white rounded-2xl border border-slate-100 p-1.5 flex items-center gap-1 overflow-x-auto" style={{ boxShadow: 'var(--shadow-card)' }}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-[13px] font-semibold whitespace-nowrap transition-all duration-150 flex-shrink-0',
+              'relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold whitespace-nowrap transition-all flex-shrink-0',
               activeTab === tab.id
-                ? 'text-navy-900 bg-navy-50'
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50',
+                ? 'text-navy-900 bg-navy-50 shadow-sm'
+                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-50',
             )}
           >
             <tab.icon className={cn('w-4 h-4', activeTab === tab.id ? 'text-navy-700' : 'text-slate-400')} strokeWidth={1.8} />
             {tab.label}
             {activeTab === tab.id && (
-              <motion.div
-                layoutId="tab-indicator"
-                className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-accent-600 rounded-full"
-                transition={{ duration: 0.2 }}
-              />
+              <motion.div layoutId="hi-tab" className="absolute bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full" style={{ background: '#C9A227' }} transition={{ duration: 0.2 }} />
             )}
           </button>
         ))}
       </div>
 
       {/* ── Tab content ── */}
-      {loading ? (
-        <div className="space-y-5">
-          <CardSkeleton rows={3} />
-          <CardSkeleton rows={4} />
-        </div>
-      ) : (
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            {activeTab === 'overview'  && <OverviewTab  home={homeInfo}                   onEdit={() => setEditMode(true)} />}
-            {activeTab === 'owner'     && <OwnerTab     owner={homeInfo.owner}             onEdit={() => setEditMode(true)} />}
-            {activeTab === 'address'   && <AddressTab   address={homeInfo.address}         onEdit={() => setEditMode(true)} />}
-            {activeTab === 'images'    && <ImagesTab    images={homeInfo.images}                                            />}
-            {activeTab === 'documents' && <DocumentsTab documents={homeInfo.documents}                                     />}
-            {activeTab === 'insurance' && <InsuranceTab insurance={homeInfo.insurance}     onEdit={() => setEditMode(true)} />}
-          </motion.div>
-        </AnimatePresence>
-      )}
-
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.18 }}
+        >
+          {activeTab === 'overview'  && <OverviewTab  />}
+          {activeTab === 'owner'     && <OwnerTab     />}
+          {activeTab === 'address'   && <AddressTab   />}
+          {activeTab === 'insurance' && <InsuranceTab />}
+        </motion.div>
+      </AnimatePresence>
     </motion.div>
   );
 }

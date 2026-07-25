@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { Plus, Wrench, Wallet, Car, Home } from 'lucide-react';
-import { selectCars, addCarExpense } from '../../store/slices/carsSlice';
-import { selectVehicleWallet, selectHomeWallet, deductFromWallet, LOW_BALANCE_THRESHOLD } from '../../store/slices/walletSlice';
+import { useGetQuery, usePostMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { CAR_EXPENSE_TYPES } from '../../data/mockCars';
 import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -11,18 +11,25 @@ import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
 const fmt = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
+const LOW_THRESHOLD = 5000;
 
 const TYPE_OPTS = Object.entries(CAR_EXPENSE_TYPES).map(([k, v]) => ({ value: k, label: v.label }));
 const BLANK = { type: 'service', description: '', amount: '', vendor: '', date: new Date().toISOString().split('T')[0], mileage: '', notes: '' };
 
 export default function QuickExpenseModal({ open, onClose }) {
-  const dispatch      = useDispatch();
-  const cars          = useSelector(selectCars);
-  const vehicleWallet = useSelector(selectVehicleWallet);
-  const homeWallet    = useSelector(selectHomeWallet);
-  const [carId,   setCarId]   = useState('');
-  const [wallet,  setWallet]  = useState('vehicle');
-  const [form,    setForm]    = useState(BLANK);
+  const propertyId = useSelector(selectCurrentPropertyId);
+
+  const { data: cars = [] } = useGetQuery({ path: '/cars', params: { propertyId } }, { skip: !propertyId });
+  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const vehicleBalance = walletData?.vehicle?.balance ?? 0;
+  const homeBalance    = walletData?.home?.balance    ?? 0;
+
+  const [addExpenseMut]   = usePostMutation();
+  const [deductWalletMut] = usePostMutation();
+
+  const [carId,  setCarId]  = useState('');
+  const [wallet, setWallet] = useState('vehicle');
+  const [form,   setForm]   = useState(BLANK);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const selectedCar = cars.find((c) => c.id === carId) ?? cars[0];
@@ -30,26 +37,29 @@ export default function QuickExpenseModal({ open, onClose }) {
 
   const handleClose = () => { onClose(); setCarId(''); setWallet('vehicle'); setForm(BLANK); };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!effectiveId)               return toast.error('No vehicle available');
+    if (!effectiveId)                                   return toast.error('No vehicle available');
     if (!form.description || !form.amount || !form.date) return toast.error('Fill required fields');
-    const amt       = Number(form.amount);
-    const selWallet = wallet === 'vehicle' ? vehicleWallet : homeWallet;
-    const expType   = CAR_EXPENSE_TYPES[form.type]?.label ?? form.type;
-    dispatch(addCarExpense({ ...form, carId: effectiveId, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined }));
-    dispatch(deductFromWallet({ wallet, amount: amt, description: form.description, date: form.date, category: expType }));
-    const afterBal    = selWallet.balance - amt;
-    const walletLabel = wallet === 'vehicle' ? 'Vehicle' : 'Home';
-    if (afterBal < LOW_BALANCE_THRESHOLD)
-      toast(`${walletLabel} wallet now AED ${fmt(Math.max(0, afterBal))} — top up soon`, { icon: '⚠️' });
-    else toast.success(`Expense added to ${selectedCar?.make} ${selectedCar?.model} · deducted from ${walletLabel} Wallet`);
-    handleClose();
+    const amt     = Number(form.amount);
+    const expType = CAR_EXPENSE_TYPES[form.type]?.label ?? form.type;
+    try {
+      await Promise.all([
+        addExpenseMut({ path: `/cars/${effectiveId}/expenses`, body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined } }).unwrap(),
+        deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: wallet, amount: amt, description: form.description, date: form.date, category: expType, carId: effectiveId } }).unwrap(),
+      ]);
+      await refetchWallet();
+      const walletLabel = wallet === 'vehicle' ? 'Vehicle' : 'Home';
+      toast.success(`Expense added to ${selectedCar?.make} ${selectedCar?.model} · deducted from ${walletLabel} Wallet`);
+      handleClose();
+    } catch (err) { toast.error(err.data?.error || 'Failed to log expense'); }
   };
 
   if (!cars.length) return null;
 
-  const cfg = CAR_EXPENSE_TYPES[form.type] ?? CAR_EXPENSE_TYPES.other;
+  const cfg            = CAR_EXPENSE_TYPES[form.type] ?? CAR_EXPENSE_TYPES.other;
+  const activeBalance  = wallet === 'vehicle' ? vehicleBalance : homeBalance;
+  const activeLabel    = wallet === 'vehicle' ? 'Vehicle Wallet' : 'Home Wallet';
 
   return (
     <Modal open={open} onClose={handleClose} title="Log Expense" subtitle="Select vehicle and enter expense details" size="md">
@@ -67,7 +77,7 @@ export default function QuickExpenseModal({ open, onClose }) {
                     : 'border-slate-100 bg-slate-50 hover:border-slate-200'
                 }`}>
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
-                  style={{ background: `linear-gradient(135deg, #0b1d3a, #1e3a6e)` }}>
+                  style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
                   {car.images?.[0]
                     ? <img src={car.images[0]} alt="" className="w-full h-full object-cover" />
                     : <Wrench className="w-4 h-4 text-white" />}
@@ -87,8 +97,8 @@ export default function QuickExpenseModal({ open, onClose }) {
           <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-2">Deduct from Wallet</label>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { k: 'vehicle', label: 'Vehicle Wallet', icon: Car,  bal: vehicleWallet.balance, color: '#0b1d3a', bg: '#eef2fb' },
-              { k: 'home',    label: 'Home Wallet',    icon: Home, bal: homeWallet.balance,    color: '#16a34a', bg: '#f0fdf4' },
+              { k: 'vehicle', label: 'Vehicle Wallet', icon: Car,  bal: vehicleBalance, color: '#0b1d3a', bg: '#eef2fb' },
+              { k: 'home',    label: 'Home Wallet',    icon: Home, bal: homeBalance,    color: '#16a34a', bg: '#f0fdf4' },
             ].map(({ k, label, icon: Icon, bal, color, bg }) => (
               <button key={k} type="button" onClick={() => setWallet(k)}
                 className="flex flex-col gap-1.5 p-3 rounded-xl border-2 text-left transition-all"
@@ -104,47 +114,15 @@ export default function QuickExpenseModal({ open, onClose }) {
                   )}
                 </div>
                 <p className="text-[15px] font-bold" style={{ color: wallet === k ? color : '#94a3b8' }}>
-                  AED {fmt(bal)}
+                  {bal < 0 ? `− AED ${fmt(Math.abs(bal))}` : `AED ${fmt(bal)}`}
                 </p>
               </button>
             ))}
           </div>
         </div>
-        {/* Selected wallet balance + after preview */}
-        {(() => {
-          const selW  = wallet === 'vehicle' ? vehicleWallet : homeWallet;
-          const wLbl  = wallet === 'vehicle' ? 'Vehicle Wallet' : 'Home Wallet';
-          const bal   = selW.balance;
-          const cost  = Number(form.amount) || 0;
-          const after = bal - cost;
-          const low   = bal < LOW_BALANCE_THRESHOLD;
-          const empty = bal <= 0;
-          return (
-            <div className={cn('flex items-center gap-3 p-3 rounded-xl border',
-              empty ? 'bg-red-50 border-red-200' : low ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
-              <Wallet className={cn('w-4 h-4 shrink-0', empty ? 'text-red-500' : low ? 'text-amber-600' : 'text-slate-400')} />
-              <div className="flex-1">
-                <p className="text-[11px] text-slate-400">{wLbl} — deducted on submit</p>
-                <p className={cn('text-[15px] font-bold', empty ? 'text-red-600' : low ? 'text-amber-700' : 'text-slate-800')}>
-                  AED {fmt(bal)}
-                </p>
-              </div>
-              {cost > 0 && (
-                <div className="text-right shrink-0">
-                  <p className="text-[10px] text-slate-400">After</p>
-                  <p className={cn('text-[13px] font-bold', after < 0 ? 'text-red-600' : after < LOW_BALANCE_THRESHOLD ? 'text-amber-600' : 'text-emerald-600')}>
-                    AED {fmt(Math.max(0, after))}
-                  </p>
-                </div>
-              )}
-              {(empty || low) && (
-                <Link to="/wallet" className={cn('shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg', empty ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
-                  {empty ? 'Deposit' : 'Top Up'}
-                </Link>
-              )}
-            </div>
-          );
-        })()}
+
+        {/* Selected wallet balance card */}
+        <WalletPanel balance={activeBalance} label={activeLabel} deduction={Number(form.amount) || 0} isVehicle={wallet === 'vehicle'} />
 
         {/* Expense fields */}
         <div>
@@ -157,7 +135,6 @@ export default function QuickExpenseModal({ open, onClose }) {
               </select>
             </div>
 
-            {/* Type preview chip */}
             <div className="col-span-2">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold" style={{ background: cfg.bg, color: cfg.color }}>
                 <Wrench className="w-3.5 h-3.5" /> {cfg.label}
@@ -203,3 +180,40 @@ export default function QuickExpenseModal({ open, onClose }) {
 }
 
 const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+
+function WalletPanel({ balance, label, deduction, isVehicle }) {
+  const isNeg = balance < 0;
+  const isLow = !isNeg && balance < LOW_THRESHOLD;
+  const bg    = isVehicle
+    ? 'linear-gradient(135deg, #0b1d3a 0%, #152d5e 100%)'
+    : 'linear-gradient(135deg, #052e16 0%, #14532d 100%)';
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: bg, boxShadow: '0 4px 20px rgba(11,29,58,0.25)' }}>
+      <div className="px-5 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Wallet className="w-3.5 h-3.5 text-white/40" />
+            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{label}</span>
+          </div>
+          {isNeg ? (
+            <span className="text-[10px] font-bold text-red-300 bg-red-500/20 border border-red-400/20 px-2.5 py-0.5 rounded-full">Overdraft</span>
+          ) : isLow ? (
+            <Link to="/wallet" className="text-[10px] font-bold text-amber-300 bg-amber-500/20 border border-amber-400/20 px-2.5 py-0.5 rounded-full hover:bg-amber-500/30 transition-colors">
+              Low · Top Up
+            </Link>
+          ) : null}
+        </div>
+        <p className={cn('text-[32px] font-black leading-none tracking-tight', isNeg ? 'text-red-300' : 'text-white')}>
+          {isNeg ? `− AED ${fmt(Math.abs(balance))}` : `AED ${fmt(balance)}`}
+        </p>
+        <p className="text-[11px] text-white/35 mt-1.5 font-medium">Current Balance</p>
+      </div>
+      {deduction > 0 && (
+        <div className="px-5 py-3 border-t border-white/8 bg-black/12 flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-white/45">This expense</span>
+          <span className="text-[13px] font-bold text-red-300">− AED {fmt(deduction)}</span>
+        </div>
+      )}
+    </div>
+  );
+}

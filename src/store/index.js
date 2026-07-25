@@ -1,6 +1,6 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
-import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
-import { propertyInjector } from './middleware/propertyInjector';
+import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER, createTransform } from 'redux-persist';
+import { apiSlice } from '../api/apiSlice';
 
 const storage = {
   getItem:    (key) => Promise.resolve(localStorage.getItem(key)),
@@ -15,9 +15,7 @@ import contractsReducer    from './slices/contractsSlice';
 import tasksReducer        from './slices/tasksSlice';
 import assetsReducer       from './slices/assetsSlice';
 import areasReducer        from './slices/areasSlice';
-import documentsReducer    from './slices/documentsSlice';
 import notificationsReducer from './slices/notificationsSlice';
-import emergencyReducer    from './slices/emergencySlice';
 import expensesReducer     from './slices/expensesSlice';
 import settingsReducer     from './slices/settingsSlice';
 import carsReducer         from './slices/carsSlice';
@@ -26,6 +24,9 @@ import employeesReducer   from './slices/employeesSlice';
 import ownersReducer      from './slices/ownersSlice';
 import propertiesReducer  from './slices/propertiesSlice';
 import letterheadsReducer from './slices/letterheadsSlice';
+import homeInfoReducer    from './slices/homeInfoSlice';
+import usersReducer      from './slices/usersSlice';
+import dashboardReducer from './slices/dashboardSlice';
 
 const rootReducer = combineReducers({
   auth:          authReducer,
@@ -35,9 +36,7 @@ const rootReducer = combineReducers({
   tasks:         tasksReducer,
   assets:        assetsReducer,
   areas:         areasReducer,
-  documents:     documentsReducer,
   notifications: notificationsReducer,
-  emergency:     emergencyReducer,
   expenses:      expensesReducer,
   settings:      settingsReducer,
   cars:          carsReducer,
@@ -46,12 +45,24 @@ const rootReducer = combineReducers({
   owners:        ownersReducer,
   properties:    propertiesReducer,
   letterheads:   letterheadsReducer,
+  homeInfo:      homeInfoReducer,
+  users:         usersReducer,
+  dashboard:     dashboardReducer,
+  [apiSlice.reducerPath]: apiSlice.reducer,
 });
 
+// Persist only currentId from properties — not the items array (those come from API on boot)
+const propertiesTransform = createTransform(
+  (inbound)  => ({ currentId: inbound.currentId }),
+  (outbound) => ({ items: [], currentId: outbound.currentId ?? null, status: 'idle', error: null }),
+  { whitelist: ['properties'] },
+);
+
 const persistConfig = {
-  key: 'ahms-v4',  // bumped — merged maintenance + repairs into tasks
+  key: 'ahms-v5',
   storage,
-  blacklist: ['ui'],
+  whitelist: ['auth', 'properties'],
+  transforms: [propertiesTransform],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -63,7 +74,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }).concat(propertyInjector),
+    }).concat(apiSlice.middleware),
 });
 
 export const persistor = persistStore(store);

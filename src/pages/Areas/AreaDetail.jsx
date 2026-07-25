@@ -1,46 +1,48 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   RiArrowLeftLine, RiBox3Line, RiMapPin2Line, RiRulerLine,
   RiCalendarCheckLine, RiHammerLine, RiAddLine,
   RiCloseCircleLine, RiArrowRightLine, RiSearchLine,
-  RiCheckboxCircleLine, RiTimerLine, RiToolsLine, RiAlertLine,
+  RiCheckboxCircleLine, RiTimerLine, RiToolsLine,
   RiTempColdLine, RiDropLine, RiFlashlightLine, RiPlugLine,
   RiShieldCheckLine, RiLeafLine, RiSofaLine, RiThermometerLine,
   RiContrastDropLine, RiLightbulbLine, RiBuildingLine,
   RiAttachmentLine, RiEditLine,
   RiLayoutGridLine, RiListCheck2, RiHome4Line,
-  RiCalendarEventLine, RiBankCardLine,
+  RiCalendarEventLine,
 } from 'react-icons/ri';
-import { selectAreaById } from '../../store/slices/areasSlice';
-import { selectAssets, updateAsset } from '../../store/slices/assetsSlice';
-import { selectTasks } from '../../store/slices/tasksSlice';
+import {
+  BedDouble, ShowerHead, UtensilsCrossed, Sofa, Utensils,
+  TreeDeciduous, Waves, Car, Briefcase, Package, Wrench,
+  Wind, Sun, MapPin,
+} from 'lucide-react';
+import { useGetQuery, usePutMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Badge from '../../components/ui/Badge';
 import { cn } from '../../utils/cn';
 
-/* ─── area type → gradient/colour ─── */
 const TYPE_META = {
-  Bedroom:      { grad: 'linear-gradient(135deg,#1e3a8a,#312e81)', light: '#eff6ff', text: '#1d4ed8',  emoji: '🛏️' },
-  Bathroom:     { grad: 'linear-gradient(135deg,#0e7490,#1d4ed8)', light: '#ecfeff', text: '#0891b2',  emoji: '🚿' },
-  Kitchen:      { grad: 'linear-gradient(135deg,#c2410c,#d97706)', light: '#fff7ed', text: '#c2410c',  emoji: '🍳' },
-  'Living Room':{ grad: 'linear-gradient(135deg,#1d4ed8,#0b1d3a)', light: '#eff6ff', text: '#2563eb',  emoji: '🛋️' },
-  'Dining Room':{ grad: 'linear-gradient(135deg,#7c3aed,#4f46e5)', light: '#f5f3ff', text: '#7c3aed',  emoji: '🍽️' },
-  Garden:       { grad: 'linear-gradient(135deg,#15803d,#16a34a)', light: '#f0fdf4', text: '#16a34a',  emoji: '🌿' },
-  'Pool Area':  { grad: 'linear-gradient(135deg,#0284c7,#06b6d4)', light: '#e0f2fe', text: '#0284c7',  emoji: '🏊' },
-  Garage:       { grad: 'linear-gradient(135deg,#475569,#334155)', light: '#f8fafc', text: '#475569',  emoji: '🚗' },
-  Office:       { grad: 'linear-gradient(135deg,#6d28d9,#7c3aed)', light: '#f5f3ff', text: '#6d28d9',  emoji: '💼' },
-  Storage:      { grad: 'linear-gradient(135deg,#64748b,#475569)', light: '#f8fafc', text: '#64748b',  emoji: '📦' },
-  Utility:      { grad: 'linear-gradient(135deg,#b45309,#d97706)', light: '#fffbeb', text: '#b45309',  emoji: '🔧' },
-  Balcony:      { grad: 'linear-gradient(135deg,#0f766e,#0d9488)', light: '#f0fdfa', text: '#0f766e',  emoji: '🏠' },
-  Roof:         { grad: 'linear-gradient(135deg,#d97706,#f59e0b)', light: '#fffbeb', text: '#d97706',  emoji: '☀️' },
-  Other:        { grad: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', light: '#f0f5ff', text: '#0b1d3a',  emoji: '📍' },
+  Bedroom:      { grad: 'linear-gradient(135deg,#1e3a8a,#312e81)', light: '#eff6ff', text: '#1d4ed8',  Icon: BedDouble       },
+  Bathroom:     { grad: 'linear-gradient(135deg,#0e7490,#1d4ed8)', light: '#ecfeff', text: '#0891b2',  Icon: ShowerHead      },
+  Kitchen:      { grad: 'linear-gradient(135deg,#c2410c,#d97706)', light: '#fff7ed', text: '#c2410c',  Icon: UtensilsCrossed },
+  'Living Room':{ grad: 'linear-gradient(135deg,#1d4ed8,#0b1d3a)', light: '#eff6ff', text: '#2563eb',  Icon: Sofa            },
+  'Dining Room':{ grad: 'linear-gradient(135deg,#7c3aed,#4f46e5)', light: '#f5f3ff', text: '#7c3aed',  Icon: Utensils        },
+  Garden:       { grad: 'linear-gradient(135deg,#15803d,#16a34a)', light: '#f0fdf4', text: '#16a34a',  Icon: TreeDeciduous   },
+  'Pool Area':  { grad: 'linear-gradient(135deg,#0284c7,#06b6d4)', light: '#e0f2fe', text: '#0284c7',  Icon: Waves           },
+  Garage:       { grad: 'linear-gradient(135deg,#475569,#334155)', light: '#f8fafc', text: '#475569',  Icon: Car             },
+  Office:       { grad: 'linear-gradient(135deg,#6d28d9,#7c3aed)', light: '#f5f3ff', text: '#6d28d9',  Icon: Briefcase       },
+  Storage:      { grad: 'linear-gradient(135deg,#64748b,#475569)', light: '#f8fafc', text: '#64748b',  Icon: Package         },
+  Utility:      { grad: 'linear-gradient(135deg,#b45309,#d97706)', light: '#fffbeb', text: '#b45309',  Icon: Wrench          },
+  Balcony:      { grad: 'linear-gradient(135deg,#0f766e,#0d9488)', light: '#f0fdfa', text: '#0f766e',  Icon: Wind            },
+  Roof:         { grad: 'linear-gradient(135deg,#d97706,#f59e0b)', light: '#fffbeb', text: '#d97706',  Icon: Sun             },
+  Other:        { grad: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', light: '#f0f5ff', text: '#0b1d3a',  Icon: MapPin          },
 };
 const typeMeta = (t) => TYPE_META[t] ?? TYPE_META.Other;
 
-/* ─── asset category → icon + colour ─── */
 const CAT_META = {
   climate:    { icon: RiTempColdLine,    bg: '#eff6ff', color: '#2563eb', label: 'Climate'    },
   HVAC:       { icon: RiThermometerLine, bg: '#fff7ed', color: '#c2410c', label: 'HVAC'       },
@@ -60,7 +62,6 @@ const CAT_META = {
 };
 const catMeta = (c) => CAT_META[c] ?? CAT_META.Other;
 
-/* ─── asset status ─── */
 const STATUS_META = {
   operational:   { label: 'Operational',  icon: RiCheckboxCircleLine, color: '#16a34a', bg: '#f0fdf4' },
   'service-due': { label: 'Service Due',  icon: RiTimerLine,          color: '#d97706', bg: '#fffbeb' },
@@ -72,26 +73,28 @@ const statusMeta = (s) => STATUS_META[s] ?? STATUS_META.operational;
 function daysUntil(d) { return d ? Math.ceil((new Date(d) - new Date()) / 86400000) : null; }
 function fmtDate(d)   { return d ? new Date(d+'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : '—'; }
 
-const TABS = ['overview', 'assets', 'history'];
-
-/* ════════════════════════════════════════════════════════ */
 export default function AreaDetail() {
   const { id } = useParams();
-  const dispatch = useDispatch();
+  const propertyId = useSelector(selectCurrentPropertyId);
 
-  const area    = useSelector(selectAreaById(id));
-  const allAssets = useSelector(selectAssets);
-  const tasks = useSelector(selectTasks);
+  const { data: area, isLoading: areaLoading } = useGetQuery({ path: `/areas/${id}` });
+  // Fetch only this area's assets directly — no client-side filtering of the full list
+  const { data: areaAssets  = [] } = useGetQuery({ path: '/assets', params: { propertyId, areaId: id } }, { skip: !propertyId || !id });
+  // Fetch all assets only for the assign modal (to pick from)
+  const { data: allAssets   = [] } = useGetQuery({ path: '/assets', params: { propertyId } },              { skip: !propertyId });
+  const { data: tasks       = [] } = useGetQuery({ path: '/tasks',  params: { propertyId } },              { skip: !propertyId });
+  const { data: allAreas    = [] } = useGetQuery({ path: '/areas',  params: { propertyId } },              { skip: !propertyId });
 
-  const areaAssets    = useMemo(() => allAssets.filter((a) => a.areaId === id), [allAssets, id]);
-  const otherAssets   = useMemo(() => allAssets.filter((a) => a.areaId !== id), [allAssets, id]);
-  const allAreas      = useSelector((s) => s.areas.items);
+  const [updateAssetMut] = usePutMutation();
 
-  const [tab,           setTab]           = useState('assets');
-  const [assetView,     setAssetView]     = useState('grid');
-  const [statusFilter,  setStatusFilter]  = useState('all');
-  const [assignOpen,    setAssignOpen]    = useState(false);
+  const otherAssets = allAssets.filter((a) => a.areaId !== id);
 
+  const [tab,          setTab]          = useState('assets');
+  const [assetView,    setAssetView]    = useState('grid');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [assignOpen,   setAssignOpen]   = useState(false);
+
+  if (areaLoading) return null;
   if (!area) return <Navigate to="/areas" replace />;
 
   const meta = typeMeta(area.type);
@@ -102,27 +105,29 @@ export default function AreaDetail() {
     .filter((t) => t.areaId === id || t.areaName === area.name)
     .sort((a, b) => new Date(b.scheduledDate) - new Date(a.scheduledDate));
 
-  const handleUnassign = (asset) => {
-    dispatch(updateAsset({ ...asset, areaId: '', areaName: '' }));
-    toast.success(`${asset.name} unassigned from ${area.name}`);
+  const handleUnassign = async (asset) => {
+    try {
+      await updateAssetMut({ path: `/assets/${asset.id}`, body: { ...asset, areaId: '', areaName: '' } }).unwrap();
+      toast.success(`${asset.name} unassigned from ${area.name}`);
+    } catch (err) { toast.error(err.data?.error || 'Failed to unassign'); }
   };
 
-  const handleAssign = (asset) => {
-    dispatch(updateAsset({ ...asset, areaId: id, areaName: area.name }));
-    toast.success(`${asset.name} assigned to ${area.name}`);
+  const handleAssign = async (asset) => {
+    try {
+      await updateAssetMut({ path: `/assets/${asset.id}`, body: { ...asset, areaId: id, areaName: area.name } }).unwrap();
+      toast.success(`${asset.name} assigned to ${area.name}`);
+    } catch (err) { toast.error(err.data?.error || 'Failed to assign'); }
   };
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-5">
 
-      {/* ── Back ── */}
       <Link to="/areas" className="inline-flex items-center gap-1.5 text-[13px] text-slate-500 hover:text-slate-700 font-semibold transition-colors">
         <RiArrowLeftLine className="w-3.5 h-3.5" />Back to Areas
       </Link>
 
       {/* ── Hero ── */}
       <div className="relative rounded-3xl overflow-hidden" style={{ background: meta.grad }}>
-        {/* subtle grid overlay */}
         <div className="absolute inset-0 opacity-[0.05]"
           style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
         <div className="absolute top-0 left-0 right-0 h-px opacity-30"
@@ -131,15 +136,15 @@ export default function AreaDetail() {
         <div className="relative z-10 p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl shrink-0"
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0"
                 style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}>
-                {meta.emoji}
+                <meta.Icon className="w-8 h-8 text-white" strokeWidth={1.5} />
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">Shah House</span>
                   <span className="text-white/20">·</span>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">{area.floor ?? 'Ground Floor'}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">{area.floorName ?? 'Ground Floor'}</span>
                 </div>
                 <h1 className="text-2xl font-bold text-white tracking-tight">{area.name}</h1>
                 <div className="flex items-center gap-3 mt-1.5 text-white/50 text-[13px]">
@@ -158,17 +163,16 @@ export default function AreaDetail() {
             </Link>
           </div>
 
-          {/* Stats bar */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-1 sm:gap-3">
             {[
               { label: 'Assigned Assets',  value: areaAssets.length },
               { label: 'Need Attention',   value: areaAssets.filter((a) => a.status === 'service-due' || a.status === 'under-repair').length },
               { label: 'History Records',  value: areaHistory.length },
             ].map((s) => (
-              <div key={s.label} className="text-center rounded-2xl px-3 py-3"
+              <div key={s.label} className="text-center rounded-2xl px-1 sm:px-3 py-3"
                 style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                <p className="text-2xl font-bold text-white leading-none">{s.value}</p>
-                <p className="text-white/40 text-[11px] mt-1 font-medium">{s.label}</p>
+                <p className="text-xl sm:text-2xl font-bold text-white leading-none">{s.value}</p>
+                <p className="text-white/40 text-[9px] sm:text-[11px] mt-1 font-medium leading-snug">{s.label}</p>
               </div>
             ))}
           </div>
@@ -214,10 +218,10 @@ export default function AreaDetail() {
               )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {[
-                  { label: 'Type',     value: area.type ?? '—'       },
-                  { label: 'Floor',    value: area.floor ?? '—'       },
-                  { label: 'Size',     value: area.size ?? '—'        },
-                  { label: 'Assets',   value: areaAssets.length       },
+                  { label: 'Type',     value: area.type ?? '—'   },
+                  { label: 'Floor',    value: area.floorName ?? '—'  },
+                  { label: 'Size',     value: area.size ?? '—'   },
+                  { label: 'Assets',   value: areaAssets.length  },
                 ].map((s) => (
                   <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
                     <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-1.5">{s.label}</p>
@@ -225,7 +229,6 @@ export default function AreaDetail() {
                   </div>
                 ))}
               </div>
-              {/* Asset mini-preview */}
               {areaAssets.length > 0 && (
                 <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
                   <div className="flex items-center justify-between mb-3">
@@ -260,7 +263,6 @@ export default function AreaDetail() {
           {/* ── Assets ── */}
           {tab === 'assets' && (
             <div className="space-y-4">
-              {/* Toolbar */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
                   {['all', 'operational', 'service-due', 'under-repair', 'inactive'].map((s) => {
@@ -301,7 +303,6 @@ export default function AreaDetail() {
                 </div>
               </div>
 
-              {/* Empty state */}
               {filteredAssets.length === 0 && (
                 <div className="bg-white rounded-2xl border border-slate-100 p-14 text-center" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
                   <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
@@ -321,7 +322,6 @@ export default function AreaDetail() {
                 </div>
               )}
 
-              {/* Grid view */}
               {filteredAssets.length > 0 && assetView === 'grid' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   <AnimatePresence mode="popLayout">
@@ -334,7 +334,6 @@ export default function AreaDetail() {
                 </div>
               )}
 
-              {/* List view */}
               {filteredAssets.length > 0 && assetView === 'list' && (
                 <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
                   <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 grid grid-cols-12 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -367,11 +366,8 @@ export default function AreaDetail() {
                 return (
                   <motion.div key={item.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}>
                     <div className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-4" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
-                      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                        isRepair ? 'bg-red-50' : 'bg-blue-50')}>
-                        {isRepair
-                          ? <RiHammerLine className="w-5 h-5 text-red-500" />
-                          : <RiCalendarCheckLine className="w-5 h-5 text-blue-500" />}
+                      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', isRepair ? 'bg-red-50' : 'bg-blue-50')}>
+                        {isRepair ? <RiHammerLine className="w-5 h-5 text-red-500" /> : <RiCalendarCheckLine className="w-5 h-5 text-blue-500" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[14px] font-semibold text-slate-800 truncate">{item.title}</p>
@@ -381,13 +377,9 @@ export default function AreaDetail() {
                       </div>
                       <div className="text-right shrink-0 ml-2">
                         {(item.cost || item.estimatedCost) && (
-                          <p className="text-[13px] font-bold text-slate-700">
-                            AED {(item.cost || item.estimatedCost || 0).toLocaleString()}
-                          </p>
+                          <p className="text-[13px] font-bold text-slate-700">AED {(item.cost || item.estimatedCost || 0).toLocaleString()}</p>
                         )}
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {fmtDate(item.scheduledDate ?? item.reportedDate)}
-                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(item.scheduledDate ?? item.reportedDate)}</p>
                         <span className={cn('inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold',
                           item.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
                           {item.status}
@@ -403,7 +395,6 @@ export default function AreaDetail() {
         </motion.div>
       </AnimatePresence>
 
-      {/* ── Assign Asset Modal ── */}
       <AssignModal
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
@@ -416,53 +407,36 @@ export default function AreaDetail() {
   );
 }
 
-/* ─── Asset card (grid) ─── */
 function AssetCard({ asset, onUnassign }) {
   const cm = catMeta(asset.category);
   const sm = statusMeta(asset.status);
-  const warrantyDays = daysUntil(asset.warranty?.expiryDate);
-  const nextService  = asset.maintenance?.nextService;
+  const warrantyDays  = daysUntil(asset.warranty?.expiryDate);
+  const nextService   = asset.maintenance?.nextService;
   const warrantyColor = warrantyDays === null ? null : warrantyDays < 0 ? '#dc2626' : warrantyDays < 90 ? '#d97706' : '#16a34a';
   const warrantyBg    = warrantyDays === null ? null : warrantyDays < 0 ? '#fef2f2' : warrantyDays < 90 ? '#fffbeb' : '#f0fdf4';
 
   return (
-    <div
-      className="group rounded-3xl overflow-hidden bg-white flex flex-col"
+    <div className="group rounded-3xl overflow-hidden bg-white flex flex-col"
       style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)' }}>
 
-      {/* ══ HEADER — dark navy ══ */}
-      <div
-        className="relative px-5 pt-4 pb-4 overflow-hidden"
+      <div className="relative px-5 pt-4 pb-4 overflow-hidden"
         style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
 
-        {/* Category accent bar */}
         <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:cm.color, opacity:0.85 }} />
-
-        {/* Decorative rings */}
         <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
         <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none' }} />
 
-        {/* Ghost watermark */}
-        <div style={{
-          position:'absolute', right:12, bottom:-6,
-          fontSize:68, fontWeight:900, lineHeight:1,
-          color:'rgba(255,255,255,0.04)',
-          letterSpacing:'-2px',
-          userSelect:'none', pointerEvents:'none',
-        }}>
+        <div style={{ position:'absolute', right:12, bottom:-6, fontSize:68, fontWeight:900, lineHeight:1, color:'rgba(255,255,255,0.04)', letterSpacing:'-2px', userSelect:'none', pointerEvents:'none' }}>
           {asset.name.substring(0,4).toUpperCase()}
         </div>
 
-        {/* Status badge */}
         <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
           style={{ background: sm.bg, color: sm.color, zIndex:10 }}>
           <sm.icon className="w-3 h-3" />{sm.label}
         </div>
 
-        {/* Category icon + name — fully inside header */}
         <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
-          <div
-            className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center"
+          <div className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center"
             style={{ background:`${cm.color}22`, border:'2.5px solid rgba(255,255,255,0.12)', boxShadow:`0 4px 16px ${cm.color}40` }}>
             <cm.icon className="w-7 h-7" style={{ color: cm.color }} />
           </div>
@@ -474,7 +448,6 @@ function AssetCard({ asset, onUnassign }) {
           </div>
         </div>
 
-        {/* Unassign button — hover reveal */}
         <div className="absolute bottom-3.5 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
           <button onClick={onUnassign} title="Unassign from this area"
             className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-red-300 hover:bg-red-500/25 border border-white/10 transition-all">
@@ -483,10 +456,7 @@ function AssetCard({ asset, onUnassign }) {
         </div>
       </div>
 
-      {/* ══ BODY ══ */}
       <div className="flex-1 flex flex-col px-5 pt-4 pb-4 gap-3">
-
-        {/* Warranty pill */}
         {warrantyDays !== null && (
           <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl"
             style={{ background: warrantyBg ?? '#f8fafc', border:`1px solid ${warrantyColor ? warrantyColor + '22' : '#f1f5f9'}` }}>
@@ -499,10 +469,8 @@ function AssetCard({ asset, onUnassign }) {
           </div>
         )}
 
-        {/* Next service */}
         {nextService && (
-          <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl bg-slate-50"
-            style={{ border:'1px solid #f1f5f9' }}>
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl bg-slate-50" style={{ border:'1px solid #f1f5f9' }}>
             <span className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-500">
               <RiCalendarCheckLine className="w-3.5 h-3.5" /> Next Service
             </span>
@@ -512,7 +480,6 @@ function AssetCard({ asset, onUnassign }) {
 
         <div className="flex-1" />
 
-        {/* Footer */}
         <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
           <div>
             {asset.purchasePrice && (
@@ -534,17 +501,15 @@ function AssetCard({ asset, onUnassign }) {
   );
 }
 
-/* ─── Asset row (list) ─── */
 function AssetRow({ asset, last, onUnassign }) {
   const cm = catMeta(asset.category);
   const sm = statusMeta(asset.status);
-  const StatusIcon = sm.icon;
   return (
     <div className={cn('flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition-colors group', !last && 'border-b border-slate-50')}>
       <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: cm.bg }}>
         <cm.icon className="w-4 h-4" style={{ color: cm.color }} />
       </div>
-      <div className="flex-1 min-w-0 col-span-4">
+      <div className="flex-1 min-w-0">
         <p className="text-[13px] font-semibold text-slate-800 truncate">{asset.name}</p>
         <p className="text-[11px] text-slate-400 truncate">{[asset.brand, asset.model].filter(Boolean).join(' · ')}</p>
       </div>
@@ -568,7 +533,6 @@ function AssetRow({ asset, last, onUnassign }) {
   );
 }
 
-/* ─── Assign Asset Modal ─── */
 function AssignModal({ open, onClose, otherAssets, allAreas, areaName, onAssign }) {
   const [search,   setSearch]   = useState('');
   const [selected, setSelected] = useState(new Set());
@@ -587,9 +551,9 @@ function AssignModal({ open, onClose, otherAssets, allAreas, areaName, onAssign 
     return next;
   });
 
-  const handleAssignSelected = () => {
+  const handleAssignSelected = async () => {
     const toAssign = otherAssets.filter((a) => selected.has(a.id));
-    toAssign.forEach((a) => onAssign(a));
+    await Promise.all(toAssign.map((a) => onAssign(a)));
     setSelected(new Set());
     setSearch('');
     onClose();
@@ -614,7 +578,6 @@ function AssignModal({ open, onClose, otherAssets, allAreas, areaName, onAssign 
             className="bg-white rounded-3xl overflow-hidden w-full max-w-lg"
             style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
 
-            {/* Header */}
             <div className="px-6 pt-6 pb-4 border-b border-slate-100">
               <div className="flex items-start justify-between mb-1">
                 <div>
@@ -633,7 +596,6 @@ function AssignModal({ open, onClose, otherAssets, allAreas, areaName, onAssign 
               </div>
             </div>
 
-            {/* Asset list */}
             <div className="max-h-80 overflow-y-auto px-3 py-2">
               {filtered.length === 0 ? (
                 <div className="py-8 text-center">
@@ -652,24 +614,17 @@ function AssignModal({ open, onClose, otherAssets, allAreas, areaName, onAssign 
                       'flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-all mb-1',
                       isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent',
                     )}>
-                    {/* Checkbox */}
-                    <div className={cn(
-                      'w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all',
-                      isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300',
-                    )}>
+                    <div className={cn('w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all',
+                      isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300')}>
                       {isSelected && (
                         <svg width="10" height="10" viewBox="0 0 10 10">
                           <polyline points="2,5.5 4,7.5 8,3" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       )}
                     </div>
-
-                    {/* Icon */}
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: cm.bg }}>
                       <cm.icon className="w-4 h-4" style={{ color: cm.color }} />
                     </div>
-
-                    {/* Info */}
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-slate-800 truncate">{asset.name}</p>
                       <p className="text-[11px] text-slate-400 truncate">
@@ -679,7 +634,6 @@ function AssignModal({ open, onClose, otherAssets, allAreas, areaName, onAssign 
                         )}
                       </p>
                     </div>
-
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: cm.bg, color: cm.color }}>
                       {cm.label}
                     </span>
@@ -688,7 +642,6 @@ function AssignModal({ open, onClose, otherAssets, allAreas, areaName, onAssign 
               })}
             </div>
 
-            {/* Footer */}
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
               <p className="text-[12px] text-slate-400">
                 {selected.size > 0 ? <span className="font-bold text-slate-700">{selected.size} asset{selected.size !== 1 ? 's' : ''} selected</span> : 'Click assets to select them'}

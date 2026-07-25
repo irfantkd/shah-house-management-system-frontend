@@ -1,17 +1,17 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
-import { Car, Fuel, AlertTriangle, Plus, Search, User, ChevronRight, Gauge, Camera, X, Wrench } from 'lucide-react';
-import {
-  selectCars, selectCarExpenses, selectFuelLogs, addCar, addCarImage,
-} from '../../store/slices/carsSlice';
+import { Car, Fuel, AlertTriangle, Plus, Search, User, ChevronRight, Gauge, Camera, X, Wrench, FileBarChart } from 'lucide-react';
+import { useGetQuery, usePostMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { CAR_EXPENSE_TYPES, CAR_CATEGORIES } from '../../data/mockCars';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
 import Modal from '../../components/ui/Modal';
 import QuickExpenseModal from './QuickExpenseModal';
 import QuickFuelModal from './QuickFuelModal';
+import ReportsTab from './tabs/ReportsTab';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
@@ -26,7 +26,7 @@ const regStatus = (expiry) => {
 };
 
 const BLANK = {
-  nickname: '', make: '', model: '', year: new Date().getFullYear(), colorName: '', color: '#94a3b8',
+  nickname: '', makeModel: '', colorName: '', color: '#94a3b8',
   plateNumber: '', vin: '', category: 'SUV',
   driverName: '', driverPhone: '',
   registrationNumber: '', registrationExpiry: '', registrationFee: '',
@@ -34,27 +34,41 @@ const BLANK = {
   odometer: '', purchaseDate: '', purchasePrice: '', notes: '',
 };
 
-export default function CarsPage() {
-  const dispatch = useDispatch();
-  const cars     = useSelector(selectCars);
-  const allExp   = useSelector(selectCarExpenses);
-  const allFuel  = useSelector(selectFuelLogs);
+function parseMakeModelYear(input) {
+  const tokens = (input || '').trim().split(/\s+/);
+  const last = tokens[tokens.length - 1] ?? '';
+  if (/^(19|20)\d{2}$/.test(last) && tokens.length > 1) {
+    const year = parseInt(last, 10);
+    const rest = tokens.slice(0, -1);
+    return { make: rest[0] ?? '', model: rest.slice(1).join(' ') || rest[0] || '', year };
+  }
+  return { make: tokens[0] ?? '', model: tokens.slice(1).join(' ') || tokens[0] || '', year: new Date().getFullYear() };
+}
 
+export default function CarsPage() {
+  const propertyId = useSelector(selectCurrentPropertyId);
+
+  const { data: cars = [] } = useGetQuery({ path: '/cars', params: { propertyId } }, { skip: !propertyId });
+
+  const [addCarMut] = usePostMutation();
+
+  const [view,        setView]        = useState('fleet'); // 'fleet' | 'reports'
   const [search,      setSearch]      = useState('');
   const [filter,      setFilter]      = useState('all');
   const [showAdd,     setShowAdd]     = useState(false);
   const [showExpense, setShowExpense] = useState(false);
   const [showFuel,    setShowFuel]    = useState(false);
   const [form,        setForm]        = useState(BLANK);
+  const [localImages, setLocalImages] = useState({});
   const fileRefs = useRef({});
 
   const now  = new Date();
   const curM = now.getMonth(), curY = now.getFullYear();
   const thisMonth = (d) => { const dt = new Date(d); return dt.getMonth() === curM && dt.getFullYear() === curY; };
 
-  const monthlyFuel = allFuel.filter((f) => thisMonth(f.date)).reduce((s, f) => s + f.totalPrice, 0);
-  const monthlyExp  = allExp.filter((e)  => thisMonth(e.date)).reduce((s, e) => s + e.amount, 0);
-  const alertCount  = cars.filter((c)    => getDays(c.registrationExpiry) <= 30).length;
+  const monthlyFuel = cars.reduce((s, c) => s + (c.fuelLogs ?? []).filter((f) => thisMonth(f.date)).reduce((ss, f) => ss + (f.totalPrice || 0), 0), 0);
+  const monthlyExp  = cars.reduce((s, c) => s + (c.expenses ?? []).filter((e) => thisMonth(e.date)).reduce((ss, e) => ss + (e.amount || 0), 0), 0);
+  const alertCount  = cars.filter((c) => getDays(c.registrationExpiry) <= 30).length;
 
   const filtered = cars.filter((c) => {
     const q     = search.toLowerCase();
@@ -66,13 +80,17 @@ export default function CarsPage() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
-    if (!form.make || !form.model || !form.plateNumber || !form.registrationExpiry) return toast.error('Fill required fields');
-    dispatch(addCar({ ...form, year: Number(form.year), purchasePrice: Number(form.purchasePrice) || 0, odometer: Number(form.odometer) || 0, registrationFee: Number(form.registrationFee) || 0, images: [], status: 'active' }));
-    toast.success('Vehicle added to fleet');
-    setShowAdd(false);
-    setForm(BLANK);
+    if (!form.makeModel.trim() || !form.plateNumber || !form.registrationExpiry) return toast.error('Fill required fields');
+    const { make, model, year } = parseMakeModelYear(form.makeModel);
+    const { makeModel, ...rest } = form;
+    try {
+      await addCarMut({ path: '/cars', body: { ...rest, make, model, year, propertyId, purchasePrice: Number(form.purchasePrice) || 0, odometer: Number(form.odometer) || 0, registrationFee: Number(form.registrationFee) || 0, status: 'active' } }).unwrap();
+      toast.success('Vehicle added to fleet');
+      setShowAdd(false);
+      setForm(BLANK);
+    } catch (err) { toast.error(err.data?.error || 'Failed to add vehicle'); }
   };
 
   const handleImageUpload = (carId, e) => {
@@ -81,7 +99,7 @@ export default function CarsPage() {
     if (!file.type.startsWith('image/')) return toast.error('Please select an image file');
     const reader = new FileReader();
     reader.onloadend = () => {
-      dispatch(addCarImage({ carId, imageUrl: reader.result }));
+      setLocalImages((prev) => ({ ...prev, [carId]: [...(prev[carId] ?? []), reader.result] }));
       toast.success('Photo uploaded successfully');
     };
     reader.readAsDataURL(file);
@@ -104,11 +122,39 @@ export default function CarsPage() {
         </div>
         {/* Quick action buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" icon={Wrench} onClick={() => setShowExpense(true)}>Log Expense</Button>
-          <Button variant="outline" icon={Fuel}   onClick={() => setShowFuel(true)}>Log Fuel</Button>
-          <Button icon={Plus}                      onClick={() => setShowAdd(true)}>Add Vehicle</Button>
+          {view === 'fleet' && <>
+            <Button variant="outline" icon={Wrench} onClick={() => setShowExpense(true)}>Log Expense</Button>
+            <Button variant="outline" icon={Fuel}   onClick={() => setShowFuel(true)}>Log Fuel</Button>
+            <Button icon={Plus}                      onClick={() => setShowAdd(true)}>Add Vehicle</Button>
+          </>}
         </div>
       </motion.div>
+
+      {/* ── View toggle: Fleet / Reports ── */}
+      <motion.div {...fade(0.03)}>
+        <div className="inline-flex gap-1 bg-white border border-slate-200 rounded-xl p-1" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <button onClick={() => setView('fleet')}
+            className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all',
+              view === 'fleet' ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
+            <Car className="w-3.5 h-3.5" /> Fleet
+          </button>
+          <button onClick={() => setView('reports')}
+            className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all',
+              view === 'reports' ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
+            <FileBarChart className="w-3.5 h-3.5" /> Reports
+          </button>
+        </div>
+      </motion.div>
+
+      {/* ── Reports view ── */}
+      {view === 'reports' && (
+        <motion.div key="reports" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <ReportsTab />
+        </motion.div>
+      )}
+
+      {/* ── Fleet view ── */}
+      {view === 'fleet' && <>
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -161,9 +207,7 @@ export default function CarsPage() {
           {filtered.map((car, i) => (
             <motion.div key={car.id} {...fade(0.05 + i * 0.04)}>
               <CarCard
-                car={car}
-                allFuel={allFuel}
-                allExp={allExp}
+                car={{ ...car, images: [...(car.images ?? []), ...(localImages[car.id] ?? [])] }}
                 thisMonth={thisMonth}
                 fileRefs={fileRefs}
                 onImageUpload={handleImageUpload}
@@ -173,6 +217,8 @@ export default function CarsPage() {
         </div>
       )}
 
+      </>} {/* end fleet view */}
+
       {/* ── Add Vehicle Modal ── */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Vehicle" subtitle="Enter vehicle details, registration & driver info" size="lg">
         <form onSubmit={handleAdd} className="space-y-5">
@@ -180,9 +226,7 @@ export default function CarsPage() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nickname" value={form.nickname} onChange={(v) => set('nickname', v)} placeholder="e.g. White Ranger" />
               <Field label="Category" value={form.category} onChange={(v) => set('category', v)} type="select" options={CAR_CATEGORIES} />
-              <Field label="Make *" value={form.make} onChange={(v) => set('make', v)} placeholder="e.g. Land Rover" required />
-              <Field label="Model *" value={form.model} onChange={(v) => set('model', v)} placeholder="e.g. Range Rover Vogue" required />
-              <Field label="Year" value={form.year} onChange={(v) => set('year', v)} type="number" placeholder="2024" />
+              <Field label="Make & Model *" value={form.makeModel} onChange={(v) => set('makeModel', v)} placeholder="e.g. Land Rover Range Rover 2024" required span2 />
               <Field label="Color Name" value={form.colorName} onChange={(v) => set('colorName', v)} placeholder="e.g. Pearl White" />
               <Field label="Plate Number *" value={form.plateNumber} onChange={(v) => set('plateNumber', v)} placeholder="Dubai A 12345" required />
               <Field label="VIN" value={form.vin} onChange={(v) => set('vin', v)} placeholder="17-character VIN" />
@@ -230,11 +274,11 @@ export default function CarsPage() {
   );
 }
 
-function CarCard({ car, allFuel, allExp, thisMonth, fileRefs, onImageUpload }) {
+function CarCard({ car, thisMonth, fileRefs, onImageUpload }) {
   const reg  = regStatus(car.registrationExpiry);
   const ins  = regStatus(car.insuranceExpiry);
-  const fuel = allFuel.filter((f) => f.carId === car.id && thisMonth(f.date)).reduce((s, f) => s + f.totalPrice, 0);
-  const exp  = allExp.filter((e)  => e.carId === car.id && thisMonth(e.date)).reduce((s, e) => s + e.amount, 0);
+  const fuel = (car.fuelLogs ?? []).filter((f) => thisMonth(f.date)).reduce((s, f) => s + (f.totalPrice || 0), 0);
+  const exp  = (car.expenses ?? []).filter((e) => thisMonth(e.date)).reduce((s, e) => s + (e.amount || 0), 0);
   const hasImg   = car.images?.[0];
   const accent   = car.color || '#2563eb';
   const makeInits = car.make.substring(0, 2).toUpperCase();
@@ -393,10 +437,10 @@ function Section({ label, children }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', placeholder, required, options }) {
+function Field({ label, value, onChange, type = 'text', placeholder, required, options, span2 }) {
   const cls = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
   return (
-    <div>
+    <div className={span2 ? 'col-span-2' : ''}>
       <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">{label}</label>
       {type === 'select'
         ? <select value={value} onChange={(e) => onChange(e.target.value)} className={cls}>{options.map((o) => <option key={o} value={o}>{o}</option>)}</select>

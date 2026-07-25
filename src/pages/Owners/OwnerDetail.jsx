@@ -1,13 +1,14 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Cake, Phone, Mail, Pencil, Trash2,
   BadgeCheck, X, Home,
 } from 'lucide-react';
-import { selectOwners, updateOwner, deleteOwner } from '../../store/slices/ownersSlice';
 import toast from 'react-hot-toast';
+import { useGetQuery, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 
 const AVATAR_COLORS = [
   '#2563eb','#7c3aed','#059669','#dc2626',
@@ -57,9 +58,11 @@ function InfoRow({ icon: Icon, label, value, color }) {
 export default function OwnerDetail() {
   const { id }   = useParams();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const owners   = useSelector(selectOwners);
-  const own      = owners.find((o) => o.id === id);
+  const propertyId = useSelector(selectCurrentPropertyId);
+
+  const { data: own, isLoading } = useGetQuery({ path: `/owners/${id}` });
+  const [updateOwnerMut] = usePutMutation();
+  const [deleteOwnerMut] = useDeleteMutation();
 
   const [editDrawer, setEditDrawer] = useState(false);
   const [delOpen,    setDelOpen]    = useState(false);
@@ -67,19 +70,24 @@ export default function OwnerDetail() {
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const openEdit = () => { setForm({ ...BLANK, ...own }); setEditDrawer(true); };
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Name is required');
-    dispatch(updateOwner({ ...form, id: own.id }));
-    toast.success('Owner updated');
-    setEditDrawer(false);
+    try {
+      await updateOwnerMut({ path: `/owners/${own.id}`, body: { ...form, id: own.id } }).unwrap();
+      toast.success('Owner updated');
+      setEditDrawer(false);
+    } catch (err) { toast.error(err.data?.error || 'Failed to update'); }
   };
-  const handleDelete = () => {
-    dispatch(deleteOwner(own.id));
-    toast.success(`${own.name} removed`);
-    navigate('/owners');
+  const handleDelete = async () => {
+    try {
+      await deleteOwnerMut({ path: `/owners/${own.id}` }).unwrap();
+      toast.success(`${own.name} removed`);
+      navigate('/owners');
+    } catch (err) { toast.error(err.data?.error || 'Failed to delete'); }
   };
 
+  if (isLoading) return null;
   if (!own) {
     return (
       <div className="text-center py-24">
@@ -177,7 +185,7 @@ export default function OwnerDetail() {
                 <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold text-white"
                   style={{ background: '#f59e0b', boxShadow: '0 2px 10px rgba(245,158,11,0.5)' }}>
                   <Cake className="w-3.5 h-3.5" />
-                  {bdayDays === 0 ? '🎉 Birthday Today!' : `Birthday in ${bdayDays} days`}
+                  {bdayDays === 0 ? 'Birthday Today!' : `Birthday in ${bdayDays} days`}
                 </div>
               )}
             </div>

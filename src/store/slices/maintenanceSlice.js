@@ -1,11 +1,10 @@
 import { createSlice, nanoid } from '@reduxjs/toolkit';
-import { maintenanceItems as initial } from '../../data/mockMaintenance';
 
 const today = () => new Date().toISOString().split('T')[0];
 
 const maintenanceSlice = createSlice({
   name: 'maintenance',
-  initialState: { items: initial },
+  initialState: { items: [] },
   reducers: {
     addMaintenance: (state, { payload }) => {
       state.items.push({

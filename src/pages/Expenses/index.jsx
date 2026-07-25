@@ -1,279 +1,371 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { motion } from 'framer-motion';
+import { useSelector } from 'react-redux';
+import { useForm } from 'react-hook-form';
+import { motion, AnimatePresence } from 'framer-motion';
+import toast from 'react-hot-toast';
 import {
-  Home, Car, Fuel, ShoppingCart, ChevronLeft, ChevronRight,
-  Plus, Receipt, ArrowUpRight, Wrench, Wallet, AlertTriangle,
-} from 'lucide-react';
-import { selectExpenses, addExpense } from '../../store/slices/expensesSlice';
-import { selectCarExpenses, selectFuelLogs, selectCars } from '../../store/slices/carsSlice';
-import { selectVehicleWallet, selectHomeWallet, deductFromWallet, LOW_BALANCE_THRESHOLD } from '../../store/slices/walletSlice';
-import { EXPENSE_CATEGORIES } from '../../data/mockExpenses';
-import { CAR_EXPENSE_TYPES } from '../../data/mockCars';
-import Modal  from '../../components/ui/Modal';
+  RiAddLine, RiSearchLine, RiCalendar2Line, RiArrowLeftLine, RiArrowRightLine,
+  RiEditLine, RiDeleteBinLine, RiWalletLine, RiHome4Line, RiShoppingCart2Line,
+  RiFilter3Line, RiReceiptLine, RiCheckboxCircleLine, RiCloseLine,
+  RiArrowUpLine, RiArrowDownLine, RiStore2Line, RiLeafLine,
+} from 'react-icons/ri';
+import {
+  useGetQuery, usePostMutation, usePutMutation, useDeleteMutation,
+} from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
+import Modal from '../../components/ui/Modal';
+import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import {
+  Field, Input, Select, Textarea, FormGrid, FormActions,
+} from '../../components/ui/FormField';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
-import toast from 'react-hot-toast';
 
-const fade = (d = 0) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.32, delay: d, ease: [0.4, 0, 0.2, 1] } });
+// ── Color presets for custom category picker ──────────────────────────────────
+const COLOR_PRESETS = [
+  { color: '#9333ea', bg: '#f5f3ff' },
+  { color: '#2563eb', bg: '#eff6ff' },
+  { color: '#16a34a', bg: '#f0fdf4' },
+  { color: '#0891b2', bg: '#ecfeff' },
+  { color: '#dc2626', bg: '#fef2f2' },
+  { color: '#ea580c', bg: '#fff7ed' },
+  { color: '#ca8a04', bg: '#fefce8' },
+  { color: '#e11d48', bg: '#ffe4e6' },
+  { color: '#7c3aed', bg: '#ede9fe' },
+  { color: '#059669', bg: '#d1fae5' },
+  { color: '#0b1d3a', bg: '#eef2fb' },
+  { color: '#64748b', bg: '#f1f5f9' },
+];
 
-const SEG = {
-  property:  { label: 'Property & Services', color: '#2563eb', bg: '#eff6ff', icon: Home,         border: '#bfdbfe' },
-  vehicle:   { label: 'Fleet — Vehicle',      color: '#0b1d3a', bg: '#f0f5ff', icon: Wrench,       border: '#c7d7f5' },
-  fuel:      { label: 'Fleet — Fuel',         color: '#d97706', bg: '#fffbeb', icon: Fuel,         border: '#fde68a' },
-  household: { label: 'Household & Daily',    color: '#16a34a', bg: '#f0fdf4', icon: ShoppingCart, border: '#bbf7d0' },
+// Look up color/bg from the live backend category list; fallback to slate
+const catCfgFrom = (cats, name) =>
+  cats.find((c) => c.name === name) ?? { color: '#64748b', bg: '#f1f5f9' };
+
+const SEG_CFG = {
+  property:  { label: 'Property & Services', color: '#2563eb', bg: '#eff6ff', Icon: RiHome4Line },
+  household: { label: 'Household & Daily',   color: '#16a34a', bg: '#f0fdf4', Icon: RiShoppingCart2Line },
 };
 
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const catCfg      = (cat) => EXPENSE_CATEGORIES[cat] ?? { color: '#64748b', bg: '#f1f5f9', segment: 'property' };
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
 
-const CUSTOM_KEY     = '__custom__';
-const CUSTOM_CFG     = { color: '#64748b', bg: '#f1f5f9' };
-const PROP_CAT_OPTS  = [...Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'property').map(([k]) => k),  CUSTOM_KEY];
-const HOUSE_CAT_OPTS = [...Object.entries(EXPENSE_CATEGORIES).filter(([,v]) => v.segment === 'household').map(([k]) => k), CUSTOM_KEY];
-const BLANK = { category: 'Cleaning', customCategory: '', description: '', amount: '', vendor: '', date: new Date().toISOString().split('T')[0], wallet: 'home' };
+function fmtAED(n) {
+  return `AED ${(n ?? 0).toLocaleString('en-AE', { maximumFractionDigits: 0 })}`;
+}
+function fmtDate(s) {
+  if (!s) return '—';
+  return new Date(s + 'T00:00:00').toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
+const PAGE_SIZE = 20;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
 export default function ExpensesPage() {
-  const dispatch    = useDispatch();
-  const allExpenses = useSelector(selectExpenses);
-  const carExpenses = useSelector(selectCarExpenses);
-  const fuelLogs    = useSelector(selectFuelLogs);
-  const cars        = useSelector(selectCars);
-  const vehicleWallet = useSelector(selectVehicleWallet);
-  const homeWallet    = useSelector(selectHomeWallet);
-
+  const propertyId = useSelector(selectCurrentPropertyId);
   const now = new Date();
-  const [period,  setPeriod]  = useState({ year: now.getFullYear(), month: now.getMonth() });
-  const [filter,  setFilter]  = useState('all');
-  const [showAdd, setShowAdd] = useState(false);
-  const [addSeg,  setAddSeg]  = useState('property');
-  const [form,    setForm]    = useState(BLANK);
 
-  const { year: selY, month: selM } = period;
-  const inPeriod = (d) => { const dt = new Date(d); return dt.getFullYear() === selY && dt.getMonth() === selM; };
-  const carName  = (id) => { const c = cars.find((x) => x.id === id); return c ? `${c.make} ${c.model}` : 'Vehicle'; };
+  // ── Filter state (all sent to backend) ────────────────────────────────────
+  const [year,        setYear]        = useState(now.getFullYear());
+  const [month,       setMonth]       = useState(now.getMonth());
+  const [segment,     setSegment]     = useState('all');
+  const [searchInput, setSearchInput] = useState('');
+  const [search,      setSearch]      = useState('');
+  const [page,        setPage]        = useState(1);
 
-  const prevMonth = () => setPeriod((p) => p.month === 0 ? { year: p.year - 1, month: 11 } : { ...p, month: p.month - 1 });
-  const nextMonth = () => setPeriod((p) => p.month === 11 ? { year: p.year + 1, month: 0 }  : { ...p, month: p.month + 1 });
-  const isCurrentMonth = selY === now.getFullYear() && selM === now.getMonth();
+  // ── Modal state ───────────────────────────────────────────────────────────
+  const [modal,     setModal]     = useState(null); // null | 'add' | expense obj
+  const [delTarget, setDelTarget] = useState(null);
 
-  // ── Build unified list ────────────────────────────────────────────
-  const allItems = useMemo(() => {
-    const propHouse = allExpenses
-      .filter((e) => inPeriod(e.date))
-      .map((e) => {
-        const cfg = catCfg(e.category);
-        return { id: e.id, date: e.date, amount: e.amount, segment: cfg.segment ?? 'property',
-          category: e.category, description: e.description, source: e.vendor ?? e.company ?? '',
-          color: cfg.color, bg: cfg.bg };
-      });
-    const vehicle = carExpenses
-      .filter((e) => inPeriod(e.date))
-      .map((e) => {
-        const cfg = CAR_EXPENSE_TYPES[e.type] ?? { label: e.type, color: '#64748b', bg: '#f8fafc' };
-        return { id: e.id, date: e.date, amount: e.amount, segment: 'vehicle',
-          category: cfg.label, description: e.description, source: carName(e.carId),
-          color: cfg.color, bg: cfg.bg };
-      });
-    const fuel = fuelLogs
-      .filter((f) => inPeriod(f.date))
-      .map((f) => ({
-        id: f.id, date: f.date, amount: f.totalPrice, segment: 'fuel',
-        category: 'Fuel', description: `${f.liters}L @ AED ${f.pricePerLiter}/L`,
-        source: `${carName(f.carId)}${f.station ? ' · ' + f.station : ''}`,
-        color: '#d97706', bg: '#fffbeb',
-      }));
-    return [...propHouse, ...vehicle, ...fuel].sort((a, b) => new Date(b.date) - new Date(a.date));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allExpenses, carExpenses, fuelLogs, selY, selM]);
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  const totals = useMemo(() => {
-    const sum = (seg) => allItems.filter((i) => i.segment === seg).reduce((s, i) => s + i.amount, 0);
-    const property = sum('property'), vehicle = sum('vehicle'), fuel = sum('fuel'), household = sum('household');
-    return { property, vehicle, fuel, household, grand: property + vehicle + fuel + household };
-  }, [allItems]);
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [year, month, segment]);
 
+  // ── API params ────────────────────────────────────────────────────────────
+  const baseParams = {
+    propertyId,
+    year,
+    month,
+  };
+  const listParams = {
+    ...baseParams,
+    ...(segment !== 'all' && { segment }),
+    ...(search && { search }),
+    page,
+    limit: PAGE_SIZE,
+  };
+
+  const { data: listResult = {} } = useGetQuery(
+    { path: '/expenses', params: listParams },
+    { skip: !propertyId },
+  );
+  const expenses  = listResult.items  ?? [];
+  const totalRows = listResult.total  ?? 0;
+  const totalPages = listResult.pages ?? 1;
+
+  const { data: stats = {} } = useGetQuery(
+    { path: '/expenses/stats', params: baseParams },
+    { skip: !propertyId },
+  );
+
+  const { data: walletData, refetch: refetchWallet } = useGetQuery(
+    { path: '/wallet', params: { propertyId } },
+    { skip: !propertyId },
+  );
+  const homeBalance    = walletData?.home?.balance    ?? 0;
+  const vehicleBalance = walletData?.vehicle?.balance ?? 0;
+
+  // All categories for this property (color lookup in rows + breakdown chart)
+  const { data: allCats = [] } = useGetQuery(
+    { path: '/expense-categories', params: { propertyId } },
+    { skip: !propertyId },
+  );
+
+  const [addMut]    = usePostMutation();
+  const [updateMut] = usePutMutation();
+  const [deleteMut] = useDeleteMutation();
+  const [deductMut] = usePostMutation();
+
+  // ── Month navigation ──────────────────────────────────────────────────────
+  const prevMonth = () => {
+    if (month === 0) { setYear((y) => y - 1); setMonth(11); }
+    else setMonth((m) => m - 1);
+  };
+  const nextMonth = () => {
+    if (month === 11) { setYear((y) => y + 1); setMonth(0); }
+    else setMonth((m) => m + 1);
+  };
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+
+  // ── Category breakdown (only for current month, all segments) ─────────────
   const catBreakdown = useMemo(() => {
-    const map = {};
-    allItems.forEach((i) => {
-      if (!map[i.category]) map[i.category] = { category: i.category, amount: 0, color: i.color, bg: i.bg };
-      map[i.category].amount += i.amount;
-    });
-    return Object.values(map)
-      .sort((a, b) => b.amount - a.amount)
-      .map((c) => ({ ...c, pct: totals.grand > 0 ? Math.round((c.amount / totals.grand) * 100) : 0 }));
-  }, [allItems, totals.grand]);
-
-  const barSegs = useMemo(() =>
-    Object.entries(SEG)
-      .map(([k, s]) => ({ ...s, key: k, amount: totals[k], pct: totals.grand > 0 ? (totals[k] / totals.grand) * 100 : 0 }))
-      .filter((s) => s.amount > 0),
-  [totals]);
-
-  const visibleItems = filter === 'all' ? allItems : allItems.filter((i) => i.segment === filter);
-
-  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const handleAdd = (e) => {
-    e.preventDefault();
-    if (!form.description || !form.amount) return toast.error('Fill description and amount');
-    if (form.category === CUSTOM_KEY && !form.customCategory.trim()) return toast.error('Enter a custom category name');
-    const amt             = Number(form.amount);
-    const selWallet       = form.wallet === 'vehicle' ? vehicleWallet : homeWallet;
-    const effectiveCat    = form.category === CUSTOM_KEY ? form.customCategory.trim() : form.category;
-    dispatch(addExpense({ ...form, category: effectiveCat, amount: amt }));
-    dispatch(deductFromWallet({
-      wallet:      form.wallet,
-      amount:      amt,
-      description: form.description,
-      date:        form.date,
-      category:    effectiveCat,
+    if (!stats.byCategory) return [];
+    return stats.byCategory.map((c) => ({
+      ...c,
+      cfg: catCfgFrom(allCats, c.category),
+      pct: stats.total > 0 ? Math.round((c.amount / stats.total) * 100) : 0,
     }));
-    const afterBal    = selWallet.balance - amt;
-    const walletLabel = form.wallet === 'vehicle' ? 'Vehicle' : 'Home';
-    if (afterBal < LOW_BALANCE_THRESHOLD)
-      toast(`${walletLabel} wallet now AED ${Math.max(0, afterBal).toLocaleString('en-AE', { maximumFractionDigits: 0 })} — top up soon`, { icon: '⚠️' });
-    else
-      toast.success(`Expense logged & deducted from ${walletLabel} Wallet`);
-    setShowAdd(false);
-    setForm(BLANK);
+  }, [stats, allCats]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleSave = async (data) => {
+    try {
+      if (modal !== 'add' && modal?.id) {
+        await updateMut({ path: `/expenses/${modal.id}`, body: data }).unwrap();
+        toast.success('Expense updated');
+      } else {
+        await addMut({ path: '/expenses', body: { ...data, propertyId } }).unwrap();
+        // Deduct from wallet
+        if (Number(data.amount) > 0) {
+          await deductMut({
+            path: '/wallet/deduct',
+            body: {
+              propertyId,
+              walletType: data.walletType ?? 'home',
+              amount: Number(data.amount),
+              description: data.description,
+              date: data.date,
+              category: data.category,
+            },
+          }).unwrap();
+          await refetchWallet();
+        }
+        toast.success('Expense logged');
+      }
+      setModal(null);
+    } catch (err) {
+      toast.error(err?.data?.error ?? 'Failed to save expense');
+    }
   };
-  const openAdd = (seg = 'property') => {
-    setAddSeg(seg);
-    setForm({ ...BLANK, category: seg === 'household' ? 'Groceries' : 'Cleaning', wallet: 'home' });
-    setShowAdd(true);
+
+  const handleDelete = async () => {
+    try {
+      await deleteMut({ path: `/expenses/${delTarget.id}` }).unwrap();
+      toast.success('Expense deleted');
+      setDelTarget(null);
+    } catch {
+      toast.error('Failed to delete');
+    }
   };
+
+  // ── Stat cards ────────────────────────────────────────────────────────────
+  const statCards = [
+    {
+      label: 'Total Spending',
+      value: fmtAED(stats.total),
+      sub: `${stats.count ?? 0} transactions`,
+      color: '#0b1d3a',
+      grad: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)',
+      light: false,
+    },
+    {
+      label: 'Property & Services',
+      value: fmtAED(stats.property),
+      sub: stats.total > 0 ? `${Math.round(((stats.property ?? 0) / stats.total) * 100)}% of total` : '0%',
+      color: '#2563eb',
+      bg: '#eff6ff',
+      light: true,
+    },
+    {
+      label: 'Household & Daily',
+      value: fmtAED(stats.household),
+      sub: stats.total > 0 ? `${Math.round(((stats.household ?? 0) / stats.total) * 100)}% of total` : '0%',
+      color: '#16a34a',
+      bg: '#f0fdf4',
+      light: true,
+    },
+  ];
 
   return (
     <div className="space-y-6">
 
       {/* ── Header ── */}
-      <motion.div {...fade(0)} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
-              <Receipt className="w-5 h-5 text-white" />
+              <RiReceiptLine className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">Expenses & Spending</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Expenses</h1>
           </div>
-          <p className="text-slate-500 text-[13px]">Property, fleet, household & daily — all in one view</p>
+          <p className="text-slate-400 text-[13px]">Property services, household & daily spending</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl px-1 py-1">
-            <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors">
-              <ChevronLeft className="w-4 h-4 text-slate-500" />
+
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Wallet balances */}
+          <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
+            <RiWalletLine className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span className="text-[12px] font-bold text-emerald-700">{fmtAED(homeBalance)}</span>
+            <span className="text-[10px] text-emerald-500 hidden sm:inline">Home</span>
+          </div>
+
+          {/* Month picker */}
+          <div className="flex items-center bg-white border border-slate-200 rounded-xl px-1 py-1">
+            <button onClick={prevMonth}
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors">
+              <RiArrowLeftLine className="w-4 h-4 text-slate-500" />
             </button>
-            <span className="text-[13px] font-bold text-slate-800 min-w-[118px] text-center px-1">
-              {MONTH_NAMES[selM]} {selY}
+            <span className="text-[13px] font-bold text-slate-800 min-w-27.5 text-center">
+              {MONTH_NAMES[month]} {year}
             </span>
             <button onClick={nextMonth} disabled={isCurrentMonth}
               className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-30">
-              <ChevronRight className="w-4 h-4 text-slate-500" />
+              <RiArrowRightLine className="w-4 h-4 text-slate-500" />
             </button>
           </div>
-          <Button icon={Plus} onClick={() => openAdd('property')}>Log Expense</Button>
+
+          <Button variant="primary" icon={RiAddLine} onClick={() => setModal('add')}>Log Expense</Button>
         </div>
       </motion.div>
 
-      {/* ── Summary Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Grand total */}
-        <motion.div {...fade(0.04)} className="col-span-2 lg:col-span-1">
-          <div className="rounded-2xl p-5 h-full flex flex-col justify-between"
-            style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow: '0 4px 20px rgba(11,29,58,0.3)' }}>
-            <div>
-              <Receipt className="w-6 h-6 text-blue-300 mb-2" />
-              <p className="text-blue-200/60 text-[11px] font-bold uppercase tracking-wider">Total Spending</p>
-            </div>
-            <div>
-              <p className="text-white font-bold text-2xl leading-tight mt-2">
-                AED {totals.grand.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-blue-300/50 text-[11px] mt-1">{allItems.length} transactions · {MONTH_NAMES[selM]}</p>
-            </div>
-          </div>
-        </motion.div>
-        {/* Segment cards */}
-        {Object.entries(SEG).map(([k, s], i) => (
-          <motion.div key={k} {...fade(0.06 + i * 0.04)}>
-            <button onClick={() => setFilter(filter === k ? 'all' : k)} className="w-full h-full text-left">
-              <div className={cn('bg-white rounded-2xl p-4 border h-full flex flex-col justify-between transition-all duration-200 hover:shadow-md',
-                filter === k ? 'ring-2' : '')}
-                style={{ borderColor: filter === k ? s.color : s.border, boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
-                  ...(filter === k ? { '--tw-ring-color': s.color } : {}) }}>
-                <div className="flex items-start justify-between">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: s.bg }}>
-                    <s.icon className="w-4 h-4" style={{ color: s.color }} />
-                  </div>
-                  {filter === k && <div className="w-2 h-2 rounded-full mt-1" style={{ background: s.color }} />}
+      {/* ── Stat cards ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {statCards.map((s, i) => (
+          <motion.div key={s.label}
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
+            {s.light ? (
+              <div className="bg-white rounded-2xl border border-slate-100 p-5 h-full"
+                style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
+                  {s.color === '#2563eb'
+                    ? <RiHome4Line className="w-4 h-4" style={{ color: s.color }} />
+                    : <RiShoppingCart2Line className="w-4 h-4" style={{ color: s.color }} />}
                 </div>
-                <div className="mt-3">
-                  <p className="text-[20px] font-bold text-slate-900 leading-none">
-                    AED {totals[k].toLocaleString('en-AE', { maximumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-[11px] font-semibold text-slate-400 mt-1 leading-tight">{s.label}</p>
-                  <p className="text-[10px] text-slate-300 mt-0.5">
-                    {totals.grand > 0 ? Math.round((totals[k] / totals.grand) * 100) : 0}% of total
-                  </p>
+                <p className="text-2xl font-black text-slate-900 leading-none tabular-nums">{s.value}</p>
+                <p className="text-[12px] font-semibold mt-1" style={{ color: s.color }}>{s.label}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{s.sub}</p>
+              </div>
+            ) : (
+              <div className="rounded-2xl p-5 h-full flex flex-col justify-between"
+                style={{ background: s.grad, boxShadow: '0 4px 20px rgba(11,29,58,0.25)' }}>
+                <RiReceiptLine className="w-6 h-6 text-blue-300" />
+                <div>
+                  <p className="text-2xl font-black text-white leading-none tabular-nums mt-3">{s.value}</p>
+                  <p className="text-blue-200/70 text-[12px] font-semibold mt-1">{s.label}</p>
+                  <p className="text-blue-300/50 text-[11px] mt-0.5">{s.sub}</p>
                 </div>
               </div>
-            </button>
+            )}
           </motion.div>
         ))}
       </div>
 
-      {/* ── Breakdown ── */}
-      {totals.grand > 0 && (
-        <motion.div {...fade(0.16)}>
-          <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
-            <p className="text-[14px] font-bold text-slate-800 mb-4">Spending Breakdown — {MONTH_NAMES[selM]} {selY}</p>
+      {/* ── Spending breakdown (only when there's data) ── */}
+      {(stats.total ?? 0) > 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5"
+            style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            <p className="text-[14px] font-bold text-slate-800 mb-4">
+              Breakdown — {MONTH_NAMES[month]} {year}
+            </p>
 
             {/* Stacked bar */}
-            <div className="flex rounded-full overflow-hidden h-3 mb-5">
-              {barSegs.map((s, idx) => (
-                <div key={s.key} style={{ width: `${s.pct}%`, background: s.color }}
-                  title={`${s.label}: AED ${s.amount.toFixed(0)} (${Math.round(s.pct)}%)`}
-                  className={cn('transition-all duration-500', idx === 0 && 'rounded-l-full', idx === barSegs.length - 1 && 'rounded-r-full')} />
+            <div className="flex rounded-full overflow-hidden h-2.5 mb-5 bg-slate-100">
+              {[
+                { key: 'property',  color: '#2563eb', amount: stats.property  ?? 0 },
+                { key: 'household', color: '#16a34a', amount: stats.household ?? 0 },
+              ].filter((s) => s.amount > 0).map((s, idx, arr) => (
+                <div key={s.key}
+                  style={{ width: `${(s.amount / stats.total) * 100}%`, background: s.color }}
+                  className={cn('transition-all duration-700',
+                    idx === 0 && 'rounded-l-full',
+                    idx === arr.length - 1 && 'rounded-r-full')} />
               ))}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {/* Segment bars */}
               <div className="space-y-3">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">By Segment</p>
-                {barSegs.map((s) => (
-                  <div key={s.key} className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: s.bg }}>
-                      <s.icon className="w-3.5 h-3.5" style={{ color: s.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[12px] font-semibold text-slate-700 truncate">{s.label}</span>
-                        <span className="text-[10px] text-slate-400 shrink-0 ml-2">{Math.round(s.pct)}%</span>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">By Segment</p>
+                {Object.entries(SEG_CFG).map(([key, s]) => {
+                  const amount = stats[key] ?? 0;
+                  const pct    = stats.total > 0 ? (amount / stats.total) * 100 : 0;
+                  return (
+                    <div key={key} className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: s.bg }}>
+                        <s.Icon className="w-4 h-4" style={{ color: s.color }} />
                       </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${s.pct}%`, background: s.color }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[12px] font-semibold text-slate-700 truncate">{s.label}</span>
+                          <span className="text-[10px] text-slate-400 ml-2 shrink-0">{Math.round(pct)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700"
+                            style={{ width: `${pct}%`, background: s.color }} />
+                        </div>
                       </div>
+                      <span className="text-[13px] font-bold text-slate-800 shrink-0 min-w-22.5 text-right tabular-nums">
+                        {fmtAED(amount)}
+                      </span>
                     </div>
-                    <span className="text-[13px] font-bold text-slate-800 shrink-0 w-20 text-right">
-                      AED {s.amount.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* Category list */}
+              {/* Top categories */}
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">By Category</p>
-                <div className="space-y-2 max-h-44 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
-                  {catBreakdown.map((c) => (
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Top Categories</p>
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                  {catBreakdown.slice(0, 8).map((c) => (
                     <div key={c.category} className="flex items-center gap-2.5 py-0.5">
-                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.color }} />
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: c.cfg.color }} />
                       <span className="text-[12px] text-slate-600 flex-1 truncate">{c.category}</span>
                       <span className="text-[10px] text-slate-400 w-8 text-right">{c.pct}%</span>
-                      <span className="text-[12px] font-bold text-slate-700 w-18 text-right">
-                        AED {c.amount.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                      <span className="text-[12px] font-bold text-slate-800 min-w-20 text-right tabular-nums">
+                        {fmtAED(c.amount)}
                       </span>
                     </div>
                   ))}
@@ -284,254 +376,505 @@ export default function ExpensesPage() {
         </motion.div>
       )}
 
-      {/* ── Transaction List ── */}
-      <motion.div {...fade(0.22)}>
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
-          {/* List header */}
-          <div className="p-5 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-50">
-            <div>
-              <p className="text-[14px] font-bold text-slate-800">All Transactions</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">{visibleItems.length} records · {MONTH_NAMES[selM]} {selY}</p>
-            </div>
-            <div className="flex gap-1 bg-slate-50 border border-slate-100 rounded-xl p-1">
-              {[
-                { k: 'all',       l: 'All'       },
-                { k: 'property',  l: 'Property'  },
-                { k: 'vehicle',   l: 'Vehicle'   },
-                { k: 'fuel',      l: 'Fuel'      },
-                { k: 'household', l: 'Household' },
-              ].map(({ k, l }) => (
-                <button key={k} onClick={() => setFilter(k)}
-                  className={cn('px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap',
-                    filter === k ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
+      {/* ── Transaction list ── */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
 
-          {/* Quick add strip */}
-          <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-50/50 border-b border-slate-50">
-            <span className="text-[11px] text-slate-400 font-medium">Log expense →</span>
-            <button onClick={() => openAdd('property')}
-              className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors">
-              <Plus className="w-3 h-3" /> Property
-            </button>
-            <span className="text-slate-200">·</span>
-            <button onClick={() => openAdd('household')}
-              className="flex items-center gap-1 text-[11px] font-bold text-green-600 hover:text-green-800 transition-colors">
-              <Plus className="w-3 h-3" /> Household
-            </button>
-            <span className="text-slate-200">·</span>
-            <Link to="/cars" className="flex items-center gap-1 text-[11px] font-bold text-amber-600 hover:text-amber-800 transition-colors">
-              <ArrowUpRight className="w-3 h-3" /> Fleet (log from Cars page)
-            </Link>
+          {/* List header + filters */}
+          <div className="p-4 border-b border-slate-100 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div>
+                <p className="text-[14px] font-bold text-slate-800">Transactions</p>
+                <p className="text-[11px] text-slate-400">{totalRows} records · {MONTH_NAMES[month]} {year}</p>
+              </div>
+              <div className="sm:ml-auto flex items-center gap-2">
+                <Button variant="outline" size="sm" icon={RiAddLine} onClick={() => setModal('add')}>
+                  Log Expense
+                </Button>
+              </div>
+            </div>
+
+            {/* Filters row */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              {/* Search */}
+              <div className="relative flex-1 min-w-0">
+                <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search description, vendor, category…"
+                  className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-[13px] placeholder-slate-400 outline-none transition-all focus:border-navy-400"
+                />
+                {searchInput && (
+                  <button onClick={() => { setSearchInput(''); setSearch(''); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                    <RiCloseLine className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Segment filter */}
+              <div className="flex gap-1 p-1 bg-slate-100 rounded-xl shrink-0">
+                {[
+                  { k: 'all',       l: 'All'       },
+                  { k: 'property',  l: 'Property'  },
+                  { k: 'household', l: 'Household' },
+                ].map(({ k, l }) => (
+                  <button key={k} onClick={() => setSegment(k)}
+                    className={cn('px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap',
+                      segment === k ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700')}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Rows */}
-          {visibleItems.length === 0 ? (
-            <div className="py-14 text-center">
-              <Receipt className="w-10 h-10 text-slate-200 mx-auto mb-3" strokeWidth={1.5} />
-              <p className="text-slate-400 text-[13px] font-medium">No {filter !== 'all' ? filter + ' ' : ''}expenses for {MONTH_NAMES[selM]} {selY}</p>
+          {expenses.length === 0 ? (
+            <div className="py-16 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <RiReceiptLine className="w-7 h-7 text-slate-300" strokeWidth={1.5} />
+              </div>
+              <p className="font-semibold text-slate-400 text-[14px]">
+                {search || segment !== 'all' ? 'No matching expenses' : `No expenses for ${MONTH_NAMES[month]} ${year}`}
+              </p>
+              <p className="text-slate-300 text-[12px] mt-1">
+                {search || segment !== 'all' ? 'Try adjusting your filters.' : 'Log property or household spending to get started.'}
+              </p>
+              <button onClick={() => setModal('add')}
+                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all"
+                style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                <RiAddLine className="w-3.5 h-3.5" /> Log First Expense
+              </button>
             </div>
           ) : (
-            <div className="divide-y divide-slate-50/70">
-              {visibleItems.map((item) => {
-                const segCfg = SEG[item.segment];
-                const Icon   = segCfg?.icon ?? Receipt;
-                return (
-                  <div key={item.id}
-                    className="flex items-center gap-3.5 px-5 py-3 hover:bg-slate-50/60 transition-colors">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: item.bg }}>
-                      <Icon className="w-4 h-4" style={{ color: item.color }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">{item.description}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {item.source && <span className="text-[11px] text-slate-400">{item.source}</span>}
-                        <span className="text-slate-200 text-[10px]">·</span>
-                        <span className="text-[11px] text-slate-300">
-                          {new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                        </span>
+            <div className="divide-y divide-slate-50">
+              <AnimatePresence mode="popLayout">
+                {expenses.map((item, i) => {
+                  const cfg    = catCfgFrom(allCats, item.category);
+                  const segCfg = SEG_CFG[item.segment] ?? SEG_CFG.property;
+                  const SegIcon = segCfg.Icon;
+                  return (
+                    <motion.div key={item.id}
+                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.97 }}
+                      transition={{ delay: i * 0.02 }}
+                      className="group flex items-center gap-3.5 px-5 py-3.5 hover:bg-slate-50/70 transition-colors relative">
+
+                      {/* Category avatar */}
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: cfg.bg }}>
+                        <SegIcon className="w-4 h-4" style={{ color: cfg.color }} />
                       </div>
-                    </div>
-                    <span className="hidden sm:inline-flex items-center px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0"
-                      style={{ background: item.bg, color: item.color }}>
-                      {item.category}
-                    </span>
-                    <p className="text-[14px] font-bold text-slate-900 shrink-0 ml-1 tabular-nums">
-                      AED {item.amount.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
-                    </p>
-                  </div>
-                );
-              })}
+
+                      {/* Text */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">
+                          {item.description}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {item.vendor && (
+                            <>
+                              <RiStore2Line className="w-3 h-3 text-slate-300 shrink-0" />
+                              <span className="text-[11px] text-slate-400 truncate max-w-35">{item.vendor}</span>
+                              <span className="text-slate-200 text-[10px]">·</span>
+                            </>
+                          )}
+                          <span className="text-[11px] text-slate-400">{fmtDate(item.date)}</span>
+                        </div>
+                      </div>
+
+                      {/* Category chip (hidden on mobile) */}
+                      <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0"
+                        style={{ background: cfg.bg, color: cfg.color }}>
+                        {item.category}
+                      </span>
+
+                      {/* Segment chip */}
+                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold shrink-0"
+                        style={{ background: segCfg.bg, color: segCfg.color }}>
+                        <segCfg.Icon className="w-3 h-3" />
+                        {item.segment === 'property' ? 'Property' : 'Household'}
+                      </span>
+
+                      {/* Amount */}
+                      <p className="text-[14px] font-bold text-slate-900 shrink-0 tabular-nums">
+                        {fmtAED(item.amount)}
+                      </p>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => setModal(item)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                          <RiEditLine className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => setDelTarget(item)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                          <RiDeleteBinLine className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
           )}
 
-          {visibleItems.length > 0 && (
-            <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
-              <p className="text-[12px] text-slate-400">{visibleItems.length} records shown</p>
-              <p className="text-[13px] font-bold text-slate-800">
-                Total: AED {visibleItems.reduce((s, i) => s + i.amount, 0).toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+          {/* Footer: total + pagination */}
+          {expenses.length > 0 && (
+            <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <p className="text-[12px] text-slate-500">
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalRows)} of {totalRows}
               </p>
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-bold text-slate-700 mr-3">
+                  Page total: {fmtAED(expenses.reduce((s, e) => s + (e.amount ?? 0), 0))}
+                </span>
+                {totalPages > 1 && (
+                  <>
+                    <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition-all">
+                      <RiArrowLeftLine className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[12px] text-slate-500 font-medium">{page} / {totalPages}</span>
+                    <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-30 transition-all">
+                      <RiArrowRightLine className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
       </motion.div>
 
-      {/* ── Add Expense Modal ── */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)}
-        title="Log Expense"
-        subtitle="Property services, household & daily shopping"
-        size="md">
-        <form onSubmit={handleAdd} className="space-y-4">
-          {/* Wallet selector */}
-          <div>
-            <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-2">Deduct from Wallet</label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { k: 'vehicle', label: 'Vehicle Wallet', icon: Car,  bal: vehicleWallet.balance, color: '#0b1d3a', bg: '#eef2fb' },
-                { k: 'home',    label: 'Home Wallet',    icon: Home, bal: homeWallet.balance,    color: '#16a34a', bg: '#f0fdf4' },
-              ].map(({ k, label, icon: Icon, bal, color, bg }) => (
-                <button key={k} type="button" onClick={() => setF('wallet', k)}
-                  className="flex flex-col gap-1.5 p-3 rounded-xl border-2 text-left transition-all"
-                  style={form.wallet === k
-                    ? { borderColor: color, background: bg }
-                    : { borderColor: '#e2e8f0', background: '#f8fafc' }}>
-                  <div className="flex items-center gap-1.5">
-                    <Icon className="w-3.5 h-3.5" style={{ color: form.wallet === k ? color : '#94a3b8' }} />
-                    <span className="text-[11px] font-bold truncate" style={{ color: form.wallet === k ? color : '#64748b' }}>{label}</span>
-                    {form.wallet === k && (
-                      <span className="ml-auto shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-black"
-                        style={{ background: color }}>✓</span>
-                    )}
-                  </div>
-                  <p className="text-[15px] font-bold" style={{ color: form.wallet === k ? color : '#94a3b8' }}>
-                    AED {bal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </div>
-          {/* Selected wallet balance + after preview */}
-          {(() => {
-            const selW  = form.wallet === 'vehicle' ? vehicleWallet : homeWallet;
-            const wLbl  = form.wallet === 'vehicle' ? 'Vehicle Wallet' : 'Home Wallet';
-            const bal   = selW.balance;
-            const cost  = Number(form.amount) || 0;
-            const after = bal - cost;
-            const low   = bal < LOW_BALANCE_THRESHOLD;
-            const empty = bal <= 0;
-            return (
-              <div className={cn('flex items-center gap-3 p-3 rounded-xl border',
-                empty ? 'bg-red-50 border-red-200' : low ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
-                <Wallet className={cn('w-4 h-4 shrink-0', empty ? 'text-red-500' : low ? 'text-amber-600' : 'text-slate-400')} />
-                <div className="flex-1">
-                  <p className="text-[11px] text-slate-400">{wLbl} — deducted on submit</p>
-                  <p className={cn('text-[15px] font-bold', empty ? 'text-red-600' : low ? 'text-amber-700' : 'text-slate-800')}>
-                    AED {bal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
-                  </p>
-                </div>
-                {cost > 0 && (
-                  <div className="text-right shrink-0">
-                    <p className="text-[10px] text-slate-400">After</p>
-                    <p className={cn('text-[13px] font-bold', after < 0 ? 'text-red-600' : after < LOW_BALANCE_THRESHOLD ? 'text-amber-600' : 'text-emerald-600')}>
-                      AED {Math.max(0, after).toLocaleString('en-AE', { maximumFractionDigits: 0 })}
-                    </p>
-                  </div>
-                )}
-                {(empty || low) && (
-                  <Link to="/wallet" className={cn('shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg', empty ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700')}>
-                    {empty ? 'Deposit' : 'Top Up'}
-                  </Link>
-                )}
-              </div>
-            );
-          })()}
-          {/* Segment toggle */}
-          <div className="flex gap-2">
-            {[
-              { k: 'property',  l: 'Property & Services', icon: Home,         c: '#2563eb' },
-              { k: 'household', l: 'Household & Daily',   icon: ShoppingCart, c: '#16a34a' },
-            ].map(({ k, l, icon: Icon, c }) => (
-              <button key={k} type="button"
-                onClick={() => { setAddSeg(k); setF('category', k === 'household' ? 'Groceries' : 'Cleaning'); }}
-                className={cn('flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-[12px] font-bold transition-all')}
-                style={addSeg === k
-                  ? { borderColor: c, background: c, color: '#fff' }
-                  : { borderColor: '#e2e8f0', background: '#f8fafc', color: '#64748b' }}>
-                <Icon className="w-3.5 h-3.5" />{l}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Category</label>
-              <select value={form.category} onChange={(e) => { setF('category', e.target.value); setF('customCategory', ''); }} className={INP}>
-                {(addSeg === 'household' ? HOUSE_CAT_OPTS : PROP_CAT_OPTS).map((c) => (
-                  <option key={c} value={c}>{c === CUSTOM_KEY ? '✏️ Custom…' : c}</option>
-                ))}
-              </select>
-            </div>
-            {form.category === CUSTOM_KEY && (
-              <div className="col-span-2">
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Custom Category Name *</label>
-                <input
-                  value={form.customCategory}
-                  onChange={(e) => setF('customCategory', e.target.value)}
-                  required
-                  placeholder="e.g. Internet Bill, Water Bill, Satellite TV…"
-                  className={INP}
-                  autoFocus
-                />
-              </div>
-            )}
-            <div className="col-span-2">
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Description *</label>
-              <input value={form.description} onChange={(e) => setF('description', e.target.value)} required
-                placeholder={addSeg === 'household' ? 'e.g. Weekly grocery shop' : 'e.g. Monthly pool service'}
-                className={INP} />
-            </div>
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Amount (AED) *</label>
-              <input value={form.amount} onChange={(e) => setF('amount', e.target.value)}
-                type="number" min="0" step="0.01" required placeholder="0.00" className={INP} />
-            </div>
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date</label>
-              <input value={form.date} onChange={(e) => setF('date', e.target.value)} type="date" className={INP} />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Vendor / Company</label>
-              <input value={form.vendor} onChange={(e) => setF('vendor', e.target.value)}
-                placeholder={addSeg === 'household' ? 'e.g. Lulu Hypermarket, Carrefour' : 'e.g. Clean Masters'}
-                className={INP} />
-            </div>
-          </div>
-          {/* Amount preview chip */}
-          {form.amount && form.category && (() => {
-            const isCustom  = form.category === CUSTOM_KEY;
-            const cfg       = isCustom ? CUSTOM_CFG : (EXPENSE_CATEGORIES[form.category] ?? CUSTOM_CFG);
-            const catLabel  = isCustom ? (form.customCategory.trim() || 'Custom') : form.category;
-            return (
-              <div className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: cfg.bg }}>
-                <div className="w-2 h-2 rounded-full" style={{ background: cfg.color }} />
-                <span className="text-[12px] font-bold" style={{ color: cfg.color }}>{catLabel}</span>
-                <span className="ml-auto text-[16px] font-bold" style={{ color: cfg.color }}>
-                  AED {Number(form.amount).toLocaleString('en-AE', { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-            );
-          })()}
-          <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
-            <Button variant="outline" type="button" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button type="submit" icon={Plus}>Log Expense</Button>
-          </div>
-        </form>
-      </Modal>
+      {/* ── Add / Edit Modal ── */}
+      <ExpenseModal
+        open={modal !== null}
+        item={modal !== 'add' ? modal : null}
+        homeBalance={homeBalance}
+        vehicleBalance={vehicleBalance}
+        onClose={() => setModal(null)}
+        onSave={handleSave}
+      />
+
+      {/* ── Delete confirm ── */}
+      <ConfirmDialog
+        open={!!delTarget}
+        onClose={() => setDelTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete Expense"
+        message={`Delete "${delTarget?.description}" (${fmtAED(delTarget?.amount)})? This cannot be undone and will not adjust your wallet balance.`}
+        confirmLabel="Delete"
+        destructive
+      />
     </div>
   );
 }
 
-const INP = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+// ─────────────────────────────────────────────────────────────────────────────
+// ExpenseModal — Add / Edit
+// ─────────────────────────────────────────────────────────────────────────────
+const LOW_THRESHOLD = 5000;
+const CUSTOM_SENTINEL = '__custom__';
+
+function ExpenseModal({ open, item, homeBalance, vehicleBalance, onClose, onSave }) {
+  const propertyId = useSelector(selectCurrentPropertyId);
+
+  const {
+    register, handleSubmit, reset, watch,
+    setValue, formState: { isSubmitting, errors },
+  } = useForm();
+
+  const [segment,     setSegment]     = useState('property');
+  const [showAddCat,  setShowAddCat]  = useState(false);
+  const [newCatName,  setNewCatName]  = useState('');
+  const [newCatColor, setNewCatColor] = useState(COLOR_PRESETS[0]);
+  const [addingCat,   setAddingCat]   = useState(false);
+
+  // ── Fetch categories from backend for this segment ────────────────────────
+  const { data: segCats = [], refetch: refetchCats } = useGetQuery(
+    { path: '/expense-categories', params: { propertyId, segment } },
+    { skip: !propertyId || !open },
+  );
+  const [createCatMut] = usePostMutation();
+
+  const isEdit = !!item;
+
+  useEffect(() => {
+    if (!open) { setShowAddCat(false); setNewCatName(''); return; }
+    const seg = item?.segment ?? 'property';
+    setSegment(seg);
+    setShowAddCat(false);
+    setNewCatName('');
+    reset(item
+      ? {
+          category:   item.category,
+          description: item.description,
+          vendor:      item.vendor ?? '',
+          amount:      item.amount,
+          date:        item.date,
+          walletType:  item.walletType ?? 'home',
+          notes:       item.notes ?? '',
+        }
+      : {
+          category:    '',
+          description: '',
+          vendor:      '',
+          amount:      '',
+          date:        new Date().toISOString().split('T')[0],
+          walletType:  'home',
+          notes:       '',
+        },
+    );
+  }, [open, item]);
+
+  // Once segCats load, set default category if form is blank
+  useEffect(() => {
+    if (!open || isEdit) return;
+    const current = watch('category');
+    if (!current && segCats.length > 0) setValue('category', segCats[0].name);
+  }, [segCats, open, isEdit]);
+
+  const handleSegmentChange = (seg) => {
+    setSegment(seg);
+    setShowAddCat(false);
+    setValue('category', ''); // will get reset when segCats reload
+  };
+
+  const handleCategoryChange = (e) => {
+    if (e.target.value === CUSTOM_SENTINEL) {
+      setShowAddCat(true);
+      // keep previous value in the select until custom is saved
+    } else {
+      setValue('category', e.target.value);
+      setShowAddCat(false);
+    }
+  };
+
+  const handleAddCustomCat = async () => {
+    const name = newCatName.trim();
+    if (!name) return;
+    setAddingCat(true);
+    try {
+      await createCatMut({
+        path: '/expense-categories',
+        body: { propertyId, name, segment, color: newCatColor.color, bg: newCatColor.bg },
+      }).unwrap();
+      await refetchCats();
+      setValue('category', name);
+      setShowAddCat(false);
+      setNewCatName('');
+      toast.success(`Category "${name}" added`);
+    } catch (err) {
+      toast.error(err?.data?.error ?? 'Failed to create category');
+    } finally {
+      setAddingCat(false);
+    }
+  };
+
+  const watchedWallet = watch('walletType', 'home');
+  const watchedAmount = parseFloat(watch('amount', '0')) || 0;
+  const watchedCat    = watch('category', '');
+  const balance       = watchedWallet === 'vehicle' ? vehicleBalance : homeBalance;
+  const after         = balance - watchedAmount;
+  const selectedCatCfg = segCats.find((c) => c.name === watchedCat) ?? { color: '#64748b', bg: '#f1f5f9' };
+
+  const onSubmit = async (d) => {
+    await onSave({ ...d, segment, amount: parseFloat(d.amount) || 0 });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title={isEdit ? 'Edit Expense' : 'Log Expense'}
+      subtitle={isEdit ? `Editing: ${item.description}` : 'Record property or household spending'}
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+        {/* ── Segment toggle ── */}
+        {!isEdit && (
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+            {Object.entries(SEG_CFG).map(([k, s]) => (
+              <button key={k} type="button" onClick={() => handleSegmentChange(k)}
+                className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-[12px] font-bold transition-all',
+                  segment === k ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400 hover:text-slate-600')}>
+                <s.Icon className="w-3.5 h-3.5" style={{ color: segment === k ? s.color : undefined }} />
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Wallet selector (new expenses only) ── */}
+        {!isEdit && (
+          <div>
+            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Deduct from Wallet</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { k: 'home',    label: 'Home Wallet',    bal: homeBalance,    color: '#16a34a', bg: '#f0fdf4' },
+                { k: 'vehicle', label: 'Vehicle Wallet', bal: vehicleBalance, color: '#0b1d3a', bg: '#eef2fb' },
+              ].map(({ k, label, bal, color, bg }) => {
+                const sel = watchedWallet === k;
+                return (
+                  <button key={k} type="button" onClick={() => setValue('walletType', k)}
+                    className="flex flex-col gap-1 p-3 rounded-xl border-2 text-left transition-all"
+                    style={sel ? { borderColor: color, background: bg } : { borderColor: '#e2e8f0', background: '#f8fafc' }}>
+                    <span className="text-[11px] font-bold" style={{ color: sel ? color : '#64748b' }}>{label}</span>
+                    <span className="text-[15px] font-black" style={{ color: sel ? color : '#94a3b8' }}>{fmtAED(bal)}</span>
+                    {sel && <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color }}>Selected ✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {watchedAmount > 0 && (
+              <div className={cn('mt-2 flex items-center justify-between px-4 py-2.5 rounded-xl border text-[12px]',
+                after < 0 ? 'bg-red-50 border-red-200' : after < LOW_THRESHOLD ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
+                <span className="text-slate-500">{watchedWallet === 'vehicle' ? 'Vehicle' : 'Home'} wallet after deduction</span>
+                <span className={cn('font-black', after < 0 ? 'text-red-600' : after < LOW_THRESHOLD ? 'text-amber-600' : 'text-emerald-700')}>
+                  {after < 0 ? `− ${fmtAED(Math.abs(after))}` : fmtAED(after)}
+                </span>
+              </div>
+            )}
+            <input type="hidden" {...register('walletType')} />
+          </div>
+        )}
+
+        {/* ── Category ── */}
+        <Field label="Category" required>
+          {/* Hidden RHF-controlled value */}
+          <input type="hidden" {...register('category', { required: 'Category is required' })} />
+
+          {/* Visual select */}
+          <div className="flex gap-2 items-start">
+            <div className="flex-1 relative">
+              <select
+                value={showAddCat ? CUSTOM_SENTINEL : watchedCat}
+                onChange={handleCategoryChange}
+                className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-blue-400 bg-white appearance-none cursor-pointer">
+                {segCats.map((c) => (
+                  <option key={c.id} value={c.name}>{c.isCustom ? `★ ${c.name}` : c.name}</option>
+                ))}
+                <option value={CUSTOM_SENTINEL}>＋ Add custom category…</option>
+              </select>
+              {/* colour swatch */}
+              {watchedCat && !showAddCat && (
+                <span className="absolute right-8 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full pointer-events-none"
+                  style={{ background: selectedCatCfg.color }} />
+              )}
+            </div>
+          </div>
+          {errors.category && <p className="text-[11px] text-red-500 mt-1">{errors.category.message}</p>}
+
+          {/* ── Inline new category panel ── */}
+          <AnimatePresence>
+            {showAddCat && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden">
+                <div className="mt-2 p-3.5 rounded-xl border border-blue-200 bg-blue-50/60 space-y-3">
+                  <p className="text-[11px] font-black text-blue-600 uppercase tracking-widest">New Custom Category</p>
+
+                  {/* Name input */}
+                  <input
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomCat(); } }}
+                    placeholder="e.g. Landscaping, Gym, Car Wash…"
+                    className="w-full h-9 px-3 rounded-lg border border-blue-200 bg-white text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400"
+                  />
+
+                  {/* Color picker */}
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 mb-2">Pick a colour</p>
+                    <div className="flex flex-wrap gap-2">
+                      {COLOR_PRESETS.map((preset) => (
+                        <button key={preset.color} type="button"
+                          onClick={() => setNewCatColor(preset)}
+                          className="w-6 h-6 rounded-full border-2 transition-all"
+                          style={{
+                            background: preset.color,
+                            borderColor: newCatColor.color === preset.color ? '#1e3a6e' : 'transparent',
+                            transform: newCatColor.color === preset.color ? 'scale(1.25)' : 'scale(1)',
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {/* Preview chip */}
+                    <span className="inline-flex items-center mt-2 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+                      style={{ background: newCatColor.bg, color: newCatColor.color }}>
+                      {newCatName || 'Preview'}
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button type="button" onClick={handleAddCustomCat} disabled={!newCatName.trim() || addingCat}
+                      className="flex-1 h-8 rounded-lg text-[12px] font-bold text-white flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                      style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                      {addingCat ? (
+                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                        </svg>
+                      ) : <RiAddLine className="w-3.5 h-3.5" />}
+                      {addingCat ? 'Adding…' : 'Add Category'}
+                    </button>
+                    <button type="button" onClick={() => { setShowAddCat(false); setNewCatName(''); }}
+                      className="px-3 h-8 rounded-lg text-[12px] font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-all">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Field>
+
+        {/* ── Core fields ── */}
+        <Field label="Description" required error={errors.description?.message}>
+          <Input
+            {...register('description', { required: 'Required' })}
+            placeholder={segment === 'household' ? 'e.g. Weekly grocery shop at Lulu' : 'e.g. Monthly pool service'}
+          />
+        </Field>
+
+        <FormGrid>
+          <Field label="Amount (AED)" required error={errors.amount?.message}>
+            <Input
+              {...register('amount', { required: 'Required', min: { value: 0.01, message: 'Must be > 0' } })}
+              type="number" min="0.01" step="0.01" placeholder="0.00"
+            />
+          </Field>
+          <Field label="Date" required>
+            <Input {...register('date', { required: true })} type="date" />
+          </Field>
+        </FormGrid>
+
+        <Field label="Vendor / Company">
+          <Input
+            {...register('vendor')}
+            placeholder={segment === 'household' ? 'e.g. Lulu Hypermarket, Carrefour' : 'e.g. Clean Masters LLC'}
+          />
+        </Field>
+
+        <Field label="Notes">
+          <Textarea {...register('notes')} rows={2} placeholder="Invoice number, reference, any observations…" />
+        </Field>
+
+        <FormActions
+          onCancel={onClose}
+          loading={isSubmitting}
+          submitLabel={isEdit ? 'Update Expense' : 'Log Expense'}
+        />
+      </form>
+    </Modal>
+  );
+}

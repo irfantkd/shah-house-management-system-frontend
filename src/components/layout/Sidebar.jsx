@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RiArrowLeftSLine, RiArrowRightSLine,
@@ -8,39 +8,85 @@ import {
   RiCheckLine, RiArrowUpDownLine, RiBuilding2Line,
   RiCloseLine, RiMapPin2Line,
 } from 'react-icons/ri';
+import {
+  Landmark, Home, Building, Building2, Hotel,
+  Waves, TreeDeciduous, LayoutGrid, HardHat, Warehouse,
+} from 'lucide-react';
 import ShahHouseLogo from '../ui/ShahHouseLogo';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import { NAV_GROUPS } from '../../constants/navigation';
 import { selectAuthUser, logoutUser } from '../../store/slices/authSlice';
-import { selectUnreadCount } from '../../store/slices/notificationsSlice';
-import { selectUpcomingBirthdays } from '../../store/slices/employeesSlice';
-import { selectOwnerBirthdays } from '../../store/slices/ownersSlice';
+import { useGetQuery } from '../../api/apiSlice';
 import {
   selectProperties, selectCurrentProperty, selectCurrentPropertyId,
   addProperty, setCurrentProperty,
 } from '../../store/slices/propertiesSlice';
 import { cn } from '../../utils/cn';
+import { getInitials } from '../../utils/getInitials';
 import toast from 'react-hot-toast';
 
 const SIDEBAR_FULL = 260;
 const SIDEBAR_MINI = 68;
 
 const PROPERTY_TYPES = ['Villa', 'Flat', 'Apartment', 'Penthouse', 'House', 'Townhouse', 'Studio', 'Duplex'];
-const PROPERTY_EMOJIS = ['🏛️', '🏡', '🏠', '🏢', '🏰', '🌊', '🌴', '🏘️', '🏗️', '🏚️'];
+
+const PROPERTY_ICONS = [
+  { key: 'landmark',  Icon: Landmark      },
+  { key: 'home',      Icon: Home          },
+  { key: 'building',  Icon: Building      },
+  { key: 'building2', Icon: Building2     },
+  { key: 'hotel',     Icon: Hotel         },
+  { key: 'waves',     Icon: Waves         },
+  { key: 'tree',      Icon: TreeDeciduous },
+  { key: 'grid',      Icon: LayoutGrid    },
+  { key: 'hardhat',   Icon: HardHat       },
+  { key: 'warehouse', Icon: Warehouse     },
+];
+const ICON_BY_KEY = Object.fromEntries(PROPERTY_ICONS.map((p) => [p.key, p.Icon]));
+const EMOJI_LEGACY = {
+  '🏛️': 'landmark', '🏡': 'home', '🏠': 'building', '🏢': 'building2',
+  '🏰': 'hotel', '🌊': 'waves', '🌴': 'tree', '🏘️': 'grid',
+  '🏗️': 'hardhat', '🏚️': 'warehouse', '🏙️': 'building2', '🌾': 'tree',
+};
+function PropIcon({ iconKey, className }) {
+  const Icon = ICON_BY_KEY[EMOJI_LEGACY[iconKey] ?? iconKey] ?? Landmark;
+  return <Icon className={className ?? 'w-4 h-4 text-white'} strokeWidth={1.5} />;
+}
 
 export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const user            = useSelector(selectAuthUser);
-  const unread          = useSelector(selectUnreadCount);
-  const birthdays       = useSelector(selectUpcomingBirthdays);
-  const ownerBirthdays  = useSelector(selectOwnerBirthdays);
   const properties      = useSelector(selectProperties);
   const currentProperty = useSelector(selectCurrentProperty);
   const currentId       = useSelector(selectCurrentPropertyId);
 
-  const [propMenuOpen, setPropMenuOpen] = useState(false);
-  const [addPropOpen,  setAddPropOpen]  = useState(false);
+  const { data: notifications = [] } = useGetQuery({ path: '/notifications', params: { propertyId: currentId } }, { skip: !currentId });
+  const { data: employees = [] }     = useGetQuery({ path: '/employees',     params: { propertyId: currentId } }, { skip: !currentId });
+  const { data: owners = [] }        = useGetQuery({ path: '/owners',        params: { propertyId: currentId } }, { skip: !currentId });
+
+  const unread = notifications.filter((n) => !n.read).length;
+
+  const daysUntilBirthday = (dob) => {
+    const now  = new Date();
+    const bd   = new Date(dob);
+    const next = new Date(now.getFullYear(), bd.getMonth(), bd.getDate());
+    if (next < now) next.setFullYear(next.getFullYear() + 1);
+    return Math.round((next - now) / 86400000);
+  };
+
+  const birthdays = useMemo(() =>
+    employees.filter((e) => e.dateOfBirth && daysUntilBirthday(e.dateOfBirth) <= 7),
+    [employees]);
+
+  const ownerBirthdays = useMemo(() =>
+    owners.filter((o) => o.dateOfBirth && daysUntilBirthday(o.dateOfBirth) <= 7),
+    [owners]);
+
+  const [propMenuOpen,  setPropMenuOpen]  = useState(false);
+  const [addPropOpen,   setAddPropOpen]   = useState(false);
+  const [logoutOpen,    setLogoutOpen]    = useState(false);
   const menuRef = useRef(null);
 
   // Close dropdown when clicking outside
@@ -57,6 +103,8 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
     toast.success('Signed out successfully');
     navigate('/login', { replace: true });
   };
+
+  const confirmLogout = () => setLogoutOpen(true);
 
   const handleSwitch = (id) => {
     dispatch(setCurrentProperty(id));
@@ -105,11 +153,11 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
               collapsed && 'justify-center',
             )}
           >
-            {/* Emoji badge */}
+            {/* Property icon badge */}
             <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-[18px] shrink-0"
+              className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              {currentProperty?.emoji ?? '🏛️'}
+              <PropIcon iconKey={currentProperty?.emoji} className="w-4 h-4 text-white" />
             </div>
 
             <AnimatePresence initial={false}>
@@ -160,7 +208,9 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
                         'w-full flex items-center gap-2.5 px-3 py-2 transition-all text-left',
                         p.id === currentId ? 'bg-white/8' : 'hover:bg-white/5',
                       )}>
-                      <span className="text-[16px] shrink-0">{p.emoji}</span>
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                        <PropIcon iconKey={p.emoji} className="w-3.5 h-3.5 text-white" />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-[13px] font-semibold truncate leading-tight">{p.name}</p>
                         <p className="text-white/35 text-[10px] truncate flex items-center gap-1">
@@ -177,8 +227,17 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
                   ))}
                 </div>
 
-                {/* Add property */}
+                {/* Footer actions */}
                 <div className="border-t border-white/[0.07] py-1">
+                  <Link
+                    to="/properties"
+                    onClick={() => setPropMenuOpen(false)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/5 transition-all">
+                    <div className="w-6 h-6 rounded-lg bg-white/8 flex items-center justify-center shrink-0">
+                      <RiArrowRightSLine className="w-3.5 h-3.5 text-white/50" />
+                    </div>
+                    <span className="text-[13px] text-white/50 font-medium">View all properties</span>
+                  </Link>
                   <button
                     onClick={() => { setPropMenuOpen(false); setAddPropOpen(true); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-white/5 transition-all text-left">
@@ -207,7 +266,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
               </AnimatePresence>
               {collapsed && <div className="h-3" />}
 
-              {group.items.map((item) => {
+              {group.items.filter((item) => !item.adminOnly || user?.role === 'admin').map((item) => {
                 let badge, badgeColor;
                 if (item.path === '/notifications') {
                   const total = unread + birthdays.length + ownerBirthdays.length;
@@ -256,7 +315,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
           <div className={cn('flex items-center gap-3 px-4 py-3', collapsed && 'justify-center px-2')}>
             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-[12px] font-bold shadow"
               style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
-              {user?.initials ?? 'MR'}
+              {getInitials(user?.name)}
             </div>
             <AnimatePresence initial={false}>
               {!collapsed && (
@@ -270,7 +329,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
             <AnimatePresence initial={false}>
               {!collapsed && (
                 <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}
-                  onClick={handleLogout}
+                  onClick={confirmLogout}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-white/10 transition-all shrink-0"
                   title="Sign out">
                   <RiLogoutBoxRLine className="w-4 h-4" />
@@ -283,6 +342,17 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
 
       {/* ── Add Property Modal ── */}
       <AddPropertyModal open={addPropOpen} onClose={() => setAddPropOpen(false)} />
+
+      {/* ── Logout Confirmation ── */}
+      <ConfirmDialog
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={handleLogout}
+        title="Sign Out"
+        message="Are you sure you want to sign out of Shah House Management System?"
+        confirmLabel="Sign Out"
+        confirmVariant="logout"
+      />
     </>
   );
 }
@@ -340,7 +410,7 @@ function NavItem({ item, collapsed, badge, badgeColor = 'bg-red-500', onClose })
 /* ── Add Property Modal ── */
 function AddPropertyModal({ open, onClose }) {
   const dispatch = useDispatch();
-  const [form, setForm] = useState({ name: '', type: 'Villa', location: '', emoji: '🏛️' });
+  const [form, setForm] = useState({ name: '', type: 'Villa', location: '', emoji: 'landmark' });
   const [errors, setErrors] = useState({});
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -362,7 +432,7 @@ function AddPropertyModal({ open, onClose }) {
       emoji:    form.emoji,
     }));
     toast.success(`${form.name} added & activated`);
-    setForm({ name: '', type: 'Villa', location: '', emoji: '🏛️' });
+    setForm({ name: '', type: 'Villa', location: '', emoji: 'landmark' });
     setErrors({});
     onClose();
   };
@@ -391,9 +461,7 @@ function AddPropertyModal({ open, onClose }) {
               style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
               <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,#3b82f6,#6366f1)', opacity:0.9 }} />
               <div style={{ position:'absolute', top:-40, right:-40, width:140, height:140, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
-              <div style={{ position:'absolute', bottom:-8, right:16, fontSize:72, fontWeight:900, color:'rgba(255,255,255,0.03)', lineHeight:1, userSelect:'none' }}>
-                {form.emoji}
-              </div>
+              <PropIcon iconKey={form.emoji} className="w-24 h-24 text-white/3 pointer-events-none select-none" style={{ position:'absolute', bottom:-12, right:8 }} />
               <div className="relative flex items-center justify-between" style={{ zIndex:5 }}>
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-widest text-white/30 mb-1">New Property</p>
@@ -410,19 +478,19 @@ function AddPropertyModal({ open, onClose }) {
             {/* Body */}
             <div className="bg-white px-6 pt-5 pb-6 space-y-4">
 
-              {/* Emoji picker */}
+              {/* Icon picker */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Choose Icon</label>
                 <div className="flex flex-wrap gap-2">
-                  {PROPERTY_EMOJIS.map((e) => (
-                    <button key={e} onClick={() => set('emoji', e)}
+                  {PROPERTY_ICONS.map(({ key, Icon }) => (
+                    <button key={key} onClick={() => set('emoji', key)}
                       className={cn(
-                        'w-10 h-10 rounded-xl text-[22px] flex items-center justify-center transition-all',
-                        form.emoji === e
+                        'w-10 h-10 rounded-xl flex items-center justify-center transition-all',
+                        form.emoji === key
                           ? 'bg-navy-900 shadow-lg scale-105'
                           : 'bg-slate-100 hover:bg-slate-200',
                       )}>
-                      {e}
+                      <Icon className={cn('w-5 h-5', form.emoji === key ? 'text-white' : 'text-slate-500')} strokeWidth={1.5} />
                     </button>
                   ))}
                 </div>

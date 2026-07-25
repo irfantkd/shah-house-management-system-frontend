@@ -1,9 +1,8 @@
 import { createSlice, nanoid } from '@reduxjs/toolkit';
-import { repairs as initial } from '../../data/mockRepairs';
 
 const repairsSlice = createSlice({
   name: 'repairs',
-  initialState: { items: initial },
+  initialState: { items: [] },
   reducers: {
     addRepair: (state, { payload }) => {
       state.items.push({

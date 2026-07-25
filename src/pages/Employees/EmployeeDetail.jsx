@@ -1,18 +1,17 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Pencil, Banknote, Wallet, Phone, CalendarDays, Cake,
   BadgeCheck, Trash2, Car, Home, AlertCircle, CheckCircle2, Clock,
-  Globe, FileText, TrendingUp, ArrowDownLeft, RotateCcw, Users, X,
+  Globe, FileText, TrendingUp, ArrowDownLeft, RotateCcw, Users, X, AlertTriangle,
 } from 'lucide-react';
-import {
-  selectEmployees, updateEmployee, deleteEmployee,
-  recordSalaryPayment, recordAdvancePayment, recoverAdvance,
-} from '../../store/slices/employeesSlice';
-import { selectVehicleWallet, selectHomeWallet, deductFromWallet, LOW_BALANCE_THRESHOLD } from '../../store/slices/walletSlice';
+import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, usePatchMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import toast from 'react-hot-toast';
+
+const LOW_BALANCE_THRESHOLD = 5000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const PALETTES = [
@@ -79,15 +78,24 @@ function InfoRow({ icon: Icon, label, value, valueColor, color }) {
 }
 
 export default function EmployeeDetail() {
-  const { id }    = useParams();
-  const navigate  = useNavigate();
-  const dispatch  = useDispatch();
+  const { id }      = useParams();
+  const navigate    = useNavigate();
+  const propertyId  = useSelector(selectCurrentPropertyId);
 
-  const employees     = useSelector(selectEmployees);
-  const vehicleWallet = useSelector(selectVehicleWallet);
-  const homeWallet    = useSelector(selectHomeWallet);
+  const { data: emp,          isLoading }  = useGetQuery({ path: `/employees/${id}` });
+  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const vehicleWallet = { balance: walletData?.vehicle?.balance ?? 0 };
+  const homeWallet    = { balance: walletData?.home?.balance    ?? 0 };
+  const salaryWallet  = { balance: walletData?.salary?.balance  ?? 0 };
 
-  const emp = employees.find((e) => e.id === id);
+  const [updateEmployeeMut]  = usePutMutation();
+  const [deleteEmployeeMut]  = useDeleteMutation();
+  const [paymentMut]         = usePostMutation();
+  const [advanceMut]         = usePostMutation();
+  const [deductWalletMut]    = usePostMutation();
+  const [recoverMut]         = usePatchMutation();
+
+  if (isLoading) return null;
   if (!emp) return <Navigate to="/employees" replace />;
 
   const [editOpen,   setEditOpen]   = useState(false);
@@ -97,7 +105,7 @@ export default function EmployeeDetail() {
   const [histFilter, setHistFilter] = useState('all');
 
   const [editForm, setEditForm] = useState({});
-  const [payForm,  setPayForm]  = useState({ month: CUR_MON, amount: '', wallet: 'home', notes: '' });
+  const [payForm,  setPayForm]  = useState({ month: CUR_MON, amount: '', wallet: 'salary', notes: '' });
   const [advForm,  setAdvForm]  = useState({ amount: '', wallet: 'home', notes: '' });
 
   const setEF = (k, v) => setEditForm((f) => ({ ...f, [k]: v }));
@@ -122,57 +130,67 @@ export default function EmployeeDetail() {
   const grad  = avatarGrad(emp.name);
 
   const openEdit = () => { setEditForm({ ...emp, monthlySalary: String(emp.monthlySalary) }); setEditOpen(true); };
-  const openPay  = () => { setPayForm({ month: CUR_MON, amount: String(emp.monthlySalary), wallet: 'home', notes: '' }); setPayOpen(true); };
+  const openPay  = () => { setPayForm({ month: CUR_MON, amount: String(emp.monthlySalary), wallet: 'salary', notes: '' }); setPayOpen(true); };
   const openAdv  = () => { setAdvForm({ amount: '', wallet: 'home', notes: '' }); setAdvOpen(true); };
 
-  const handleSaveEdit = (e) => {
+  const handleSaveEdit = async (e) => {
     e.preventDefault();
     if (!editForm.name?.trim() || !editForm.dateOfBirth || !editForm.monthlySalary)
       return toast.error('Fill required fields');
-    dispatch(updateEmployee({ ...editForm, id: emp.id, monthlySalary: Number(editForm.monthlySalary) }));
-    toast.success('Employee updated');
-    setEditOpen(false);
+    try {
+      await updateEmployeeMut({ path: `/employees/${emp.id}`, body: { ...editForm, monthlySalary: Number(editForm.monthlySalary) } }).unwrap();
+      toast.success('Employee updated');
+      setEditOpen(false);
+    } catch (err) { toast.error(err.data?.error || 'Failed to update employee'); }
   };
 
-  const handleDelete = () => {
-    dispatch(deleteEmployee(emp.id));
-    toast.success(`${emp.name} removed`);
-    navigate('/employees');
+  const handleDelete = async () => {
+    try {
+      await deleteEmployeeMut({ path: `/employees/${emp.id}` }).unwrap();
+      toast.success(`${emp.name} removed`);
+      navigate('/employees');
+    } catch (err) { toast.error(err.data?.error || 'Failed to remove employee'); }
   };
 
-  const handlePaySalary = (e) => {
+  const handlePaySalary = async (e) => {
     e.preventDefault();
     if (!payForm.amount) return toast.error('Enter amount');
     const amt    = Number(payForm.amount);
-    const selW   = payForm.wallet === 'vehicle' ? vehicleWallet : homeWallet;
-    const wLabel = payForm.wallet === 'vehicle' ? 'Vehicle' : 'Home';
     const paidOn = new Date().toISOString().split('T')[0];
-    dispatch(recordSalaryPayment({ employeeId: emp.id, payment: { month: payForm.month, amount: amt, wallet: payForm.wallet, paidOn, notes: payForm.notes } }));
-    dispatch(deductFromWallet({ wallet: payForm.wallet, amount: amt, description: `${emp.name} — ${fmtMonth(payForm.month)} Salary`, date: paidOn, category: 'Salary' }));
-    const after = selW.balance - amt;
-    if (after < LOW_BALANCE_THRESHOLD) toast(`${wLabel} wallet low: AED ${fmtAmt(Math.max(0, after))}`, { icon: '⚠️' });
-    else toast.success(`AED ${fmtAmt(amt)} salary paid`);
-    setPayOpen(false);
+    try {
+      await Promise.all([
+        paymentMut({ path: `/employees/${emp.id}/payments`, body: { month: payForm.month, amount: amt, wallet: 'salary', paidOn, notes: payForm.notes, type: 'salary' } }).unwrap(),
+        deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: 'salary', amount: amt, description: `Salary — ${emp.name}`, date: paidOn, category: 'Salary' } }).unwrap(),
+      ]);
+      await refetchWallet();
+      toast.success(`AED ${fmtAmt(amt)} salary paid`);
+      setPayOpen(false);
+    } catch (err) { toast.error(err.data?.error || 'Failed to record payment'); }
   };
 
-  const handleAdvance = (e) => {
+  const handleAdvance = async (e) => {
     e.preventDefault();
     if (!advForm.amount) return toast.error('Enter advance amount');
     const amt    = Number(advForm.amount);
     const selW   = advForm.wallet === 'vehicle' ? vehicleWallet : homeWallet;
     const wLabel = advForm.wallet === 'vehicle' ? 'Vehicle' : 'Home';
     const paidOn = new Date().toISOString().split('T')[0];
-    dispatch(recordAdvancePayment({ employeeId: emp.id, payment: { amount: amt, wallet: advForm.wallet, paidOn, notes: advForm.notes } }));
-    dispatch(deductFromWallet({ wallet: advForm.wallet, amount: amt, description: `${emp.name} — Salary Advance`, date: paidOn, category: 'Salary Advance' }));
-    const after = selW.balance - amt;
-    if (after < LOW_BALANCE_THRESHOLD) toast(`${wLabel} wallet low: AED ${fmtAmt(Math.max(0, after))}`, { icon: '⚠️' });
-    else toast.success(`AED ${fmtAmt(amt)} advance paid to ${emp.name}`);
-    setAdvOpen(false);
+    try {
+      await Promise.all([
+        advanceMut({ path: `/employees/${emp.id}/advances`, body: { amount: amt, wallet: advForm.wallet, paidOn, notes: advForm.notes } }).unwrap(),
+        deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: advForm.wallet, amount: amt, description: `Advance — ${emp.name}`, date: paidOn, category: 'Advance' } }).unwrap(),
+      ]);
+      await refetchWallet();
+      toast.success(`AED ${fmtAmt(amt)} advance paid to ${emp.name}`);
+      setAdvOpen(false);
+    } catch (err) { toast.error(err.data?.error || 'Failed to record advance'); }
   };
 
-  const handleRecover = (paymentId) => {
-    dispatch(recoverAdvance({ employeeId: emp.id, paymentId }));
-    toast.success('Advance marked as recovered');
+  const handleRecover = async (paymentId) => {
+    try {
+      await recoverMut({ path: `/employees/${emp.id}/advances/${paymentId}`, body: { recovered: true } }).unwrap();
+      toast.success('Advance marked as recovered');
+    } catch (err) { toast.error(err.data?.error || 'Failed to recover advance'); }
   };
 
   // Shared wallet picker
@@ -286,7 +304,7 @@ export default function EmployeeDetail() {
                 <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold text-white"
                   style={{ background:'#f59e0b', boxShadow:'0 2px 10px rgba(245,158,11,0.5)' }}>
                   <Cake className="w-3.5 h-3.5" />
-                  {bdayDays === 0 ? '🎉 Birthday Today!' : `Birthday in ${bdayDays} days`}
+                  {bdayDays === 0 ? 'Birthday Today!' : `Birthday in ${bdayDays} days`}
                 </div>
               )}
             </div>
@@ -439,7 +457,7 @@ export default function EmployeeDetail() {
                           </div>
                           <p className="text-[12px] text-slate-600 mt-0.5">{isSal ? fmtMonth(p.month) : `Advance — ${fmtDate(p.paidOn)}`}</p>
                           <p className="text-[10px] text-slate-400 mt-0.5">
-                            Paid {fmtDate(p.paidOn)} · {p.wallet === 'vehicle' ? 'Vehicle' : 'Home'} Wallet
+                            Paid {fmtDate(p.paidOn)} · {p.wallet === 'salary' ? 'Salary' : p.wallet === 'vehicle' ? 'Vehicle' : 'Home'} Wallet
                             {p.notes && ` · ${p.notes}`}
                           </p>
                         </div>
@@ -629,13 +647,27 @@ export default function EmployeeDetail() {
                       <input value={payForm.amount} onChange={(e) => setPF('amount', e.target.value)} type="number" min="0" required placeholder="0" className={INP} />
                     </div>
                   </div>
+                  {/* Salary wallet — always deducted from here */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Deduct from Wallet</label>
-                    <WalletPicker value={payForm.wallet} onChange={(k) => setPF('wallet', k)} />
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Deducted From</label>
+                    <div className="flex items-center gap-3 p-3.5 rounded-2xl border-2"
+                      style={{ borderColor:'#7c3aed', background:'#f5f3ff' }}>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background:'linear-gradient(135deg,#6d28d9,#7c3aed)' }}>
+                        <Wallet className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[13px] font-bold text-purple-700">Salary Wallet</p>
+                        <p className="text-[10px] text-purple-400">Dedicated employee salary fund</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[16px] font-black text-purple-700">AED {fmtAmt(salaryWallet.balance)}</p>
+                        <p className="text-[10px] text-purple-400">Available</p>
+                      </div>
+                    </div>
                   </div>
                   {Number(payForm.amount) > 0 && (() => {
-                    const selW  = payForm.wallet === 'vehicle' ? vehicleWallet : homeWallet;
-                    const after = selW.balance - Number(payForm.amount);
+                    const after = salaryWallet.balance - Number(payForm.amount);
                     return (
                       <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
                         <span className="text-[12px] text-slate-500">Balance after payment</span>

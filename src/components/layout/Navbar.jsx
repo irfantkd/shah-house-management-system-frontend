@@ -8,9 +8,11 @@ import {
   RiLogoutBoxRLine, RiUserLine, RiArrowRightLine,
 } from 'react-icons/ri';
 import { selectAuthUser, logoutUser } from '../../store/slices/authSlice';
-import { selectNotifications, selectUnreadCount, markRead } from '../../store/slices/notificationsSlice';
+import { useGetQuery, usePatchMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { getNavLabel, ALL_NAV_ITEMS } from '../../constants/navigation';
 import { cn } from '../../utils/cn';
+import { getInitials } from '../../utils/getInitials';
 import toast from 'react-hot-toast';
 
 export default function Navbar({ onMenuClick }) {
@@ -18,8 +20,10 @@ export default function Navbar({ onMenuClick }) {
   const navigate      = useNavigate();
   const { pathname }  = useLocation();
   const user          = useSelector(selectAuthUser);
-  const notifications = useSelector(selectNotifications);
-  const unread        = useSelector(selectUnreadCount);
+  const propertyId    = useSelector(selectCurrentPropertyId);
+  const { data: notifications = [] } = useGetQuery({ path: '/notifications', params: { propertyId } }, { skip: !propertyId });
+  const [markReadMut] = usePatchMutation();
+  const unread = notifications.filter((n) => !n.read).length;
   const [notifOpen,  setNotifOpen]  = useState(false);
   const [userOpen,   setUserOpen]   = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -120,7 +124,7 @@ export default function Navbar({ onMenuClick }) {
                     <p className="text-[13px] text-slate-400">All caught up!</p>
                   </div>
                 ) : recentNotifs.map((n) => (
-                  <div key={n.id} onClick={() => dispatch(markRead(n.id))}
+                  <div key={n.id} onClick={() => markReadMut({ path: `/notifications/${n.id}`, body: { read: true } })}
                     className={cn('flex gap-3 px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors', !n.read && 'bg-blue-50/60')}>
                     <div className={cn('w-2 h-2 rounded-full mt-1.5 shrink-0', n.read ? 'bg-slate-200' : 'bg-accent-500')} />
                     <div className="min-w-0">
@@ -147,7 +151,7 @@ export default function Navbar({ onMenuClick }) {
           className="flex items-center gap-2.5 pl-1 py-1 pr-2 rounded-xl hover:bg-slate-50 transition-colors">
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold shadow-sm shrink-0"
             style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
-            {user?.initials ?? 'MR'}
+            {getInitials(user?.name)}
           </div>
           <div className="hidden sm:block text-left">
             <p className="text-[13px] font-bold text-slate-800 leading-tight">{user?.name ?? 'Mirfan'}</p>
@@ -165,7 +169,7 @@ export default function Navbar({ onMenuClick }) {
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[13px] font-bold shrink-0"
                     style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
-                    {user?.initials ?? 'MR'}
+                    {getInitials(user?.name)}
                   </div>
                   <div>
                     <p className="text-[13px] font-bold text-navy-900 leading-tight">{user?.name ?? 'Mirfan'}</p>

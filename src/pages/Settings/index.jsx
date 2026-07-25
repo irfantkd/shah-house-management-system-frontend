@@ -5,9 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   RiUserLine, RiHomeLine, RiBellLine, RiShieldLine,
-  RiSaveLine, RiSmartphoneLine, RiMailLine,
+  RiSaveLine, RiSmartphoneLine,
 } from 'react-icons/ri';
-import { selectProfile, selectProperty, selectNotifSettings, saveProfile, saveProperty, saveNotifSettings } from '../../store/slices/settingsSlice';
+import { selectAuthUser, updateAuthProfile, changePassword } from '../../store/slices/authSlice';
+import { useGetQuery, usePutMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
+import { getInitials } from '../../utils/getInitials';
 import { Field, Input, Select, Textarea, FormGrid } from '../../components/ui/FormField';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
@@ -90,32 +93,46 @@ function Toggle({ checked, onChange, label, description }) {
 
 function ProfileTab() {
   const dispatch = useDispatch();
-  const profile  = useSelector(selectProfile);
+  const authUser = useSelector(selectAuthUser);
   const { register, handleSubmit, reset } = useForm();
-  useEffect(() => { reset(profile ?? {}); }, [profile]);
+
+  useEffect(() => {
+    if (!authUser) return;
+    reset({ name: authUser.name || '', phone: authUser.phone || '' });
+  }, [authUser]);
+
+  const onSubmit = async (d) => {
+    const res = await dispatch(updateAuthProfile({ name: d.name, phone: d.phone }));
+    if (res.error) { toast.error('Failed to save profile'); return; }
+    toast.success('Profile saved!');
+  };
+
   return (
     <SettingsCard title="Personal Profile" subtitle="Your name and contact details">
-      <form onSubmit={handleSubmit((d) => { dispatch(saveProfile(d)); toast.success('Profile saved!'); })} className="space-y-5">
-        <FormGrid>
-          <Field label="First Name"><Input {...register('firstName')} placeholder="Amir" /></Field>
-          <Field label="Last Name"><Input {...register('lastName')} placeholder="Al Rashidi" /></Field>
-        </FormGrid>
-        <FormGrid>
-          <Field label="Email">
-            <div className="relative">
-              <RiMailLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              <Input {...register('email')} type="email" placeholder="owner@villa.ae" style={{ paddingLeft: '2.5rem' }} />
-            </div>
-          </Field>
-          <Field label="Phone">
-            <div className="relative">
-              <RiSmartphoneLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              <Input {...register('phone')} placeholder="+971 50 XXX XXXX" style={{ paddingLeft: '2.5rem' }} />
-            </div>
-          </Field>
-        </FormGrid>
-        <Field label="Language">
-          <Select {...register('language')} placeholder="Select language" options={LANGUAGES.map((l) => ({ value: l, label: l }))} />
+      <div className="flex items-center gap-4 mb-6 p-4 bg-slate-50 rounded-2xl">
+        <div className="w-14 h-14 rounded-full bg-navy-900 flex items-center justify-center text-white text-[18px] font-bold shrink-0">
+          {getInitials(authUser?.name)}
+        </div>
+        <div>
+          <p className="text-[14px] font-bold text-slate-900">{authUser?.name || '—'}</p>
+          <p className="text-[13px] text-slate-500">{authUser?.email}</p>
+          <span className={cn(
+            'inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-[11px] font-bold',
+            authUser?.role === 'admin' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600',
+          )}>
+            {authUser?.role === 'admin' ? 'Admin' : 'Viewer'}
+          </span>
+        </div>
+      </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <Field label="Full Name" required>
+          <Input {...register('name', { required: true })} placeholder="Your full name" />
+        </Field>
+        <Field label="Phone">
+          <div className="relative">
+            <RiSmartphoneLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Input {...register('phone')} placeholder="+971 50 XXX XXXX" style={{ paddingLeft: '2.5rem' }} />
+          </div>
         </Field>
         <div className="flex justify-end pt-2">
           <Button variant="primary" icon={RiSaveLine} type="submit">Save Profile</Button>
@@ -126,13 +143,25 @@ function ProfileTab() {
 }
 
 function PropertyTab() {
-  const dispatch  = useDispatch();
-  const property  = useSelector(selectProperty);
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const { data: settings = {} } = useGetQuery({ path: '/settings', params: { propertyId } }, { skip: !propertyId });
+  const [savePropertyMut] = usePutMutation();
   const { register, handleSubmit, reset } = useForm();
-  useEffect(() => { reset(property ?? {}); }, [property]);
+
+  useEffect(() => { reset(settings.property ?? {}); }, [settings]);
+
+  const onSubmit = async (d) => {
+    try {
+      await savePropertyMut({ path: '/settings/property', body: { propertyId, ...d } }).unwrap();
+      toast.success('Property saved!');
+    } catch {
+      toast.error('Failed to save property');
+    }
+  };
+
   return (
     <SettingsCard title="Property Details" subtitle="Villa information and configuration">
-      <form onSubmit={handleSubmit((d) => { dispatch(saveProperty(d)); toast.success('Property saved!'); })} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Field label="Property Name / Reference">
           <Input {...register('propertyName')} placeholder="e.g. Villa Al Noor — Palm Jumeirah" />
         </Field>
@@ -168,11 +197,27 @@ function PropertyTab() {
 }
 
 function NotifsTab() {
-  const dispatch  = useDispatch();
-  const settings  = useSelector(selectNotifSettings) ?? {};
-  const [local, setLocal] = useState({ maintenance: true, repairs: true, warranties: true, contracts: true, expenses: false, ...settings });
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const { data: notifSettings = {} } = useGetQuery({ path: '/settings/notifications', params: { propertyId } }, { skip: !propertyId });
+  const [saveNotifMut] = usePutMutation();
+  const [local, setLocal] = useState({ maintenance: true, repairs: true, warranties: true, contracts: true, expenses: false });
+
+  useEffect(() => {
+    if (notifSettings && Object.keys(notifSettings).length > 0) {
+      setLocal((prev) => ({ ...prev, ...notifSettings }));
+    }
+  }, [notifSettings]);
+
   const toggle = (k) => setLocal((p) => ({ ...p, [k]: !p[k] }));
-  const onSave = () => { dispatch(saveNotifSettings(local)); toast.success('Preferences saved!'); };
+
+  const onSave = async () => {
+    try {
+      await saveNotifMut({ path: '/settings/notifications', body: { propertyId, ...local } }).unwrap();
+      toast.success('Preferences saved!');
+    } catch {
+      toast.error('Failed to save preferences');
+    }
+  };
 
   return (
     <SettingsCard title="Notification Preferences" subtitle="Choose what alerts you want to receive">
@@ -191,36 +236,45 @@ function NotifsTab() {
 }
 
 function SecurityTab() {
-  const [saved, setSaved] = useState(false);
-  const { register, handleSubmit } = useForm();
+  const dispatch = useDispatch();
+  const { register, handleSubmit, reset, watch, setError, formState: { errors } } = useForm();
+  const [busy, setBusy] = useState(false);
+  const newPw = watch('newPassword', '');
+
+  const onSubmit = async (d) => {
+    if (d.newPassword !== d.confirmPassword) {
+      setError('confirmPassword', { message: 'Passwords do not match' });
+      return;
+    }
+    setBusy(true);
+    const res = await dispatch(changePassword({ currentPassword: d.currentPassword, newPassword: d.newPassword }));
+    setBusy(false);
+    if (res.error) { toast.error(res.payload || 'Failed to change password'); return; }
+    toast.success('Password changed successfully!');
+    reset();
+  };
+
   return (
-    <SettingsCard title="Security" subtitle="Manage your password and access settings">
-      <form onSubmit={handleSubmit(() => { setSaved(true); toast.success('Password updated!'); setTimeout(() => setSaved(false), 3000); })} className="space-y-5">
-        <Field label="Current Password">
-          <Input {...register('currentPassword')} type="password" placeholder="Enter current password" />
+    <SettingsCard title="Security" subtitle="Change your login password">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <Field label="Current Password" required>
+          <Input {...register('currentPassword', { required: 'Required' })} type="password" placeholder="Enter current password" />
+          {errors.currentPassword && <p className="text-[12px] text-danger-500 mt-1">{errors.currentPassword.message}</p>}
         </Field>
-        <Field label="New Password">
-          <Input {...register('newPassword')} type="password" placeholder="Minimum 8 characters" />
+        <Field label="New Password" required hint="Minimum 6 characters">
+          <Input {...register('newPassword', { required: 'Required', minLength: { value: 6, message: 'Minimum 6 characters' } })} type="password" placeholder="New password" />
+          {errors.newPassword && <p className="text-[12px] text-danger-500 mt-1">{errors.newPassword.message}</p>}
         </Field>
-        <Field label="Confirm New Password">
-          <Input {...register('confirmPassword')} type="password" placeholder="Repeat new password" />
+        <Field label="Confirm New Password" required>
+          <Input {...register('confirmPassword', { required: 'Required', validate: (v) => v === newPw || 'Passwords do not match' })} type="password" placeholder="Repeat new password" />
+          {errors.confirmPassword && <p className="text-[12px] text-danger-500 mt-1">{errors.confirmPassword.message}</p>}
         </Field>
         <div className="flex justify-end pt-2">
-          <Button variant="primary" icon={saved ? RiShieldLine : RiSaveLine} type="submit">
-            {saved ? 'Saved!' : 'Update Password'}
+          <Button variant="primary" icon={busy ? null : RiShieldLine} type="submit" disabled={busy}>
+            {busy ? 'Saving…' : 'Update Password'}
           </Button>
         </div>
       </form>
-      <div className="mt-6 pt-6 border-t border-slate-100">
-        <p className="text-[13px] font-bold text-slate-700 mb-3">Session</p>
-        <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
-          <div>
-            <p className="text-[13px] font-semibold text-slate-700">Active session</p>
-            <p className="text-[12px] text-slate-400">You are currently logged in on this device.</p>
-          </div>
-          <button className="text-[12px] font-bold text-danger-500 hover:text-danger-600 transition-colors px-3 py-1.5 rounded-lg hover:bg-danger-50">Sign Out</button>
-        </div>
-      </div>
     </SettingsCard>
   );
 }

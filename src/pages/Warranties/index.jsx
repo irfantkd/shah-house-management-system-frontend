@@ -6,7 +6,8 @@ import {
   Phone, Package, ChevronRight, Clock, AlertTriangle,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
-import { selectAssets } from '../../store/slices/assetsSlice';
+import { useGetQuery } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Badge from '../../components/ui/Badge';
 import { StatCardSkeleton } from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
@@ -38,9 +39,10 @@ function fmtDate(str) {
 const FILTERS = ['All', 'Active', 'Expiring', 'Expired'];
 
 export default function WarrantiesPage() {
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const { data: allAssets = [], isFetching } = useGetQuery({ path: '/assets', params: { propertyId } }, { skip: !propertyId });
   const [loading, setLoading] = useState(true);
   const [filter,  setFilter]  = useState('All');
-  const allAssets = useSelector(selectAssets);
 
   useEffect(() => {
     const t = setTimeout(() => setLoading(false), 750);

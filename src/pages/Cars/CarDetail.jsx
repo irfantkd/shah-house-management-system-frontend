@@ -1,27 +1,47 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Edit, AlertCircle, Fuel, Gauge, FileText,
-  Camera, ChevronLeft, ChevronRight, Trash2, Plus,
+  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, Wrench, BarChart2,
 } from 'lucide-react';
-import { selectCarById, addCarImage, removeCarImage } from '../../store/slices/carsSlice';
+import { useGetQuery, usePutMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Badge   from '../../components/ui/Badge';
 import Button  from '../../components/ui/Button';
 import { cn }  from '../../utils/cn';
 import toast   from 'react-hot-toast';
-import OverviewTab  from './tabs/OverviewTab';
-import ExpensesTab  from './tabs/ExpensesTab';
-import FuelTab      from './tabs/FuelTab';
-import DocumentsTab from './tabs/DocumentsTab';
+import OverviewTab     from './tabs/OverviewTab';
+import ExpensesTab     from './tabs/ExpensesTab';
+import FuelTab         from './tabs/FuelTab';
+import DocumentsTab    from './tabs/DocumentsTab';
+import MaintenanceTab  from './tabs/MaintenanceTab';
+import StatsTab        from './tabs/StatsTab';
 
 const TABS = [
-  { id: 'overview',  label: 'Overview',  icon: Car      },
-  { id: 'expenses',  label: 'Expenses',  icon: Gauge    },
-  { id: 'fuel',      label: 'Fuel Log',  icon: Fuel     },
-  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'overview',     label: 'Overview',     icon: Car       },
+  { id: 'expenses',     label: 'Expenses',     icon: Gauge     },
+  { id: 'fuel',         label: 'Fuel Log',     icon: Fuel      },
+  { id: 'maintenance',  label: 'Maintenance',  icon: Wrench    },
+  { id: 'stats',        label: 'Stats',        icon: BarChart2 },
+  { id: 'documents',    label: 'Documents',    icon: FileText  },
 ];
+
+const INP_E = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white';
+
+function parseMakeModelYear(input) {
+  const tokens = (input || '').trim().split(/\s+/);
+  const last = tokens[tokens.length - 1] ?? '';
+  if (/^(19|20)\d{2}$/.test(last) && tokens.length > 1) {
+    const year = parseInt(last, 10);
+    const rest = tokens.slice(0, -1);
+    return { make: rest[0] ?? '', model: rest.slice(1).join(' ') || rest[0] || '', year };
+  }
+  return { make: tokens[0] ?? '', model: tokens.slice(1).join(' ') || tokens[0] || '', year: new Date().getFullYear() };
+}
+const LBL_E = 'block text-[10.5px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider';
+const CAR_CATS = ['SUV', 'Sedan', 'Sports', 'Pickup', 'Van', 'Minivan', 'Luxury', 'Other'];
 
 const getDays    = (d) => Math.ceil((new Date(d) - new Date()) / 86400000);
 const regStatus  = (expiry) => {
@@ -32,16 +52,21 @@ const regStatus  = (expiry) => {
 };
 
 export default function CarDetail() {
-  const { id }    = useParams();
-  const navigate  = useNavigate();
-  const dispatch  = useDispatch();
-  const fileRef   = useRef(null);
+  const { id }      = useParams();
+  const navigate    = useNavigate();
+  const propertyId  = useSelector(selectCurrentPropertyId);
+  const fileRef     = useRef(null);
 
-  const [tab,    setTab]    = useState('overview');
-  const [imgIdx, setImgIdx] = useState(0);
+  const [tab,         setTab]        = useState('overview');
+  const [imgIdx,      setImgIdx]     = useState(0);
+  const [showEdit,    setShowEdit]   = useState(false);
+  const [editForm,    setEditForm]   = useState({});
+  const [localImages, setLocalImages] = useState([]);
 
-  const car = useSelector(selectCarById(id));
+  const { data: car, isLoading } = useGetQuery({ path: `/cars/${id}` });
+  const [updateCarMut] = usePutMutation();
 
+  if (isLoading) return null;
   if (!car) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center gap-3">
       <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
@@ -55,7 +80,8 @@ export default function CarDetail() {
   const reg     = regStatus(car.registrationExpiry);
   const ins     = regStatus(car.insuranceExpiry);
   const regDays = getDays(car.registrationExpiry);
-  const images  = car.images ?? [];
+  const backendImages = car.images ?? [];
+  const images  = [...backendImages, ...localImages];
   const activeIdx = Math.min(imgIdx, Math.max(images.length - 1, 0));
   const activeImg = images[activeIdx] ?? null;
 
@@ -65,7 +91,7 @@ export default function CarDetail() {
     if (!file.type.startsWith('image/')) return toast.error('Please select an image file');
     const reader = new FileReader();
     reader.onloadend = () => {
-      dispatch(addCarImage({ carId: car.id, imageUrl: reader.result }));
+      setLocalImages((prev) => [...prev, reader.result]);
       setImgIdx(0);
       toast.success('Photo added');
     };
@@ -75,13 +101,41 @@ export default function CarDetail() {
 
   const handleRemove = (index, e) => {
     e.stopPropagation();
-    dispatch(removeCarImage({ carId: car.id, index }));
+    if (index < backendImages.length) { toast.error('Cannot remove synced photos here'); return; }
+    setLocalImages((prev) => prev.filter((_, i) => i !== index - backendImages.length));
     setImgIdx(0);
     toast.success('Photo removed');
   };
 
   const prevImg = () => setImgIdx((i) => (i - 1 + images.length) % images.length);
   const nextImg = () => setImgIdx((i) => (i + 1) % images.length);
+
+  const startEdit = () => {
+    setEditForm({
+      makeModel: [car.make, car.model, car.year].filter(Boolean).join(' '),
+      category: car.category ?? '', nickname: car.nickname ?? '',
+      plateNumber: car.plateNumber ?? '', color: car.color ?? '',
+      colorName: car.colorName ?? '', odometer: car.odometer ?? 0,
+      driverName: car.driverName ?? '', driverContact: car.driverContact ?? '',
+      registrationExpiry: car.registrationExpiry ?? '',
+      insuranceExpiry: car.insuranceExpiry ?? '',
+    });
+    setShowEdit(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editForm.makeModel?.trim())   { toast.error('Make & model is required'); return; }
+    if (!editForm.plateNumber?.trim()) { toast.error('Plate number is required'); return; }
+    const { make, model, year } = parseMakeModelYear(editForm.makeModel);
+    const { makeModel, ...rest } = editForm;
+    try {
+      await updateCarMut({ path: `/cars/${id}`, body: { ...rest, make, model, year, odometer: +editForm.odometer } }).unwrap();
+      toast.success(`${make} ${model} updated`);
+      setShowEdit(false);
+    } catch (err) { toast.error(err.data?.error || 'Failed to update vehicle'); }
+  };
+
+  const setF = (k, v) => setEditForm((f) => ({ ...f, [k]: v }));
 
   return (
     <div className="space-y-5">
@@ -167,6 +221,7 @@ export default function CarDetail() {
               </div>
               <div className="shrink-0">
                 <Button variant="outline" size="sm" icon={Edit}
+                  onClick={startEdit}
                   className="border-white/20! text-white! hover:bg-white/10!">
                   Edit Vehicle
                 </Button>
@@ -240,11 +295,93 @@ export default function CarDetail() {
 
       {/* ── Tab Content ── */}
       <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-        {tab === 'overview'  && <OverviewTab  car={car} />}
-        {tab === 'expenses'  && <ExpensesTab  carId={car.id} />}
-        {tab === 'fuel'      && <FuelTab      carId={car.id} />}
-        {tab === 'documents' && <DocumentsTab car={car} />}
+        {tab === 'overview'    && <OverviewTab    car={car} />}
+        {tab === 'expenses'    && <ExpensesTab    carId={car.id} />}
+        {tab === 'fuel'        && <FuelTab        carId={car.id} />}
+        {tab === 'maintenance' && <MaintenanceTab carId={car.id} />}
+        {tab === 'stats'       && <StatsTab       carId={car.id} />}
+        {tab === 'documents'   && <DocumentsTab   car={car} />}
       </motion.div>
+
+      {/* ── Edit Vehicle Modal ── */}
+      {showEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowEdit(false)} />
+          <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 flex items-center justify-between"
+              style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+              <div>
+                <p className="text-white font-bold text-[16px]">Edit Vehicle</p>
+                <p className="text-white/50 text-[12px]">{car.make} {car.model} · {car.plateNumber}</p>
+              </div>
+              <button onClick={() => setShowEdit(false)}
+                className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+            {/* Form */}
+            <div className="p-6 overflow-y-auto max-h-[65vh]">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className={LBL_E}>Make & Model *</label>
+                  <input value={editForm.makeModel ?? ''} onChange={(e) => setF('makeModel', e.target.value)} className={INP_E} placeholder="e.g. Land Rover Range Rover 2024" />
+                </div>
+                <div>
+                  <label className={LBL_E}>Category</label>
+                  <select value={editForm.category} onChange={(e) => setF('category', e.target.value)} className={INP_E}>
+                    {CAR_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={LBL_E}>Plate Number *</label>
+                  <input value={editForm.plateNumber} onChange={(e) => setF('plateNumber', e.target.value)} className={INP_E} placeholder="e.g. B 12345" />
+                </div>
+                <div>
+                  <label className={LBL_E}>Nickname</label>
+                  <input value={editForm.nickname} onChange={(e) => setF('nickname', e.target.value)} className={INP_E} placeholder="e.g. Family Cruiser" />
+                </div>
+                <div>
+                  <label className={LBL_E}>Color Name</label>
+                  <input value={editForm.colorName} onChange={(e) => setF('colorName', e.target.value)} className={INP_E} placeholder="e.g. Pearl White" />
+                </div>
+                <div>
+                  <label className={LBL_E}>Odometer (km)</label>
+                  <input type="number" min="0" value={editForm.odometer} onChange={(e) => setF('odometer', e.target.value)} className={INP_E} />
+                </div>
+                <div>
+                  <label className={LBL_E}>Driver Name</label>
+                  <input value={editForm.driverName} onChange={(e) => setF('driverName', e.target.value)} className={INP_E} placeholder="Driver's full name" />
+                </div>
+                <div>
+                  <label className={LBL_E}>Driver Contact</label>
+                  <input value={editForm.driverContact} onChange={(e) => setF('driverContact', e.target.value)} className={INP_E} placeholder="+971 50 …" />
+                </div>
+                <div>
+                  <label className={LBL_E}>Registration Expiry</label>
+                  <input type="date" value={editForm.registrationExpiry} onChange={(e) => setF('registrationExpiry', e.target.value)} className={INP_E} />
+                </div>
+                <div>
+                  <label className={LBL_E}>Insurance Expiry</label>
+                  <input type="date" value={editForm.insuranceExpiry} onChange={(e) => setF('insuranceExpiry', e.target.value)} className={INP_E} />
+                </div>
+              </div>
+            </div>
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end">
+              <button onClick={() => setShowEdit(false)}
+                className="px-5 py-2.5 rounded-xl text-[13px] font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-all">
+                Cancel
+              </button>
+              <button onClick={handleEditSave}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all"
+                style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                <Save className="w-3.5 h-3.5" /> Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

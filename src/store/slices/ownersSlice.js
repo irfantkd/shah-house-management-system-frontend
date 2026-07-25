@@ -1,34 +1,53 @@
-import { createSlice } from '@reduxjs/toolkit';
-import { mockOwners } from '../../data/mockOwners';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '../../services/api';
+
+export const fetchOwners = createAsyncThunk('owners/fetchAll', async (params) => {
+  const { data } = await api.get('/owners', { params });
+  return data.data;
+});
+
+export const addOwner = createAsyncThunk('owners/add', async (payload, { getState }) => {
+  const pid = getState().properties?.currentId;
+  const { data } = await api.post('/owners', { ...payload, propertyId: pid });
+  return data.data;
+});
+
+export const updateOwner = createAsyncThunk('owners/update', async ({ id, ...payload }) => {
+  const { data } = await api.put(`/owners/${id}`, payload);
+  return data.data;
+});
+
+export const deleteOwner = createAsyncThunk('owners/delete', async (id) => {
+  await api.delete(`/owners/${id}`);
+  return id;
+});
 
 const ownersSlice = createSlice({
   name: 'owners',
-  initialState: { items: mockOwners },
-  reducers: {
-    addOwner: (state, { payload }) => {
-      state.items.push({ id: `own-${Date.now()}`, notes: '', ...payload });
-    },
-    updateOwner: (state, { payload }) => {
-      const i = state.items.findIndex((o) => o.id === payload.id);
-      if (i !== -1) state.items[i] = { ...state.items[i], ...payload };
-    },
-    deleteOwner: (state, { payload }) => {
-      state.items = state.items.filter((o) => o.id !== payload);
-    },
+  initialState: { items: [], status: 'idle' },
+  reducers: {},
+  extraReducers: (b) => {
+    b.addCase(fetchOwners.fulfilled,  (state, { payload }) => { state.items = payload; })
+     .addCase(addOwner.fulfilled,    (state, { payload }) => { state.items.push(payload); })
+     .addCase(updateOwner.fulfilled, (state, { payload }) => {
+       const i = state.items.findIndex((o) => o.id === payload.id);
+       if (i !== -1) state.items[i] = payload;
+     })
+     .addCase(deleteOwner.fulfilled, (state, { payload: id }) => {
+       state.items = state.items.filter((o) => o.id !== id);
+     });
   },
 });
 
-export const { addOwner, updateOwner, deleteOwner } = ownersSlice.actions;
+const pid = (s) => s.properties?.currentId;
 
-const pid = (s) => s.properties?.currentId ?? 'prop-default';
-
-export const selectOwners = (s) => (s.owners.items ?? []).filter((o) => (o.propertyId || 'prop-default') === pid(s));
+export const selectOwners = (s) => (s.owners.items ?? []).filter((o) => o.propertyId === pid(s));
 
 export const selectOwnerBirthdays = (s) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return (s.owners.items ?? [])
-    .filter((o) => o.dateOfBirth && (o.propertyId || 'prop-default') === pid(s))
+    .filter((o) => o.dateOfBirth && o.propertyId === pid(s))
     .map((o) => {
       const dob  = new Date(o.dateOfBirth);
       const yr   = today.getFullYear();

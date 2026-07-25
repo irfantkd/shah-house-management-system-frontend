@@ -1,18 +1,27 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, UserPlus, Wallet, Cake, Phone, CalendarDays, BadgeCheck,
   ChevronDown, ChevronUp, Pencil, Banknote, Clock, CheckCircle2,
-  AlertCircle, Car, Home, Trash2, ArrowDownLeft, ArrowRight, X,
+  AlertCircle, Trash2, ArrowDownLeft, ArrowRight, X, FileText, AlertTriangle,
 } from 'lucide-react';
-import {
-  selectEmployees, selectUpcomingBirthdays,
-  addEmployee, updateEmployee, deleteEmployee, recordSalaryPayment,
-} from '../../store/slices/employeesSlice';
-import { selectVehicleWallet, selectHomeWallet, deductFromWallet, LOW_BALANCE_THRESHOLD } from '../../store/slices/walletSlice';
+import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
+import { downloadSalaryPDF } from '../../utils/pdfReport';
 import toast from 'react-hot-toast';
+
+const LOW_BALANCE_THRESHOLD = 5000;
+
+const daysUntilBirthday = (dob) => {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const d = new Date(dob);
+  const yr = today.getFullYear();
+  let next = new Date(yr, d.getMonth(), d.getDate());
+  if (next < today) next = new Date(yr + 1, d.getMonth(), d.getDate());
+  return Math.round((next - today) / 86_400_000);
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const PALETTES = [
@@ -49,7 +58,7 @@ const EMP_BLANK = {
   dateOfBirth: '', joinDate: new Date().toISOString().split('T')[0],
   monthlySalary: '', status: 'active', notes: '',
 };
-const PAY_BLANK = { month: CUR_MON, amount: '', wallet: 'home', notes: '' };
+const PAY_BLANK = { month: CUR_MON, amount: '', wallet: 'salary', notes: '' };
 const INP = 'w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-[14px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all';
 const SEL = `${INP} cursor-pointer`;
 
@@ -102,7 +111,7 @@ function EmployeeCard({ emp, bday, onEdit, onDelete, onPay, isHistOpen, onToggle
           <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
             style={{ background:'#f59e0b', boxShadow:'0 2px 8px rgba(245,158,11,0.5)', zIndex:10 }}>
             <Cake className="w-3 h-3" />
-            {bday.daysUntilBirthday === 0 ? '🎉 Today!' : `${bday.daysUntilBirthday} days`}
+            {bday.daysUntilBirthday === 0 ? 'Today!' : `${bday.daysUntilBirthday} days`}
           </div>
         )}
 
@@ -136,7 +145,7 @@ function EmployeeCard({ emp, bday, onEdit, onDelete, onPay, isHistOpen, onToggle
         </div>
 
         {/* Edit / delete — hover reveal */}
-        <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
+        <div className="absolute bottom-3.5 right-4 flex gap-1.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
           <button onClick={onEdit}
             className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/15 border border-white/10 transition-all">
             <Pencil className="w-3.5 h-3.5" />
@@ -248,7 +257,7 @@ function EmployeeCard({ emp, bday, onEdit, onDelete, onPay, isHistOpen, onToggle
                       <div key={p.id} className="flex items-center gap-2 py-2 px-3 rounded-xl bg-slate-50">
                         <div className="flex-1 min-w-0">
                           <p className="text-[12px] font-bold text-slate-700">{p.type === 'salary' ? fmtMonth(p.month) : `Advance — ${fmtDate(p.paidOn)}`}</p>
-                          <p className="text-[10px] text-slate-400">{p.wallet === 'vehicle' ? 'Vehicle' : 'Home'} Wallet · {fmtDate(p.paidOn)}</p>
+                          <p className="text-[10px] text-slate-400">Salary Wallet · {fmtDate(p.paidOn)}</p>
                         </div>
                         <p className="text-[13px] font-bold text-slate-800 tabular-nums shrink-0">AED {fmtAmt(p.amount)}</p>
                       </div>
@@ -266,13 +275,19 @@ function EmployeeCard({ emp, bday, onEdit, onDelete, onPay, isHistOpen, onToggle
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function EmployeesPage() {
-  const dispatch      = useDispatch();
-  const employees     = useSelector(selectEmployees);
-  const birthdays     = useSelector(selectUpcomingBirthdays);
-  const vehicleWallet = useSelector(selectVehicleWallet);
-  const homeWallet    = useSelector(selectHomeWallet);
+  const propertyId = useSelector(selectCurrentPropertyId);
 
-  const [empDrawer,  setEmpDrawer]  = useState(null);   // null | 'add' | emp-obj
+  const { data: employees    = [] }             = useGetQuery({ path: '/employees',      params: { propertyId } }, { skip: !propertyId });
+  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const salaryWallet = { balance: walletData?.salary?.balance ?? 0 };
+
+  const [addEmployeeMut]    = usePostMutation();
+  const [updateEmployeeMut] = usePutMutation();
+  const [deleteEmployeeMut] = useDeleteMutation();
+  const [paymentMut]        = usePostMutation();
+  const [deductWalletMut]   = usePostMutation();
+
+  const [empDrawer,  setEmpDrawer]  = useState(null);
   const [payModal,   setPayModal]   = useState(null);
   const [delConfirm, setDelConfirm] = useState(null);
   const [historyId,  setHistoryId]  = useState(null);
@@ -282,56 +297,60 @@ export default function EmployeesPage() {
   const setEF = (k, v) => setEmpForm((f) => ({ ...f, [k]: v }));
   const setPF = (k, v) => setPayForm((f) => ({ ...f, [k]: v }));
 
+  const birthdays = useMemo(() =>
+    employees
+      .filter((e) => e.dateOfBirth)
+      .map((e) => ({ ...e, daysUntilBirthday: daysUntilBirthday(e.dateOfBirth) }))
+      .filter((e) => e.daysUntilBirthday <= 7)
+      .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday),
+    [employees]);
+
   const active         = employees.filter((e) => e.status === 'active');
   const monthlyPayroll = active.reduce((s, e) => s + Number(e.monthlySalary), 0);
-  const unpaidList     = active.filter((e) => !e.salaryHistory.some((p) => p.type === 'salary' && p.month === CUR_MON));
+  const unpaidList     = active.filter((e) => !e.salaryHistory?.some((p) => p.type === 'salary' && p.month === CUR_MON));
 
   const openAdd  = ()    => { setEmpForm(EMP_BLANK); setEmpDrawer('add'); };
   const openEdit = (emp) => { setEmpForm({ ...emp, monthlySalary: String(emp.monthlySalary) }); setEmpDrawer(emp); };
   const openPay  = (emp) => { setPayForm({ ...PAY_BLANK, amount: String(emp.monthlySalary) }); setPayModal(emp); };
 
-  const handleSaveEmp = (e) => {
+  const handleSaveEmp = async (e) => {
     e.preventDefault();
     if (!empForm.name.trim() || !empForm.dateOfBirth || !empForm.monthlySalary)
       return toast.error('Fill all required fields');
-    if (empDrawer === 'add') {
-      dispatch(addEmployee({ ...empForm, monthlySalary: Number(empForm.monthlySalary) }));
-      toast.success(`${empForm.name} added`);
-    } else {
-      dispatch(updateEmployee({ ...empForm, id: empDrawer.id, monthlySalary: Number(empForm.monthlySalary) }));
-      toast.success('Employee updated');
-    }
-    setEmpDrawer(null);
+    try {
+      if (empDrawer === 'add') {
+        await addEmployeeMut({ path: '/employees', body: { ...empForm, propertyId, monthlySalary: Number(empForm.monthlySalary) } }).unwrap();
+        toast.success(`${empForm.name} added`);
+      } else {
+        await updateEmployeeMut({ path: `/employees/${empDrawer.id}`, body: { ...empForm, monthlySalary: Number(empForm.monthlySalary) } }).unwrap();
+        toast.success('Employee updated');
+      }
+      setEmpDrawer(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to save employee'); }
   };
 
-  const handleDelete = () => {
-    dispatch(deleteEmployee(delConfirm.id));
-    toast.success(`${delConfirm.name} removed`);
-    setDelConfirm(null);
+  const handleDelete = async () => {
+    try {
+      await deleteEmployeeMut({ path: `/employees/${delConfirm.id}` }).unwrap();
+      toast.success(`${delConfirm.name} removed`);
+      setDelConfirm(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to remove employee'); }
   };
 
-  const handlePaySalary = (e) => {
+  const handlePaySalary = async (e) => {
     e.preventDefault();
     if (!payForm.amount) return toast.error('Enter amount');
     const amt    = Number(payForm.amount);
-    const selW   = payForm.wallet === 'vehicle' ? vehicleWallet : homeWallet;
-    const wLabel = payForm.wallet === 'vehicle' ? 'Vehicle' : 'Home';
     const paidOn = new Date().toISOString().split('T')[0];
-    dispatch(recordSalaryPayment({
-      employeeId: payModal.id,
-      payment: { month: payForm.month, amount: amt, wallet: payForm.wallet, paidOn, notes: payForm.notes },
-    }));
-    dispatch(deductFromWallet({
-      wallet: payForm.wallet, amount: amt,
-      description: `${payModal.name} — ${fmtMonth(payForm.month)} Salary`,
-      date: paidOn, category: 'Salary',
-    }));
-    const after = selW.balance - amt;
-    if (after < LOW_BALANCE_THRESHOLD)
-      toast(`${wLabel} wallet low: AED ${fmtAmt(Math.max(0, after))}`, { icon: '⚠️' });
-    else
+    try {
+      await Promise.all([
+        paymentMut({ path: `/employees/${payModal.id}/payments`, body: { month: payForm.month, amount: amt, wallet: 'salary', paidOn, notes: payForm.notes, type: 'salary' } }).unwrap(),
+        deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: 'salary', amount: amt, description: `Salary — ${payModal.name}`, date: paidOn, category: 'Salary' } }).unwrap(),
+      ]);
+      await refetchWallet();
       toast.success(`AED ${fmtAmt(amt)} paid to ${payModal.name}`);
-    setPayModal(null);
+      setPayModal(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to record payment'); }
   };
 
   return (
@@ -351,11 +370,18 @@ export default function EmployeesPage() {
               <p className="text-[12px] text-slate-400">Shah House · {active.length} active · {employees.length} total</p>
             </div>
           </div>
-          <button onClick={openAdd}
-            className="flex items-center gap-2 px-5 h-10 rounded-2xl text-[13px] font-bold text-white hover:opacity-90 active:scale-[0.97] transition-all"
-            style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow:'0 4px 14px rgba(11,29,58,0.3)' }}>
-            <UserPlus className="w-4 h-4" /> Add Employee
-          </button>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => downloadSalaryPDF({ employees, salaryWallet, periodLabel: new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), propertyName: 'Shah House', propertyType: 'Villa' })}
+              className="flex items-center gap-2 px-4 h-10 rounded-2xl text-[13px] font-bold text-slate-700 border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] transition-all">
+              <FileText className="w-4 h-4" /> Salary Report
+            </button>
+            <button onClick={openAdd}
+              className="flex items-center gap-2 px-5 h-10 rounded-2xl text-[13px] font-bold text-white hover:opacity-90 active:scale-[0.97] transition-all"
+              style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow:'0 4px 14px rgba(11,29,58,0.3)' }}>
+              <UserPlus className="w-4 h-4" /> Add Employee
+            </button>
+          </div>
         </motion.div>
 
         {/* ── Birthday banner ── */}
@@ -378,7 +404,7 @@ export default function EmployeesPage() {
                       </div>
                       <span className="text-[14px] font-bold text-amber-950">{emp.name}</span>
                       <span className="text-[12px] text-amber-600">
-                        {emp.daysUntilBirthday === 0 ? '— 🎉 Today!' : emp.daysUntilBirthday === 1 ? '— Tomorrow' : `— in ${emp.daysUntilBirthday} days`}
+                        {emp.daysUntilBirthday === 0 ? '— Today!' : emp.daysUntilBirthday === 1 ? '— Tomorrow' : `— in ${emp.daysUntilBirthday} days`}
                       </span>
                     </div>
                   ))}
@@ -637,44 +663,37 @@ export default function EmployeesPage() {
                     </div>
                   </div>
 
-                  {/* Wallet selector */}
+                  {/* Salary wallet info */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Deduct from Wallet</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { k:'vehicle', label:'Vehicle Wallet', icon:Car,  bal:vehicleWallet.balance, color:'#0b1d3a', bg:'#eef2fb' },
-                        { k:'home',    label:'Home Wallet',    icon:Home, bal:homeWallet.balance,    color:'#16a34a', bg:'#f0fdf4' },
-                      ].map(({ k, label, icon:Icon, bal, color, bg }) => (
-                        <button key={k} type="button" onClick={() => setPF('wallet', k)}
-                          className="flex flex-col gap-1.5 p-3 rounded-2xl border-2 text-left transition-all"
-                          style={payForm.wallet === k ? { borderColor:color, background:bg } : { borderColor:'#e2e8f0', background:'#f8fafc' }}>
-                          <div className="flex items-center gap-1.5">
-                            <Icon className="w-3.5 h-3.5" style={{ color: payForm.wallet === k ? color : '#94a3b8' }} />
-                            <span className="text-[11px] font-bold truncate" style={{ color: payForm.wallet === k ? color : '#64748b' }}>{label}</span>
-                            {payForm.wallet === k && (
-                              <span className="ml-auto shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-black" style={{ background:color }}>✓</span>
-                            )}
-                          </div>
-                          <p className="text-[15px] font-bold" style={{ color: payForm.wallet === k ? color : '#94a3b8' }}>
-                            AED {fmtAmt(bal)}
-                          </p>
-                        </button>
-                      ))}
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">Deducted From</label>
+                    <div className="flex items-center gap-3 p-3.5 rounded-2xl border-2"
+                      style={{ borderColor:'#7c3aed', background:'#f5f3ff' }}>
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background:'linear-gradient(135deg,#6d28d9,#7c3aed)' }}>
+                        <Wallet className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[13px] font-bold text-purple-700">Salary Wallet</p>
+                        <p className="text-[10px] text-purple-400">Dedicated employee salary fund</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[16px] font-black text-purple-700">AED {fmtAmt(salaryWallet.balance)}</p>
+                        <p className="text-[10px] text-purple-400">Available</p>
+                      </div>
                     </div>
                   </div>
 
                   {/* Balance after */}
-                  {(() => {
-                    const selW  = payForm.wallet === 'vehicle' ? vehicleWallet : homeWallet;
-                    const after = selW.balance - (Number(payForm.amount) || 0);
-                    return Number(payForm.amount) > 0 ? (
+                  {Number(payForm.amount) > 0 && (() => {
+                    const after = salaryWallet.balance - Number(payForm.amount);
+                    return (
                       <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
                         <span className="text-[12px] text-slate-500">Balance after payment</span>
                         <span className={`text-[14px] font-black ${after < 0 ? 'text-red-600' : after < LOW_BALANCE_THRESHOLD ? 'text-amber-600' : 'text-emerald-600'}`}>
                           AED {fmtAmt(Math.max(0, after))}
                         </span>
                       </div>
-                    ) : null;
+                    );
                   })()}
 
                   <div>

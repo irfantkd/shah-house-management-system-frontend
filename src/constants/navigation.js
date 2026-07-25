@@ -6,20 +6,22 @@ import {
   RiBox3Line,
   RiCarLine,
   RiBuildingLine,
+  RiBuilding4Line,
   RiFileList3Line,
   RiCalendarCheckLine,
   RiHistoryLine,
   RiShieldCheckLine,
   RiBankCardLine,
   RiWalletLine,
-  RiFolderOpenLine,
   RiCalendarLine,
   RiBellLine,
-  RiPhoneLine,
   RiSettingsLine,
   RiToolsLine,
   RiTeamLine,
   RiVipCrownLine,
+  RiShieldUserLine,
+  RiStackLine,
+  RiExchangeLine,
 } from 'react-icons/ri';
 
 export const NAV_GROUPS = [
@@ -32,10 +34,12 @@ export const NAV_GROUPS = [
   {
     label: 'Property',
     items: [
-      { label: 'Home Information', icon: RiHome4Line,    path: '/home-info' },
-      { label: 'Areas & Rooms',    icon: RiMapPin2Line,  path: '/areas'     },
-      { label: 'Assets',           icon: RiBox3Line,     path: '/assets'    },
-      { label: 'Fleet / Cars',     icon: RiCarLine,      path: '/cars'      },
+      { label: 'Properties',       icon: RiBuilding4Line, path: '/properties' },
+      { label: 'Home Information', icon: RiHome4Line,     path: '/home-info'  },
+      { label: 'Floors',           icon: RiStackLine,     path: '/floors'     },
+      { label: 'Areas & Rooms',    icon: RiMapPin2Line,   path: '/areas'      },
+      { label: 'Assets',           icon: RiBox3Line,      path: '/assets'     },
+      { label: 'Fleet / Cars',     icon: RiCarLine,       path: '/cars'       },
     ],
   },
   {
@@ -53,9 +57,9 @@ export const NAV_GROUPS = [
     items: [
       { label: 'History',    icon: RiHistoryLine,          path: '/history'    },
       { label: 'Warranties', icon: RiShieldCheckLine,      path: '/warranties' },
-      { label: 'Wallet',     icon: RiWalletLine,           path: '/wallet'     },
-      { label: 'Expenses',   icon: RiBankCardLine,         path: '/expenses'   },
-      { label: 'Documents',  icon: RiFolderOpenLine,       path: '/documents'  },
+      { label: 'Wallet',       icon: RiWalletLine,    path: '/wallet'        },
+      { label: 'Transactions', icon: RiExchangeLine,  path: '/transactions'  },
+      { label: 'Expenses',     icon: RiBankCardLine,  path: '/expenses'      },
       { label: 'Calendar',   icon: RiCalendarLine,         path: '/calendar'   },
       { label: 'Letterhead', icon: RiPrinterLine,          path: '/letterhead' },
     ],
@@ -63,9 +67,9 @@ export const NAV_GROUPS = [
   {
     label: 'System',
     items: [
-      { label: 'Notifications', icon: RiBellLine,     path: '/notifications' },
-      { label: 'Emergency',     icon: RiPhoneLine,    path: '/emergency'     },
-      { label: 'Settings',      icon: RiSettingsLine, path: '/settings'      },
+      { label: 'Notifications', icon: RiBellLine,      path: '/notifications'           },
+      { label: 'Users',         icon: RiShieldUserLine, path: '/users', adminOnly: true },
+      { label: 'Settings',      icon: RiSettingsLine,  path: '/settings'                },
     ],
   },
 ];

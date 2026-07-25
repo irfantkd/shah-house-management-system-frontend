@@ -1,6 +1,6 @@
-﻿import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -9,9 +9,8 @@ import {
   RiShieldLine, RiMoneyDollarCircleLine, RiCheckLine, RiCakeLine, RiTeamLine,
   RiVipCrownLine,
 } from 'react-icons/ri';
-import { selectNotifications, selectUnreadCount, markRead, markAllRead, dismissNotification } from '../../store/slices/notificationsSlice';
-import { selectUpcomingBirthdays } from '../../store/slices/employeesSlice';
-import { selectOwnerBirthdays }    from '../../store/slices/ownersSlice';
+import { useGetQuery, usePatchMutation, useDeleteMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { NOTIF_TYPE_CFG } from '../../data/mockNotifications';
 import { cn } from '../../utils/cn';
 
@@ -46,22 +45,86 @@ function fmtAgo(iso) {
   return `${Math.floor(hr / 24)}d ago`;
 }
 
+const daysUntilBirthday = (dob) => {
+  const now  = new Date();
+  const bd   = new Date(dob);
+  const next = new Date(now.getFullYear(), bd.getMonth(), bd.getDate());
+  if (next < now) next.setFullYear(next.getFullYear() + 1);
+  return Math.round((next - now) / 86400000);
+};
+const nextBirthdayDate = (dob) => {
+  const now  = new Date();
+  const bd   = new Date(dob);
+  const next = new Date(now.getFullYear(), bd.getMonth(), bd.getDate());
+  if (next < now) next.setFullYear(next.getFullYear() + 1);
+  return next.toISOString();
+};
+
 const TYPES = ['all', 'maintenance', 'repair', 'warranty', 'contract', 'payment', 'info'];
 
 export default function NotificationsPage() {
-  const dispatch  = useDispatch();
-  const all       = useSelector(selectNotifications);
-  const unread    = useSelector(selectUnreadCount);
-  const birthdays      = useSelector(selectUpcomingBirthdays);
-  const ownerBirthdays = useSelector(selectOwnerBirthdays);
+  const propertyId = useSelector(selectCurrentPropertyId);
+
+  const { data: all = [] }       = useGetQuery({ path: '/notifications', params: { propertyId } }, { skip: !propertyId });
+  const { data: employees = [] } = useGetQuery({ path: '/employees',     params: { propertyId } }, { skip: !propertyId });
+  const { data: owners = [] }    = useGetQuery({ path: '/owners',        params: { propertyId } }, { skip: !propertyId });
+
+  const [markReadMut]    = usePatchMutation();
+  const [markAllReadMut] = usePatchMutation();
+  const [dismissMut]     = useDeleteMutation();
+
   const [tab,      setTab]      = useState('all');
   const [showRead, setShowRead] = useState(true);
+
+  const unread = all.filter((n) => !n.read).length;
+
+  const birthdays = useMemo(() =>
+    employees
+      .filter((e) => e.dateOfBirth)
+      .map((e) => ({ ...e, daysUntilBirthday: daysUntilBirthday(e.dateOfBirth), nextBirthday: nextBirthdayDate(e.dateOfBirth) }))
+      .filter((e) => e.daysUntilBirthday <= 7)
+      .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday),
+    [employees]);
+
+  const ownerBirthdays = useMemo(() =>
+    owners
+      .filter((o) => o.dateOfBirth)
+      .map((o) => ({ ...o, daysUntilBirthday: daysUntilBirthday(o.dateOfBirth), nextBirthday: nextBirthdayDate(o.dateOfBirth) }))
+      .filter((o) => o.daysUntilBirthday <= 7)
+      .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday),
+    [owners]);
 
   const filtered = all.filter((n) => {
     if (tab !== 'all' && n.type !== tab) return false;
     if (!showRead && n.read) return false;
     return true;
   });
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markAllReadMut({ path: '/notifications/mark-all-read', body: { propertyId } }).unwrap();
+      toast.success('All marked as read');
+    } catch {
+      toast.error('Failed to mark all read');
+    }
+  };
+
+  const handleMarkRead = async (id) => {
+    try {
+      await markReadMut({ path: `/notifications/${id}`, body: { read: true } }).unwrap();
+    } catch {
+      toast.error('Failed to mark read');
+    }
+  };
+
+  const handleDismiss = async (id) => {
+    try {
+      await dismissMut({ path: `/notifications/${id}` }).unwrap();
+      toast.success('Notification dismissed');
+    } catch {
+      toast.error('Failed to dismiss');
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="max-w-3xl mx-auto space-y-6">
@@ -77,11 +140,11 @@ export default function NotificationsPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-navy-900 tracking-tight">Notifications</h1>
-            <p className="text-[13px] text-slate-400 mt-0.5">{unread > 0 ? `${unread} unread` : 'All caught up'} Â· {all.length} total</p>
+            <p className="text-[13px] text-slate-400 mt-0.5">{unread > 0 ? `${unread} unread` : 'All caught up'} · {all.length} total</p>
           </div>
         </div>
         {unread > 0 && (
-          <button onClick={() => { dispatch(markAllRead()); toast.success('All marked as read'); }}
+          <button onClick={handleMarkAllRead}
             className="flex items-center gap-2 px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white text-[13px] font-semibold rounded-xl transition-all">
             <RiCheckDoubleLine className="w-4 h-4" />Mark All Read
           </button>
@@ -136,7 +199,7 @@ export default function NotificationsPage() {
                     </div>
                     <div className="text-right shrink-0">
                       {emp.daysUntilBirthday === 0
-                        ? <span className="text-[12px] font-black text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl">🎉 Today!</span>
+                        ? <span className="text-[12px] font-black text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl">Today!</span>
                         : emp.daysUntilBirthday === 1
                           ? <span className="text-[12px] font-bold text-amber-700">Tomorrow</span>
                           : <span className="text-[12px] font-bold text-amber-700">In {emp.daysUntilBirthday} days</span>}
@@ -175,7 +238,7 @@ export default function NotificationsPage() {
                     </div>
                     <div className="text-right shrink-0">
                       {own.daysUntilBirthday === 0
-                        ? <span className="text-[12px] font-black text-violet-700 bg-violet-100 px-2.5 py-1 rounded-xl">🎉 Today!</span>
+                        ? <span className="text-[12px] font-black text-violet-700 bg-violet-100 px-2.5 py-1 rounded-xl">Today!</span>
                         : own.daysUntilBirthday === 1
                           ? <span className="text-[12px] font-bold text-violet-700">Tomorrow</span>
                           : <span className="text-[12px] font-bold text-violet-700">In {own.daysUntilBirthday} days</span>}
@@ -202,8 +265,8 @@ export default function NotificationsPage() {
             {filtered.map((n, i) => (
               <motion.div key={n.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 40, scale: 0.95 }} transition={{ delay: i * 0.03 }}>
                 <NotifCard notif={n}
-                  onMarkRead={() => dispatch(markRead(n.id))}
-                  onDismiss={() => { dispatch(dismissNotification(n.id)); toast.success('Notification dismissed'); }}
+                  onMarkRead={() => handleMarkRead(n.id)}
+                  onDismiss={() => handleDismiss(n.id)}
                 />
               </motion.div>
             ))}

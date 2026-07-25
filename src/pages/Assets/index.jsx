@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -13,10 +13,15 @@ import {
   RiPlugLine, RiLeafLine, RiSofaLine, RiLightbulbLine,
   RiBuildingLine, RiContrastDropLine,
   RiCheckboxCircleLine, RiTimerLine, RiCloseCircleLine, RiCloseLine,
-  RiArrowDownSLine, RiArrowLeftLine, RiBuilding2Line, RiAttachmentLine,
+  RiArrowLeftLine, RiAttachmentLine,
 } from 'react-icons/ri';
-import { selectAssets, addAsset, updateAsset, deleteAsset } from '../../store/slices/assetsSlice';
-import { selectAreas } from '../../store/slices/areasSlice';
+import {
+  BedDouble, ShowerHead, UtensilsCrossed, Sofa, Utensils,
+  TreeDeciduous, Waves, Car, Briefcase, Package, Wrench,
+  Wind, Sun, MapPin,
+} from 'lucide-react';
+import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { Field, Input, Select, Textarea, FormGrid, FormSection, FormActions } from '../../components/ui/FormField';
@@ -57,57 +62,113 @@ const STATUS_FILTER_MAP = { 'All': null, 'Operational': 'operational', 'Service 
 function daysUntil(d) { return d ? Math.ceil((new Date(d + 'T00:00:00') - new Date()) / 86400000) : null; }
 function fmtDate(s) { return s ? new Date(s + 'T00:00:00').toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
 
+const PAGE_SIZE = 12;
+
 export default function AssetsPage() {
-  const dispatch       = useDispatch();
-  const assets         = useSelector(selectAssets);
-  const areas          = useSelector(selectAreas);
-  const [search,       setSearch]     = useState('');
-  const [catFilt,      setCatFilt]    = useState('All');
-  const [statusFilt,   setStatusFilt] = useState('All');
-  const [view,         setView]       = useState('grid');
-  const [modal,        setModal]        = useState(null);   // null | 'add' | asset object (edit)
+  const propertyId = useSelector(selectCurrentPropertyId);
+
+  // ── Filters (sent to backend) ──────────────────────────────────────────────
+  const [searchInput,  setSearchInput]  = useState('');
+  const [search,       setSearch]       = useState('');
+  const [catFilt,      setCatFilt]      = useState('All');
+  const [statusFilt,   setStatusFilt]   = useState('All');
+  const [view,         setView]         = useState('grid');
+  const [page,         setPage]         = useState(1);
+  const [modal,        setModal]        = useState(null);
   const [delTarget,    setDelTarget]    = useState(null);
-  const [assignTarget, setAssignTarget] = useState(null);  // single-asset assign
-  const [bulkAssign,   setBulkAssign]   = useState(false); // bulk assign modal
+  const [assignTarget, setAssignTarget] = useState(null);
+  const [bulkAssign,   setBulkAssign]   = useState(false);
 
-  const filtered = assets.filter((a) => {
-    const q   = search.toLowerCase();
-    const ms  = a.name.toLowerCase().includes(q) || (a.brand ?? '').toLowerCase().includes(q) || (a.areaName ?? '').toLowerCase().includes(q);
-    const mc  = catFilt === 'All' || a.category === catFilt;
-    const sv  = STATUS_FILTER_MAP[statusFilt];
-    const mst = !sv || a.status === sv;
-    return ms && mc && mst;
-  });
+  // Debounce search input → API param
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  const cats         = [...new Set(assets.map((a) => a.category))];
-  const warningCount = assets.filter((a) => { const d = daysUntil(a.warranty?.expiryDate); return d !== null && d >= 0 && d < 90; }).length;
-  const totalValue   = assets.reduce((s, a) => s + (a.currentValue ?? a.purchasePrice ?? 0), 0);
-  const needService  = assets.filter((a) => a.status === 'service-due' || a.status === 'under-repair').length;
-  const unassigned   = assets.filter((a) => !a.areaId).length;
+  // Reset page when any filter changes
+  useEffect(() => { setPage(1); }, [search, catFilt, statusFilt]);
 
-  const handleSave = (data) => {
-    if (modal !== 'add') {
-      dispatch(updateAsset({ ...modal, ...data }));
-      toast.success('Asset updated!');
-    } else {
-      dispatch(addAsset(data));
-      toast.success('Asset added!');
-    }
-    setModal(null);
+  // ── Build API params ───────────────────────────────────────────────────────
+  const catParam    = catFilt !== 'All'    ? catFilt                        : undefined;
+  const statusParam = statusFilt !== 'All' ? STATUS_FILTER_MAP[statusFilt]  : undefined;
+  const assetParams = {
+    propertyId,
+    page,
+    limit: PAGE_SIZE,
+    ...(search      && { search   : search      }),
+    ...(catParam    && { category : catParam    }),
+    ...(statusParam && { status   : statusParam }),
   };
 
-  const handleAssignArea = (asset, areaId) => {
+  // Paginated list — response shape: { items, total, page, pages, limit }
+  const { data: assetsResult = {} } = useGetQuery(
+    { path: '/assets', params: assetParams },
+    { skip: !propertyId },
+  );
+  const assets     = assetsResult.items  ?? [];
+  const totalPages = assetsResult.pages  ?? 1;
+  const totalCount = assetsResult.total  ?? 0;
+
+  // All areas (for assign modal + modal area dropdown)
+  const { data: areas = [] } = useGetQuery({ path: '/areas', params: { propertyId } }, { skip: !propertyId });
+
+  // Stats from backend (total, unassigned, etc.)
+  const { data: assetStats = {} } = useGetQuery({ path: '/assets/stats', params: { propertyId } }, { skip: !propertyId });
+
+  // All assets unfiltered — needed only for BulkAssign modal (shows full list for selection)
+  const { data: allAssetsFlat = [] } = useGetQuery(
+    { path: '/assets', params: { propertyId } },
+    { skip: !propertyId },
+  );
+
+  const [addAssetMut]    = usePostMutation();
+  const [updateAssetMut] = usePutMutation();
+  const [deleteAssetMut] = useDeleteMutation();
+
+  // Stats from backend
+  const unassigned      = assetStats.unassigned       ?? 0;
+  const warningCount    = assetStats.warrantiesExpiring ?? 0;
+  const totalValue      = assetStats.totalValue        ?? 0;
+  const needService     = assetStats.needService       ?? 0;
+  const overallTotal    = assetStats.total             ?? 0;
+
+  const handleSave = async (data) => {
+    try {
+      if (modal !== 'add') {
+        await updateAssetMut({
+          path: `/assets/${modal.id}`,
+          body: { ...modal, ...data, warranty: { ...modal.warranty, ...data.warranty } },
+        }).unwrap();
+        toast.success('Asset updated!');
+      } else {
+        await addAssetMut({ path: '/assets', body: { ...data, propertyId } }).unwrap();
+        toast.success('Asset added!');
+      }
+      setModal(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to save'); }
+  };
+
+  const handleAssignArea = async (asset, areaId) => {
     const area = areas.find((a) => a.id === areaId);
-    dispatch(updateAsset({ ...asset, areaId: areaId || '', areaName: area?.name || '' }));
-    toast.success(areaId ? `Assigned to ${area?.name}` : 'Unassigned from area');
-    setAssignTarget(null);
+    try {
+      await updateAssetMut({
+        path: `/assets/${asset.id}`,
+        body: { ...asset, areaId: areaId || null, areaName: area?.name || '' },
+      }).unwrap();
+      toast.success(areaId ? `Assigned to ${area?.name}` : 'Unassigned from area');
+      setAssignTarget(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to assign'); }
   };
 
-  const handleBulkAssign = (area, selectedAssetIds) => {
-    const toAssign = assets.filter((a) => selectedAssetIds.has(a.id));
-    toAssign.forEach((a) => dispatch(updateAsset({ ...a, areaId: area.id, areaName: area.name })));
-    toast.success(`${toAssign.length} asset${toAssign.length !== 1 ? 's' : ''} assigned to ${area.name}`);
-    setBulkAssign(false);
+  const handleBulkAssign = async (area, selectedAssetIds) => {
+    const toAssign = allAssetsFlat.filter((a) => selectedAssetIds.has(a.id));
+    try {
+      await Promise.all(toAssign.map((a) =>
+        updateAssetMut({ path: `/assets/${a.id}`, body: { ...a, areaId: area.id, areaName: area.name } }).unwrap(),
+      ));
+      toast.success(`${toAssign.length} asset${toAssign.length !== 1 ? 's' : ''} assigned to ${area.name}`);
+      setBulkAssign(false);
+    } catch (err) { toast.error(err.data?.error || 'Failed to assign'); }
   };
 
   return (
@@ -117,7 +178,7 @@ export default function AssetsPage() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Assets</h1>
-          <p className="text-[13px] text-slate-400 mt-0.5">{assets.length} assets · {unassigned} unassigned</p>
+          <p className="text-[13px] text-slate-400 mt-0.5">{overallTotal} assets · {unassigned} unassigned</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setBulkAssign(true)}
@@ -132,10 +193,10 @@ export default function AssetsPage() {
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Assets',       value: assets.length,                         icon: RiBox3Line,    color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
-          { label: 'Total Value',        value: `AED ${totalValue.toLocaleString()}`,  icon: RiBankCardLine,color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
-          { label: 'Warranties Expiring',value: warningCount,                          icon: RiAlertLine,   color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
-          { label: 'Need Service',       value: needService,                           icon: RiToolsLine,   color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
+          { label: 'Total Assets',        value: overallTotal,                          icon: RiBox3Line,    color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+          { label: 'Total Value',         value: `AED ${totalValue.toLocaleString()}`,  icon: RiBankCardLine,color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+          { label: 'Warranties Expiring', value: warningCount,                          icon: RiAlertLine,   color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+          { label: 'Need Service',        value: needService,                           icon: RiToolsLine,   color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
             className="bg-white rounded-2xl p-5 border" style={{ borderColor: s.border, boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
@@ -155,8 +216,8 @@ export default function AssetsPage() {
           <p className="text-[13px] font-semibold flex-1" style={{ color: '#0b1d3a' }}>
             {unassigned} asset{unassigned !== 1 ? 's' : ''} not yet assigned to an area.
           </p>
-          <button onClick={() => setStatusFilt('All')} className="text-[12px] font-bold hover:underline" style={{ color: '#1d4ed8' }}>
-            Show all →
+          <button onClick={() => setBulkAssign(true)} className="text-[12px] font-bold hover:underline" style={{ color: '#1d4ed8' }}>
+            Assign now →
           </button>
         </div>
       )}
@@ -165,7 +226,7 @@ export default function AssetsPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search assets, brand, area…"
+          <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search assets, brand, area…"
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-[13px] placeholder-slate-400 outline-none transition-all"
             onFocus={(e) => (e.currentTarget.style.boxShadow = '0 0 0 2px #93c5fd')}
             onBlur={(e) => (e.currentTarget.style.boxShadow = '')} />
@@ -185,7 +246,7 @@ export default function AssetsPage() {
       {/* ── Category pills ── */}
       <div className="space-y-2">
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {['All', ...cats].map((cat) => {
+          {['All', ...ASSET_CATS].map((cat) => {
             const m = catMeta(cat);
             const active = catFilt === cat;
             return (
@@ -222,17 +283,28 @@ export default function AssetsPage() {
         </div>
       </div>
 
+      {/* ── Result count when filtering ── */}
+      {(search || catFilt !== 'All' || statusFilt !== 'All') && totalCount > 0 && (
+        <p className="text-[12px] text-slate-500 font-medium -mt-2">
+          {totalCount} result{totalCount !== 1 ? 's' : ''} found
+        </p>
+      )}
+
       {/* ── Empty state ── */}
-      {filtered.length === 0 ? (
+      {assets.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
           <RiBox3Line className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-          <p className="font-semibold text-slate-400">No assets found</p>
-          <button onClick={() => setModal('add')} className="mt-3 text-[13px] font-semibold hover:underline" style={{ color: '#2563eb' }}>+ Add first asset</button>
+          <p className="font-semibold text-slate-400">
+            {search || catFilt !== 'All' || statusFilt !== 'All' ? 'No assets match your filters' : 'No assets yet'}
+          </p>
+          {!(search || catFilt !== 'All' || statusFilt !== 'All') && (
+            <button onClick={() => setModal('add')} className="mt-3 text-[13px] font-semibold hover:underline" style={{ color: '#2563eb' }}>+ Add first asset</button>
+          )}
         </div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           <AnimatePresence mode="popLayout">
-            {filtered.map((a, i) => (
+            {assets.map((a, i) => (
               <motion.div key={a.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ delay: i * 0.04 }}>
                 <AssetCard asset={a} areas={areas}
                   onEdit={() => setModal(a)}
@@ -244,9 +316,9 @@ export default function AssetsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
-          {filtered.map((a, i) => (
+          {assets.map((a, i) => (
             <AssetRow key={a.id} asset={a}
-              last={i === filtered.length - 1}
+              last={i === assets.length - 1}
               onEdit={() => setModal(a)}
               onDelete={() => setDelTarget(a)}
               onAssign={() => setAssignTarget(a)} />
@@ -254,20 +326,43 @@ export default function AssetsPage() {
         </div>
       )}
 
+      {/* ── Pagination ── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+            className={cn('w-9 h-9 rounded-xl border flex items-center justify-center transition-all text-slate-500',
+              page === 1 ? 'opacity-40 cursor-not-allowed border-slate-200' : 'hover:bg-slate-50 border-slate-200')}>
+            <RiArrowLeftLine className="w-4 h-4" />
+          </button>
+          <span className="text-[13px] font-semibold text-slate-600">Page {page} of {totalPages}</span>
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className={cn('w-9 h-9 rounded-xl border flex items-center justify-center transition-all text-slate-500',
+              page === totalPages ? 'opacity-40 cursor-not-allowed border-slate-200' : 'hover:bg-slate-50 border-slate-200')}>
+            <RiArrowRightLine className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* ── Modals ── */}
-      <AssetModal open={modal !== null} asset={modal !== 'add' ? modal : null}
+      <AssetModal open={modal !== null} asset={modal !== 'add' ? modal : null} areas={areas}
         onClose={() => setModal(null)} onSave={handleSave} />
 
       <AssignAreaModal open={!!assignTarget} asset={assignTarget} areas={areas}
         onClose={() => setAssignTarget(null)}
         onAssign={(areaId) => handleAssignArea(assignTarget, areaId)} />
 
-      <BulkAssignModal open={bulkAssign} areas={areas} assets={assets}
+      <BulkAssignModal open={bulkAssign} areas={areas} assets={allAssetsFlat}
         onClose={() => setBulkAssign(false)}
         onAssign={handleBulkAssign} />
 
       <ConfirmDialog open={!!delTarget} onClose={() => setDelTarget(null)}
-        onConfirm={() => { dispatch(deleteAsset(delTarget.id)); toast.success('Asset deleted'); setDelTarget(null); }}
+        onConfirm={async () => {
+          try {
+            await deleteAssetMut({ path: `/assets/${delTarget.id}` }).unwrap();
+            toast.success('Asset deleted');
+            setDelTarget(null);
+          } catch (err) { toast.error(err.data?.error || 'Failed to delete'); }
+        }}
         title="Delete Asset" message={`Delete "${delTarget?.name}"? This cannot be undone.`} />
     </motion.div>
   );
@@ -292,14 +387,9 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
         className="relative px-5 pt-4 pb-4 overflow-hidden"
         style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
 
-        {/* Category accent bar at very top */}
         <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:cm.color, opacity:0.85 }} />
-
-        {/* Decorative rings */}
         <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
         <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none' }} />
-
-        {/* Ghost watermark */}
         <div style={{
           position:'absolute', right:12, bottom:-6,
           fontSize:68, fontWeight:900, lineHeight:1,
@@ -310,14 +400,12 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
           {a.name.substring(0,4).toUpperCase()}
         </div>
 
-        {/* Status badge — top right */}
         <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
           style={{ background: sm.bg, color: sm.color, zIndex:10 }}>
           <sm.icon className="w-3 h-3" />
           {sm.label}
         </div>
 
-        {/* Category icon + name row — fully inside header */}
         <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
           <div
             className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center"
@@ -336,7 +424,6 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
           </div>
         </div>
 
-        {/* Edit / delete — hover reveal */}
         <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
           <button onClick={onEdit}
             className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/15 border border-white/10 transition-all">
@@ -434,7 +521,6 @@ function AssetRow({ asset: a, last, onEdit, onDelete, onAssign }) {
         style={{ background: sm.bg, color: sm.color }}>
         <sm.icon className="w-3 h-3" />{sm.label}
       </span>
-      {/* Area badge */}
       {hasArea ? (
         <Link to={`/areas/${a.areaId}`}
           className="hidden lg:inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 hover:opacity-80"
@@ -451,14 +537,14 @@ function AssetRow({ asset: a, last, onEdit, onDelete, onAssign }) {
       <span className="hidden md:block text-[12px] font-bold shrink-0" style={{ color: '#0b1d3a' }}>
         AED {(a.currentValue ?? a.purchasePrice ?? 0).toLocaleString()}
       </span>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-        <button onClick={onEdit} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
+      <div className="flex items-center gap-1 shrink-0">
+        <button onClick={onEdit} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all sm:opacity-0 sm:group-hover:opacity-100">
           <RiEditLine className="w-3.5 h-3.5" />
         </button>
-        <button onClick={onDelete} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
+        <button onClick={onDelete} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all sm:opacity-0 sm:group-hover:opacity-100">
           <RiDeleteBinLine className="w-3.5 h-3.5" />
         </button>
-        <Link to={`/assets/${a.id}`} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all">
+        <Link to={`/assets/${a.id}`} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all sm:opacity-0 sm:group-hover:opacity-100">
           <RiArrowRightLine className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -466,8 +552,8 @@ function AssetRow({ asset: a, last, onEdit, onDelete, onAssign }) {
   );
 }
 
-/* ═══ Add / Edit Asset Modal — NO area field on Add ═══ */
-function AssetModal({ open, onClose, asset, onSave }) {
+/* ═══ Add / Edit Asset Modal ═══ */
+function AssetModal({ open, onClose, asset, onSave, areas }) {
   const { register, handleSubmit, reset } = useForm();
   const isEdit = !!asset;
 
@@ -480,13 +566,15 @@ function AssetModal({ open, onClose, asset, onSave }) {
       status: asset.status ?? 'operational',
       purchaseDate: asset.purchaseDate ?? '', purchasePrice: asset.purchasePrice ?? '',
       currentValue: asset.currentValue ?? '', notes: asset.notes ?? '',
+      areaId: asset.areaId ?? '',
       wProvider: asset.warranty?.provider ?? '', wPhone: asset.warranty?.phone ?? '',
       wType: asset.warranty?.type ?? 'Parts & Labor',
       wStart: asset.warranty?.startDate ?? '', wExpiry: asset.warranty?.expiryDate ?? '',
-    } : { condition: 'good', status: 'operational', wType: 'Parts & Labor' });
+    } : { condition: 'good', status: 'operational', wType: 'Parts & Labor', areaId: '' });
   }, [open, asset]);
 
   const onSubmit = (d) => {
+    const assignedArea = areas.find((a) => a.id === d.areaId);
     onSave({
       name: d.name, category: d.category,
       brand: d.brand ?? '', model: d.model ?? '',
@@ -496,6 +584,8 @@ function AssetModal({ open, onClose, asset, onSave }) {
       purchasePrice: parseFloat(d.purchasePrice) || 0,
       currentValue: parseFloat(d.currentValue) || 0,
       notes: d.notes ?? '',
+      areaId:   d.areaId   || null,
+      areaName: assignedArea?.name || '',
       warranty: {
         provider: d.wProvider ?? '', phone: d.wPhone ?? '', type: d.wType ?? '',
         startDate: d.wStart ?? '', expiryDate: d.wExpiry ?? '',
@@ -506,7 +596,7 @@ function AssetModal({ open, onClose, asset, onSave }) {
   return (
     <Modal open={open} onClose={onClose} size="lg"
       title={isEdit ? 'Edit Asset' : 'Add New Asset'}
-      subtitle={isEdit ? 'Update asset details' : 'Enter asset details — assign to an area afterwards'}>
+      subtitle={isEdit ? 'Update asset details' : 'Enter asset details and assign to an area'}>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <FormGrid>
           <Field label="Asset Name" required>
@@ -532,6 +622,19 @@ function AssetModal({ open, onClose, asset, onSave }) {
               options={CONDITIONS.map((c) => ({ value: c, label: c.charAt(0).toUpperCase() + c.slice(1) }))} />
           </Field>
         </FormGrid>
+
+        {/* Area assignment — available for both add and edit */}
+        <Field label="Assign to Area">
+          <Select {...register('areaId')}
+            options={[
+              { value: '', label: 'Not assigned' },
+              ...areas.map((a) => ({
+                value: a.id,
+                label: a.floorName ? `${a.name} · ${a.floorName}` : a.name,
+              })),
+            ]} />
+        </Field>
+
         <FormSection title="Make & Model">
           <FormGrid>
             <Field label="Brand"><Input {...register('brand')} placeholder="e.g. Daikin" /></Field>
@@ -558,16 +661,6 @@ function AssetModal({ open, onClose, asset, onSave }) {
           </FormGrid>
         </FormSection>
         <Field label="Notes"><Textarea {...register('notes')} rows={2} placeholder="Additional notes…" /></Field>
-
-        {/* Area note (not a field) */}
-        {!isEdit && (
-          <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl" style={{ background: '#f0f5ff', border: '1px solid #c7d7f5' }}>
-            <RiMapPin2Line className="w-4 h-4 mt-0.5 shrink-0" style={{ color: '#2563eb' }} />
-            <p className="text-[12px] text-slate-600">
-              <strong className="text-slate-800">Area assignment</strong> — After adding the asset, use the <strong>"Assign to Area"</strong> button on the card to assign it to a room.
-            </p>
-          </div>
-        )}
 
         <FormActions onCancel={onClose} submitLabel={isEdit ? 'Update Asset' : 'Add Asset'} />
       </form>
@@ -618,7 +711,6 @@ function AssignAreaModal({ open, onClose, asset, areas, onAssign }) {
             </div>
 
             <div className="p-5 space-y-2">
-              {/* Unassign option */}
               <button onClick={() => setSelected('')}
                 className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all',
                   selected === '' ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:bg-slate-50')}>
@@ -644,7 +736,7 @@ function AssignAreaModal({ open, onClose, asset, areas, onAssign }) {
                         <RiMapPin2Line className="w-4 h-4 shrink-0" style={{ color: isActive ? '#2563eb' : '#94a3b8' }} />
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-semibold text-slate-800 truncate">{area.name}</p>
-                          {area.floor && <p className="text-[11px] text-slate-400">{area.floor}</p>}
+                          {area.floorName && <p className="text-[11px] text-slate-400">{area.floorName}</p>}
                         </div>
                         {isActive && <RiCheckboxCircleLine className="w-5 h-5 shrink-0" style={{ color: '#2563eb' }} />}
                       </button>
@@ -672,27 +764,31 @@ function AssignAreaModal({ open, onClose, asset, areas, onAssign }) {
 }
 
 /* ═══ Bulk Assign Modal — Step 1: pick area, Step 2: pick assets ═══ */
-const TYPE_EMOJI = {
-  Bedroom:'🛏️', Bathroom:'🚿', Kitchen:'🍳', 'Living Room':'🛋️', 'Dining Room':'🍽️',
-  Garden:'🌿', 'Pool Area':'🏊', Garage:'🚗', Office:'💼', Storage:'📦',
-  Utility:'🔧', Balcony:'🏠', Roof:'☀️', Other:'📍',
+const TYPE_ICON = {
+  Bedroom: BedDouble, Bathroom: ShowerHead, Kitchen: UtensilsCrossed,
+  'Living Room': Sofa, 'Dining Room': Utensils, Garden: TreeDeciduous,
+  'Pool Area': Waves, Garage: Car, Office: Briefcase, Storage: Package,
+  Utility: Wrench, Balcony: Wind, Roof: Sun, Other: MapPin,
 };
-const typeEmoji = (t) => TYPE_EMOJI[t] ?? '📍';
+function AreaTypeIcon({ type, className }) {
+  const Icon = TYPE_ICON[type] ?? MapPin;
+  return <Icon className={className ?? 'w-5 h-5 text-white'} strokeWidth={1.5} />;
+}
 
 function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
-  const [step,          setStep]          = useState(1);
-  const [selectedArea,  setSelectedArea]  = useState(null);
-  const [selectedIds,   setSelectedIds]   = useState(new Set());
-  const [areaSearch,    setAreaSearch]    = useState('');
-  const [assetSearch,   setAssetSearch]   = useState('');
+  const [step,         setStep]         = useState(1);
+  const [selectedArea, setSelectedArea] = useState(null);
+  const [selectedIds,  setSelectedIds]  = useState(new Set());
+  const [areaSearch,   setAreaSearch]   = useState('');
+  const [assetSearch,  setAssetSearch]  = useState('');
 
   useEffect(() => {
     if (!open) { setStep(1); setSelectedArea(null); setSelectedIds(new Set()); setAreaSearch(''); setAssetSearch(''); }
   }, [open]);
 
-  const filteredAreas  = areas.filter((a) =>
+  const filteredAreas = areas.filter((a) =>
     a.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
-    (a.floor ?? '').toLowerCase().includes(areaSearch.toLowerCase()),
+    (a.floorName ?? '').toLowerCase().includes(areaSearch.toLowerCase()),
   );
 
   const filteredAssets = assets.filter((a) =>
@@ -757,7 +853,6 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                 </button>
               </div>
 
-              {/* Step indicator */}
               <div className="flex items-center gap-2">
                 {[1, 2].map((s) => (
                   <div key={s} className="flex items-center gap-2">
@@ -776,7 +871,7 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                 {selectedArea && step === 2 && (
                   <span className="ml-auto flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full"
                     style={{ background: '#f0f5ff', color: '#0b1d3a' }}>
-                    {typeEmoji(selectedArea.type)} {selectedArea.name}
+                    <AreaTypeIcon type={selectedArea.type} className="w-3.5 h-3.5" style={{ color: '#0b1d3a' }} /> {selectedArea.name}
                   </span>
                 )}
               </div>
@@ -810,14 +905,13 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                           : { background: '#fff', borderColor: '#e2e8f0' }}
                         onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = '#f8fafc'; }}
                         onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = '#fff'; }}>
-                        {/* Area emoji */}
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                           style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
-                          {typeEmoji(area.type)}
+                          <AreaTypeIcon type={area.type} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[14px] font-semibold text-slate-800 truncate">{area.name}</p>
-                          <p className="text-[11px] text-slate-400">{area.floor ?? '—'} · {areaAssetCount} asset{areaAssetCount !== 1 ? 's' : ''} currently</p>
+                          <p className="text-[11px] text-slate-400">{area.floorName ?? '—'} · {areaAssetCount} asset{areaAssetCount !== 1 ? 's' : ''} currently</p>
                         </div>
                         {isActive
                           ? <RiCheckboxCircleLine className="w-5 h-5 shrink-0" style={{ color: '#2563eb' }} />
@@ -879,7 +973,6 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                         onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
                         onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = '#fff'; }}>
 
-                        {/* Checkbox */}
                         <div className="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all"
                           style={isSelected ? { background: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1' }}>
                           {isSelected && (
@@ -889,12 +982,10 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                           )}
                         </div>
 
-                        {/* Category icon */}
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: cm.bg }}>
                           <cm.icon className="w-4 h-4" style={{ color: cm.color }} />
                         </div>
 
-                        {/* Info */}
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-semibold text-slate-800 truncate">{asset.name}</p>
                           <p className="text-[11px] text-slate-400 truncate">
@@ -902,13 +993,12 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                           </p>
                         </div>
 
-                        {/* Current area badge */}
                         {alreadyHere ? (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: '#f0fdf4', color: '#16a34a' }}>
                             Already here
                           </span>
                         ) : asset.areaId ? (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 truncate max-w-[80px]"
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 truncate max-w-20"
                             style={{ background: '#fff7ed', color: '#c2410c' }}>
                             {asset.areaName}
                           </span>

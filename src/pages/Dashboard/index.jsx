@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -6,32 +6,31 @@ import {
   RiFileList3Line, RiToolsLine, RiAlertLine, RiCalendarCheckLine,
   RiArrowRightLine, RiArrowRightSLine, RiMapPin2Line, RiBuildingLine,
   RiArrowUpLine, RiArrowDownLine, RiBellLine, RiBox3Line,
-  RiShieldCheckLine, RiHome4Line, RiDropLine, RiLeafLine,
-  RiBankCardLine, RiTimeLine, RiCheckboxCircleLine, RiAddLine,
+  RiHome4Line, RiBankCardLine, RiTimeLine, RiCheckboxCircleLine, RiAddLine,
   RiUploadCloudLine, RiHammerLine, RiCarLine, RiGasStationLine,
+  RiUserLine,
 } from 'react-icons/ri';
-import { selectContracts } from '../../store/slices/contractsSlice';
-import { selectTasks } from '../../store/slices/tasksSlice';
-import { selectAssets } from '../../store/slices/assetsSlice';
-import { selectAreas } from '../../store/slices/areasSlice';
-import { selectAuthUser } from '../../store/slices/authSlice';
-import { selectCars, selectCarExpenses, selectFuelLogs as selectFleetFuel } from '../../store/slices/carsSlice';
-import { selectExpenses } from '../../store/slices/expensesSlice';
-import { selectVehicleWallet, selectHomeWallet, LOW_BALANCE_THRESHOLD } from '../../store/slices/walletSlice';
-import { EXPENSE_CATEGORIES, PROPERTY_CATS, HOUSEHOLD_CATS } from '../../data/mockExpenses';
-import { selectUnreadCount } from '../../store/slices/notificationsSlice';
+import {
+  BedDouble, ShowerHead, UtensilsCrossed, Sofa, Utensils,
+  TreeDeciduous, Waves, Car, Briefcase, Package, Wrench,
+  Wind, Sun, MapPin,
+} from 'lucide-react';
+import { useGetQuery } from '../../api/apiSlice';
+import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
+import { selectAuthUser }           from '../../store/slices/authSlice';
 import Badge from '../../components/ui/Badge';
 import { cn } from '../../utils/cn';
+
+const LOW_BALANCE = 500;
 
 function fmtRelative(dateStr) {
   if (!dateStr) return '';
   const days = Math.floor((new Date() - new Date(dateStr + 'T00:00:00')) / 86400000);
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
+  if (days < 7)  return `${days}d ago`;
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-AE', { day: 'numeric', month: 'short' });
 }
-
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -39,7 +38,6 @@ function getGreeting() {
   return 'Good evening';
 }
 function getDaysUntil(d) { return Math.ceil((new Date(d) - new Date()) / 86400000); }
-function fmtDate(d) { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', weekday: 'short' }); }
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 18 },
@@ -59,167 +57,67 @@ const ACT_CFG = {
 };
 
 const TYPE_META = {
-  Bedroom:      { emoji: '🛏️', grad: 'linear-gradient(135deg,#1e3a8a,#312e81)', light: '#eff6ff', text: '#1d4ed8'  },
-  Bathroom:     { emoji: '🚿', grad: 'linear-gradient(135deg,#0e7490,#1d4ed8)', light: '#ecfeff', text: '#0891b2'  },
-  Kitchen:      { emoji: '🍳', grad: 'linear-gradient(135deg,#c2410c,#d97706)', light: '#fff7ed', text: '#c2410c'  },
-  'Living Room':{ emoji: '🛋️', grad: 'linear-gradient(135deg,#1d4ed8,#0b1d3a)', light: '#eff6ff', text: '#2563eb'  },
-  'Dining Room':{ emoji: '🍽️', grad: 'linear-gradient(135deg,#7c3aed,#4f46e5)', light: '#f5f3ff', text: '#7c3aed'  },
-  Garden:       { emoji: '🌿', grad: 'linear-gradient(135deg,#15803d,#16a34a)', light: '#f0fdf4', text: '#16a34a'  },
-  'Pool Area':  { emoji: '🏊', grad: 'linear-gradient(135deg,#0284c7,#06b6d4)', light: '#e0f2fe', text: '#0284c7'  },
-  Garage:       { emoji: '🚗', grad: 'linear-gradient(135deg,#475569,#334155)', light: '#f8fafc', text: '#475569'  },
-  Office:       { emoji: '💼', grad: 'linear-gradient(135deg,#6d28d9,#7c3aed)', light: '#f5f3ff', text: '#6d28d9'  },
-  Storage:      { emoji: '📦', grad: 'linear-gradient(135deg,#64748b,#475569)', light: '#f8fafc', text: '#64748b'  },
-  Utility:      { emoji: '🔧', grad: 'linear-gradient(135deg,#b45309,#d97706)', light: '#fffbeb', text: '#b45309'  },
-  Balcony:      { emoji: '🏠', grad: 'linear-gradient(135deg,#0f766e,#0d9488)', light: '#f0fdfa', text: '#0f766e'  },
-  Roof:         { emoji: '☀️', grad: 'linear-gradient(135deg,#d97706,#f59e0b)', light: '#fffbeb', text: '#d97706'  },
-  Other:        { emoji: '📍', grad: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', light: '#f0f5ff', text: '#0b1d3a'  },
+  Bedroom:      { Icon: BedDouble,       grad: 'linear-gradient(135deg,#1e3a8a,#312e81)', light: '#eff6ff', text: '#1d4ed8'  },
+  Bathroom:     { Icon: ShowerHead,      grad: 'linear-gradient(135deg,#0e7490,#1d4ed8)', light: '#ecfeff', text: '#0891b2'  },
+  Kitchen:      { Icon: UtensilsCrossed, grad: 'linear-gradient(135deg,#c2410c,#d97706)', light: '#fff7ed', text: '#c2410c'  },
+  'Living Room':{ Icon: Sofa,            grad: 'linear-gradient(135deg,#1d4ed8,#0b1d3a)', light: '#eff6ff', text: '#2563eb'  },
+  'Dining Room':{ Icon: Utensils,        grad: 'linear-gradient(135deg,#7c3aed,#4f46e5)', light: '#f5f3ff', text: '#7c3aed'  },
+  Garden:       { Icon: TreeDeciduous,   grad: 'linear-gradient(135deg,#15803d,#16a34a)', light: '#f0fdf4', text: '#16a34a'  },
+  'Pool Area':  { Icon: Waves,           grad: 'linear-gradient(135deg,#0284c7,#06b6d4)', light: '#e0f2fe', text: '#0284c7'  },
+  Garage:       { Icon: Car,             grad: 'linear-gradient(135deg,#475569,#334155)', light: '#f8fafc', text: '#475569'  },
+  Office:       { Icon: Briefcase,       grad: 'linear-gradient(135deg,#6d28d9,#7c3aed)', light: '#f5f3ff', text: '#6d28d9'  },
+  Storage:      { Icon: Package,         grad: 'linear-gradient(135deg,#64748b,#475569)', light: '#f8fafc', text: '#64748b'  },
+  Utility:      { Icon: Wrench,          grad: 'linear-gradient(135deg,#b45309,#d97706)', light: '#fffbeb', text: '#b45309'  },
+  Balcony:      { Icon: Wind,            grad: 'linear-gradient(135deg,#0f766e,#0d9488)', light: '#f0fdfa', text: '#0f766e'  },
+  Roof:         { Icon: Sun,             grad: 'linear-gradient(135deg,#d97706,#f59e0b)', light: '#fffbeb', text: '#d97706'  },
+  Other:        { Icon: MapPin,          grad: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', light: '#f0f5ff', text: '#0b1d3a'  },
 };
 const typeMeta = (t) => TYPE_META[t] ?? TYPE_META.Other;
 
-export default function Dashboard() {
-  const user        = useSelector(selectAuthUser);
-  const contracts   = useSelector(selectContracts);
-  const tasks = useSelector(selectTasks);
-  const assets      = useSelector(selectAssets);
-  const areas       = useSelector(selectAreas);
-  const unread      = useSelector(selectUnreadCount);
-  const cars          = useSelector(selectCars);
-  const fleetFuel     = useSelector(selectFleetFuel);
-  const allExpenses   = useSelector(selectExpenses);
-  const carExpenses   = useSelector(selectCarExpenses);
-  const vehicleWallet = useSelector(selectVehicleWallet);
-  const homeWallet    = useSelector(selectHomeWallet);
-  const [loading, setLoading] = useState(true);
+const EMPTY_DASH = { expenses: {}, home: {}, stats: {}, wallet: {}, upcomingSchedule: [], recentActivities: [], expiringContracts: [], areas: [], cars: [], healthScore: 0, fleetFuelMonth: 0 };
 
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 800); return () => clearTimeout(t); }, []);
+export default function Dashboard() {
+  const propertyId = useSelector(selectCurrentPropertyId);
+  const user       = useSelector(selectAuthUser);
+
+  const { data: dash = EMPTY_DASH, isLoading }    = useGetQuery({ path: '/dashboard',    params: { propertyId } }, { skip: !propertyId });
+  const { data: notifications = [] }              = useGetQuery({ path: '/notifications', params: { propertyId } }, { skip: !propertyId });
+
+  const unread = notifications.filter((n) => !n.read).length;
+  const loading = isLoading || !propertyId;
 
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Fleet helpers
-  const fleetCurM     = new Date().getMonth();
-  const fleetCurY     = new Date().getFullYear();
-  const fleetFuelMo   = fleetFuel
-    .filter((f) => { const d = new Date(f.date); return d.getMonth() === fleetCurM && d.getFullYear() === fleetCurY; })
-    .reduce((s, f) => s + f.totalPrice, 0);
-  const inCurMonth  = (d) => { const dt = new Date(d); return dt.getMonth() === fleetCurM && dt.getFullYear() === fleetCurY; };
-  const propTotal   = allExpenses.filter((e) => inCurMonth(e.date) && PROPERTY_CATS.has(e.category)).reduce((s, e) => s + e.amount, 0);
-  const houseTotal  = allExpenses.filter((e) => inCurMonth(e.date) && HOUSEHOLD_CATS.has(e.category)).reduce((s, e) => s + e.amount, 0);
-  const vehicleTotal = carExpenses.filter((e) => inCurMonth(e.date)).reduce((s, e) => s + e.amount, 0);
-  const grandTotal  = propTotal + houseTotal + vehicleTotal + fleetFuelMo;
+  // Expense segments from dashboard response
+  const { expenses, home, stats, wallet, upcomingSchedule, recentActivities, expiringContracts, areas, cars, healthScore, fleetFuelMonth } = dash;
 
-  const curMonthLabel = new Date(fleetCurY, fleetCurM, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const grandTotal = (expenses.property ?? 0) + (expenses.household ?? 0) + (expenses.vehicle ?? 0) + (expenses.fuel ?? 0);
 
   const dashExpSegs = [
-    { category: 'Property & Services', amount: propTotal,    color: '#2563eb' },
-    { category: 'Household & Daily',   amount: houseTotal,   color: '#16a34a' },
-    { category: 'Fleet — Vehicle',     amount: vehicleTotal, color: '#0b1d3a' },
-    { category: 'Fleet — Fuel',        amount: fleetFuelMo,  color: '#d97706' },
+    { category: 'Property & Services', amount: expenses.property ?? 0,  color: '#2563eb' },
+    { category: 'Household & Daily',   amount: expenses.household ?? 0, color: '#16a34a' },
+    { category: 'Fleet — Vehicle',     amount: expenses.vehicle ?? 0,   color: '#0b1d3a' },
+    { category: 'Fleet — Fuel',        amount: expenses.fuel ?? 0,      color: '#d97706' },
   ]
     .filter((s) => s.amount > 0)
     .map((s) => ({ ...s, percent: grandTotal > 0 ? Math.round((s.amount / grandTotal) * 100) : 0 }));
 
-  const carsAlertCount = cars.filter((c) => {
-    const d = Math.ceil((new Date(c.registrationExpiry) - new Date()) / 86400000);
-    return d <= 30;
-  }).length;
+  const curMonthLabel = useMemo(() => {
+    const [y, m] = (expenses.month ?? '').split('-');
+    if (!y || !m) return '';
+    return new Date(Number(y), Number(m) - 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  }, [expenses.month]);
 
-  // Derived schedule / activity / expiry from Redux
-  const upcomingSchedule = useMemo(() =>
-    tasks
-      .filter((t) => ['scheduled', 'overdue'].includes(t.status) && t.scheduledDate)
-      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
-      .slice(0, 6)
-      .map((t) => ({
-        id: t.id,
-        title: t.title,
-        date: t.scheduledDate,
-        company: t.companyName ?? '',
-        area: t.areaName ?? '',
-        type: t.category === 'Repair' ? 'repair' : 'maintenance',
-      })),
-  [tasks]);
+  const homeInsDays = home.insurance?.expiryDate ? getDaysUntil(home.insurance.expiryDate) : null;
 
-  const recentActivities = useMemo(() =>
-    tasks
-      .filter((t) => t.status === 'completed' && t.completedDate)
-      .sort((a, b) => (b.completedDate ?? '').localeCompare(a.completedDate ?? ''))
-      .slice(0, 5)
-      .map((t) => ({
-        id: t.id,
-        type: t.category === 'Repair' ? 'repair' : 'maintenance',
-        title: t.category === 'Repair' ? 'Repair Completed' : 'Maintenance Completed',
-        detail: `${t.title}${t.companyName ? ' — ' + t.companyName : ''}`,
-        time: fmtRelative(t.completedDate),
-      })),
-  [tasks]);
-
-  const expiringItems = useMemo(() =>
-    contracts
-      .filter((c) => { const d = getDaysUntil(c.endDate); return d >= 0 && d <= 60; })
-      .sort((a, b) => getDaysUntil(a.endDate) - getDaysUntil(b.endDate))
-      .slice(0, 4)
-      .map((c) => ({
-        id: c.id,
-        type: 'contract',
-        name: c.title,
-        company: c.companyName ?? '',
-        expiresIn: getDaysUntil(c.endDate),
-        status: getDaysUntil(c.endDate) <= 14 ? 'danger' : getDaysUntil(c.endDate) <= 30 ? 'warning' : 'info',
-      })),
-  [contracts]);
-
-  // Per-area asset count
-  const areaAssetCount = assets.reduce((m, a) => {
-    if (a.areaId) m[a.areaId] = (m[a.areaId] ?? 0) + 1;
-    return m;
-  }, {});
-
-  const stats = [
-    {
-      label: 'Active Contracts',
-      value: contracts.filter((c) => c.status === 'active').length,
-      icon: RiFileList3Line,
-      color: '#2563eb',
-      bg: '#eff6ff',
-      border: '#bfdbfe',
-      trend: '+2 this month',
-      up: true,
-      href: '/contracts',
-    },
-    {
-      label: 'Upcoming Maintenance',
-      value: tasks.filter((t) => t.category === 'Maintenance' && t.status === 'scheduled').length,
-      icon: RiCalendarCheckLine,
-      color: '#d97706',
-      bg: '#fffbeb',
-      border: '#fde68a',
-      trend: '3 due this week',
-      up: null,
-      href: '/maintenance',
-    },
-    {
-      label: 'Open Repairs',
-      value: tasks.filter((t) => t.category === 'Repair' && t.status !== 'completed').length,
-      icon: RiHammerLine,
-      color: '#dc2626',
-      bg: '#fef2f2',
-      border: '#fecaca',
-      trend: '1 critical',
-      up: false,
-      href: '/maintenance',
-    },
-    {
-      label: 'Total Assets',
-      value: assets.length,
-      icon: RiBox3Line,
-      color: '#0b1d3a',
-      bg: '#f0f5ff',
-      border: '#c7d7f5',
-      trend: `${areas.length || 10} areas tracked`,
-      up: true,
-      href: '/assets',
-    },
+  const stats4 = [
+    { label: 'Active Contracts',     value: stats.activeContracts,     icon: RiFileList3Line, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', trend: '+2 this month', up: true,  href: '/contracts'   },
+    { label: 'Upcoming Maintenance', value: stats.upcomingMaintenance, icon: RiCalendarCheckLine, color: '#d97706', bg: '#fffbeb', border: '#fde68a', trend: '3 due this week', up: null, href: '/maintenance' },
+    { label: 'Open Repairs',         value: stats.openRepairs,         icon: RiHammerLine,    color: '#dc2626', bg: '#fef2f2', border: '#fecaca', trend: '1 critical', up: false, href: '/maintenance' },
+    { label: 'Total Assets',         value: stats.totalAssets,         icon: RiBox3Line,      color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', trend: `${stats.totalAreas || 0} areas tracked`, up: true,  href: '/assets' },
   ];
+
+  const maxAreaCount = useMemo(() => Math.max(...areas.map((a) => a.assetCount ?? 0), 1), [areas]);
 
   if (loading) return <DashboardSkeleton />;
 
@@ -230,8 +128,6 @@ export default function Dashboard() {
       <motion.div {...fadeUp(0)}>
         <div className="relative overflow-hidden rounded-3xl p-7"
           style={{ background: 'linear-gradient(135deg, #0b1d3a 0%, #1e3a6e 55%, #0f2648 100%)' }}>
-
-          {/* Decorative elements */}
           <div className="absolute top-0 right-0 w-80 h-80 rounded-full opacity-[0.06]"
             style={{ background: 'radial-gradient(circle, #93c5fd, transparent)', transform: 'translate(30%, -30%)' }} />
           <div className="absolute bottom-0 left-1/2 w-64 h-64 rounded-full opacity-[0.04]"
@@ -246,34 +142,29 @@ export default function Dashboard() {
                 <RiHome4Line className="w-7 h-7 text-blue-300" />
               </div>
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] text-blue-300/60 font-bold uppercase tracking-[0.2em]">Property Management</span>
-                </div>
+                <span className="text-[10px] text-blue-300/60 font-bold uppercase tracking-[0.2em]">Property Management</span>
                 <h1 className="text-white font-bold text-2xl sm:text-3xl leading-tight tracking-tight">
                   {getGreeting()}, {user?.name?.split(' ')[0] ?? 'Welcome'} 👋
                 </h1>
                 <p className="text-blue-200/50 text-[13px] mt-0.5">{today}</p>
               </div>
             </div>
-
-            {/* Property badge */}
             <div className="shrink-0 flex items-center gap-3 px-5 py-3 rounded-2xl"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
               <div>
-                <p className="text-blue-100 font-bold text-[15px] leading-tight">Shah House</p>
-                <p className="text-blue-200/40 text-[11px]">Dubai, UAE · Villa Property</p>
+                <p className="text-blue-100 font-bold text-[15px] leading-tight">{home.name}</p>
+                <p className="text-blue-200/40 text-[11px]">{home.address?.city}, UAE · {home.type}</p>
               </div>
               <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/50 animate-pulse" />
             </div>
           </div>
 
-          {/* Quick action row */}
           <div className="relative z-10 flex flex-wrap gap-2.5 mt-6">
             {[
               { label: 'Schedule Maintenance', icon: RiCalendarCheckLine, to: '/maintenance' },
               { label: 'Report Repair',        icon: RiHammerLine,        to: '/maintenance' },
               { label: 'New Contract',         icon: RiFileList3Line,     to: '/contracts'   },
-              { label: 'Upload Document',      icon: RiUploadCloudLine,   to: '/documents'   },
+              { label: 'Print Letterhead',     icon: RiUploadCloudLine,   to: '/letterhead'  },
             ].map(({ label, icon: Icon, to }) => (
               <Link key={to} to={to}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold text-blue-100 transition-all"
@@ -289,14 +180,13 @@ export default function Dashboard() {
 
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s, i) => (
+        {stats4.map((s, i) => (
           <motion.div key={s.label} {...fadeUp(0.05 + i * 0.06)}>
             <Link to={s.href}>
               <div className="bg-white rounded-2xl p-5 border hover:shadow-md transition-all duration-200 cursor-pointer group"
                 style={{ borderColor: s.border, boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
                 <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: s.bg }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: s.bg }}>
                     <s.icon className="w-5 h-5" style={{ color: s.color }} />
                   </div>
                   {s.up !== null && (
@@ -314,34 +204,100 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ── Property Overview: horizontal scroll of area cards ── */}
+      {/* ── Home Information Card ── */}
+      <motion.div {...fadeUp(0.13)}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+          <div className="h-0.5" style={{ background: 'linear-gradient(90deg, transparent, #C9A227 30%, #C9A227 70%, transparent)' }} />
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                  <RiHome4Line className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-[14px] font-bold text-slate-800">{home.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{home.type}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="text-[10px] font-bold text-emerald-700">{home.status}</span>
+                  </div>
+                </div>
+              </div>
+              <Link to="/home-info" className="flex items-center gap-1 text-[12px] font-bold text-blue-600 hover:text-blue-700 shrink-0">
+                Full details <RiArrowRightLine className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Link to="/home-info" className="flex flex-col gap-1 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-1.5">
+                  <RiUserLine className="w-3 h-3 text-slate-500" />
+                  <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Owner</span>
+                </div>
+                <p className="text-[13px] font-bold text-slate-800 truncate">{home.owner?.title} {home.owner?.name}</p>
+                <p className="text-[11px] text-slate-400 truncate">{home.owner?.phone}</p>
+              </Link>
+              <Link to="/home-info" className="flex flex-col gap-1 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-1.5">
+                  <RiMapPin2Line className="w-3 h-3 text-blue-600" />
+                  <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Address</span>
+                </div>
+                <p className="text-[13px] font-bold text-slate-800 truncate">{home.address?.district}</p>
+                <p className="text-[11px] text-slate-400">{home.address?.city}, UAE</p>
+              </Link>
+              <Link to="/home-info" className="flex flex-col gap-1 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                <div className="flex items-center gap-1.5">
+                  <RiAddLine className="w-3 h-3 text-emerald-600" />
+                  <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Insurance</span>
+                </div>
+                <p className="text-[13px] font-bold text-slate-800 truncate">{home.insurance?.provider}</p>
+                {homeInsDays !== null && homeInsDays < 90 ? (
+                  <p className={cn('text-[11px] font-semibold', homeInsDays < 30 ? 'text-red-600' : 'text-amber-600')}>
+                    Expires in {homeInsDays}d
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-emerald-600 font-semibold">Active</p>
+                )}
+              </Link>
+              <div className="flex flex-col gap-1 p-3 rounded-xl bg-slate-50">
+                <div className="flex items-center gap-1.5">
+                  <RiBuildingLine className="w-3 h-3 text-slate-500" />
+                  <span className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Property</span>
+                </div>
+                <p className="text-[13px] font-bold text-slate-800">{home.bedrooms}BR · {home.bathrooms}BA</p>
+                <p className="text-[11px] text-slate-400">{home.size?.toLocaleString()}m² · Built {home.yearBuilt}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ── Property Overview: areas horizontal scroll ── */}
       {areas.length > 0 && (
         <motion.div {...fadeUp(0.15)}>
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-[14px] font-bold text-slate-800">Property Overview</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">Rooms & spaces in Shah House</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Rooms & spaces in {home.name}</p>
             </div>
             <Link to="/areas" className="flex items-center gap-1 text-[12px] text-blue-600 font-bold hover:text-blue-700">
               View all <RiArrowRightLine className="w-3.5 h-3.5" />
             </Link>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2">
-            {areas.slice(0, 6).map((area) => {
-              const meta  = typeMeta(area.type);
-              const count = areaAssetCount[area.id] ?? 0;
+            {areas.map((area) => {
+              const meta = typeMeta(area.type);
               return (
                 <Link key={area.id} to={`/areas/${area.id}`}
                   className="shrink-0 w-36 rounded-2xl overflow-hidden border border-slate-100 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group bg-white"
                   style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
-                  {/* Mini hero */}
                   <div className="h-20 flex items-center justify-center" style={{ background: meta.grad }}>
-                    <span className="text-3xl select-none">{meta.emoji}</span>
+                    <meta.Icon className="w-8 h-8 text-white" strokeWidth={1.5} />
                   </div>
                   <div className="p-3">
                     <p className="text-[12px] font-bold text-slate-800 truncate leading-tight">{area.name}</p>
                     <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                      <RiBox3Line className="w-3 h-3" />{count} asset{count !== 1 ? 's' : ''}
+                      <RiBox3Line className="w-3 h-3" />{area.assetCount} asset{area.assetCount !== 1 ? 's' : ''}
                     </p>
                   </div>
                 </Link>
@@ -363,17 +319,17 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-[14px] font-bold text-slate-800">Fleet Overview</p>
-                  <p className="text-[11px] text-slate-400">{cars.length} vehicle{cars.length !== 1 ? 's' : ''} · Shah House</p>
+                  <p className="text-[11px] text-slate-400">{cars.length} vehicle{cars.length !== 1 ? 's' : ''} · {home.name}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                {carsAlertCount > 0 && (
+                {stats.carAlerts > 0 && (
                   <span className="flex items-center gap-1.5 text-[12px] font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
-                    <RiAlertLine className="w-3.5 h-3.5" /> {carsAlertCount} reg. alert{carsAlertCount !== 1 ? 's' : ''}
+                    <RiAlertLine className="w-3.5 h-3.5" /> {stats.carAlerts} reg. alert{stats.carAlerts !== 1 ? 's' : ''}
                   </span>
                 )}
                 <span className="flex items-center gap-1.5 text-[12px] font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100">
-                  <RiGasStationLine className="w-3.5 h-3.5" /> AED {fleetFuelMo.toFixed(0)} fuel/mo
+                  <RiGasStationLine className="w-3.5 h-3.5" /> AED {(fleetFuelMonth ?? 0).toFixed(0)} fuel/mo
                 </span>
                 <Link to="/cars" className="flex items-center gap-1 text-[12px] text-blue-600 font-bold hover:text-blue-700">
                   Manage <RiArrowRightLine className="w-3.5 h-3.5" />
@@ -381,20 +337,20 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {cars.slice(0, 3).map((car) => {
-                const regDays = Math.ceil((new Date(car.registrationExpiry) - new Date()) / 86400000);
-                const expired  = regDays < 0;
-                const expiring = regDays >= 0 && regDays <= 30;
+              {cars.map((car) => {
+                const regDays  = car.regDays;
+                const expired  = regDays !== null && regDays < 0;
+                const expiring = regDays !== null && regDays >= 0 && regDays <= 30;
                 return (
                   <Link key={car.id} to={`/cars/${car.id}`}
                     className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all group bg-slate-50/60">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ background: `linear-gradient(135deg, #0b1d3a, #1e3a6e)` }}>
+                      style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
                       <RiCarLine className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-bold text-slate-800 truncate leading-tight">{car.make} {car.model}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{car.plateNumber} · {car.driverName.split(' ')[0]}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{car.plateNumber} · {car.driverName?.split(' ')[0]}</p>
                     </div>
                     <div className="shrink-0">
                       {expired  && <span className="text-[10px] font-bold text-white bg-red-500 px-2 py-0.5 rounded-full">Expired</span>}
@@ -429,13 +385,13 @@ export default function Dashboard() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { key: 'vehicle', label: 'Vehicle Wallet', wallet: vehicleWallet, color: '#0b1d3a', bg: '#f0f5ff', icon: RiCarLine },
-              { key: 'home',    label: 'Home Wallet',    wallet: homeWallet,    color: '#16a34a', bg: '#f0fdf4', icon: RiHome4Line },
-            ].map(({ key, label, wallet, color, bg, icon: Icon }) => {
-              const bal   = wallet.balance ?? 0;
-              const total = wallet.totalDeposited ?? 0;
+              { key: 'vehicle', label: 'Vehicle Wallet', w: wallet.vehicle, color: '#0b1d3a', bg: '#f0f5ff', icon: RiCarLine },
+              { key: 'home',    label: 'Home Wallet',    w: wallet.home,    color: '#16a34a', bg: '#f0fdf4', icon: RiHome4Line },
+            ].map(({ key, label, w, color, bg, icon: Icon }) => {
+              const bal   = w?.balance ?? 0;
+              const total = w?.totalDeposited ?? 0;
               const pct   = total > 0 ? Math.max(0, Math.min(100, (bal / total) * 100)) : 0;
-              const low   = bal < LOW_BALANCE_THRESHOLD;
+              const low   = bal < LOW_BALANCE;
               const empty = bal <= 0;
               return (
                 <Link key={key} to="/wallet"
@@ -488,7 +444,6 @@ export default function Dashboard() {
                   return (
                     <div key={item.id}
                       className="flex items-center gap-3.5 p-3 rounded-2xl hover:bg-slate-50 transition-colors group cursor-pointer">
-                      {/* Date pill */}
                       <div className={cn('shrink-0 w-12 text-center rounded-xl py-1.5',
                         urgent ? 'bg-red-50' : soon ? 'bg-amber-50' : 'bg-blue-50')}>
                         <p className={cn('text-[9px] font-bold uppercase', urgent ? 'text-red-500' : soon ? 'text-amber-600' : 'text-blue-500')}>
@@ -498,7 +453,6 @@ export default function Dashboard() {
                           {new Date(item.date + 'T00:00:00').getDate()}
                         </p>
                       </div>
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold text-slate-800 truncate">{item.title}</p>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -511,7 +465,6 @@ export default function Dashboard() {
                           </span>
                         </div>
                       </div>
-                      {/* Right */}
                       <div className="flex items-center gap-2 shrink-0">
                         <Badge variant={TYPE_VARIANT[item.type] ?? 'default'} size="sm">
                           {TYPE_LABELS[item.type] ?? item.type}
@@ -524,6 +477,9 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
+                {upcomingSchedule.length === 0 && (
+                  <p className="text-[13px] text-slate-400 text-center py-4">No upcoming tasks scheduled</p>
+                )}
               </div>
             </SectionCard>
           </motion.div>
@@ -551,11 +507,14 @@ export default function Dashboard() {
                         <p className="text-[11px] text-slate-400 truncate">{item.detail}</p>
                       </div>
                       <span className="text-[11px] text-slate-300 whitespace-nowrap shrink-0 flex items-center gap-1">
-                        <RiTimeLine className="w-3 h-3" />{item.time}
+                        <RiTimeLine className="w-3 h-3" />{fmtRelative(item.completedDate)}
                       </span>
                     </div>
                   );
                 })}
+                {recentActivities.length === 0 && (
+                  <p className="text-[13px] text-slate-400 text-center py-4">No completed tasks yet</p>
+                )}
               </div>
             </SectionCard>
           </motion.div>
@@ -569,16 +528,16 @@ export default function Dashboard() {
             <div className="bg-white rounded-2xl border border-slate-100 p-5"
               style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
               <p className="text-[13px] font-bold text-slate-800 mb-0.5">Property Health</p>
-              <p className="text-[11px] text-slate-400 mb-4">Shah House — overall status</p>
+              <p className="text-[11px] text-slate-400 mb-4">{home.name} — overall status</p>
               <div className="flex items-center justify-center mb-5">
-                <HealthDonut score={84} />
+                <HealthDonut score={healthScore} />
               </div>
               <div className="grid grid-cols-2 gap-2.5 mb-4">
                 {[
-                  { label: 'Contracts',  value: contracts.filter((c) => c.status === 'active').length, icon: RiFileList3Line,  color: '#2563eb', bg: '#eff6ff' },
-                  { label: 'Assets',     value: assets.length,                                        icon: RiBox3Line,        color: '#16a34a', bg: '#f0fdf4' },
-                  { label: 'Repairs',    value: tasks.filter((t) => t.category === 'Repair' && t.status !== 'completed').length, icon: RiHammerLine, color: '#dc2626', bg: '#fef2f2' },
-                  { label: 'Alerts',     value: unread,                                               icon: RiBellLine,        color: '#d97706', bg: '#fffbeb' },
+                  { label: 'Contracts', value: stats.activeContracts, icon: RiFileList3Line, color: '#2563eb', bg: '#eff6ff' },
+                  { label: 'Assets',    value: stats.totalAssets,     icon: RiBox3Line,      color: '#16a34a', bg: '#f0fdf4' },
+                  { label: 'Repairs',   value: stats.openRepairs,     icon: RiHammerLine,    color: '#dc2626', bg: '#fef2f2' },
+                  { label: 'Alerts',    value: unread,                icon: RiBellLine,      color: '#d97706', bg: '#fffbeb' },
                 ].map((s) => (
                   <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: s.bg }}>
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-white">
@@ -592,22 +551,19 @@ export default function Dashboard() {
                 ))}
               </div>
 
-              {/* Per-area mini bars */}
               {areas.length > 0 && (
                 <div className="border-t border-slate-50 pt-4 space-y-2.5">
                   <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Areas at a Glance</p>
                   {areas.slice(0, 4).map((area) => {
-                    const meta  = typeMeta(area.type);
-                    const count = areaAssetCount[area.id] ?? 0;
-                    const maxCount = Math.max(...areas.map((a) => areaAssetCount[a.id] ?? 0), 1);
-                    const barPct   = Math.round((count / maxCount) * 100);
+                    const meta   = typeMeta(area.type);
+                    const barPct = Math.round(((area.assetCount ?? 0) / maxAreaCount) * 100);
                     return (
                       <Link key={area.id} to={`/areas/${area.id}`} className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity">
-                        <span className="text-base select-none w-5 text-center">{meta.emoji}</span>
+                        <meta.Icon className="w-4 h-4 shrink-0" style={{ color: meta.text }} strokeWidth={1.5} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-[11px] font-semibold text-slate-700 truncate">{area.name}</span>
-                            <span className="text-[10px] text-slate-400 shrink-0 ml-1">{count}</span>
+                            <span className="text-[10px] text-slate-400 shrink-0 ml-1">{area.assetCount}</span>
                           </div>
                           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-500"
@@ -622,7 +578,7 @@ export default function Dashboard() {
             </div>
           </motion.div>
 
-          {/* Monthly Expenses — real data */}
+          {/* Monthly Expenses */}
           <motion.div {...fadeUp(0.24)}>
             <SectionCard
               title="Monthly Spending"
@@ -635,7 +591,6 @@ export default function Dashboard() {
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">All categories combined</p>
               </div>
-              {/* Stacked bar */}
               {grandTotal > 0 && (
                 <div className="flex rounded-full overflow-hidden h-2.5 mb-4 gap-px">
                   {dashExpSegs.map((e, i) => (
@@ -678,7 +633,7 @@ export default function Dashboard() {
               action={<Link to="/contracts" className="text-[12px] text-blue-600 font-bold hover:text-blue-700">View all →</Link>}
             >
               <div className="space-y-2">
-                {expiringItems.map((item) => (
+                {expiringContracts.map((item) => (
                   <div key={item.id}
                     className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group">
                     <div className="min-w-0 flex-1">
@@ -688,7 +643,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 shrink-0 ml-2">
                       <span className={cn(
                         'px-2 py-0.5 rounded-full text-[10px] font-bold',
-                        item.status === 'danger'  ? 'bg-red-50 text-red-600'    :
+                        item.status === 'danger'  ? 'bg-red-50 text-red-600'     :
                         item.status === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600',
                       )}>
                         {item.expiresIn}d left
@@ -697,6 +652,9 @@ export default function Dashboard() {
                     </div>
                   </div>
                 ))}
+                {expiringContracts.length === 0 && (
+                  <p className="text-[12px] text-slate-400 text-center py-2">No expiring contracts</p>
+                )}
               </div>
             </SectionCard>
           </motion.div>
@@ -707,7 +665,6 @@ export default function Dashboard() {
   );
 }
 
-/* ─── Section card wrapper ─── */
 function SectionCard({ title, subtitle, action, children }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-5"
@@ -724,7 +681,6 @@ function SectionCard({ title, subtitle, action, children }) {
   );
 }
 
-/* ─── Health donut SVG ─── */
 function HealthDonut({ score }) {
   const r = 48, circ = 2 * Math.PI * r;
   const filled = (score / 100) * circ;
@@ -739,31 +695,28 @@ function HealthDonut({ score }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-3xl font-bold leading-none" style={{ color }}>{score}</span>
-        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-0.5">Score</span>
+        <span className="text-[10px] text-slate-400 font-semibold mt-0.5">/ 100</span>
       </div>
     </div>
   );
 }
 
-/* ─── Loading skeleton ─── */
 function DashboardSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
       <div className="h-44 rounded-3xl bg-slate-200" />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[0,1,2,3].map((i) => <div key={i} className="h-28 rounded-2xl bg-slate-200" />)}
+        {[...Array(4)].map((_, i) => <div key={i} className="h-28 rounded-2xl bg-slate-100" />)}
       </div>
-      <div className="flex gap-3 overflow-x-auto">
-        {[0,1,2,3,4,5].map((i) => <div key={i} className="shrink-0 w-36 h-36 rounded-2xl bg-slate-200" />)}
-      </div>
+      <div className="h-40 rounded-2xl bg-slate-100" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="h-80 rounded-2xl bg-slate-200" />
-          <div className="h-60 rounded-2xl bg-slate-200" />
+        <div className="lg:col-span-2 space-y-4">
+          <div className="h-64 rounded-2xl bg-slate-100" />
+          <div className="h-48 rounded-2xl bg-slate-100" />
         </div>
-        <div className="space-y-6">
-          <div className="h-64 rounded-2xl bg-slate-200" />
-          <div className="h-52 rounded-2xl bg-slate-200" />
+        <div className="space-y-4">
+          <div className="h-72 rounded-2xl bg-slate-100" />
+          <div className="h-48 rounded-2xl bg-slate-100" />
         </div>
       </div>
     </div>

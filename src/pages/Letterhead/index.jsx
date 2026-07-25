@@ -1,15 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useDispatch, useSelector } from 'react-redux';
 import {
   Plus, Trash2, RotateCcw, Building2, Phone, Mail, MapPin,
   User, ClipboardList, Eye, RefreshCw, Download, X, Archive,
   FileText, MessageCircle, Loader2, Save, Sparkles, TrendingUp,
+  ArrowDownToLine, SendHorizonal,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '../../utils/cn';
-import { saveLetterhead, deleteLetterhead, selectLetterheads } from '../../store/slices/letterheadsSlice';
+import { useGetQuery, usePostMutation, useDeleteMutation } from '../../api/apiSlice';
 import { generateLetterheadPdf } from '../../utils/generateLetterheadPdf';
 
 /* ─── Config ─────────────────────────────────────────────── */
@@ -29,7 +29,7 @@ const TYPES = {
     accent: '#16a34a',
     accentLight: '#f0fdf4',
     accentMid: '#bbf7d0',
-    emoji: '📥',
+    Icon: ArrowDownToLine,
   },
   issued: {
     label: 'Material Issue Note',
@@ -40,7 +40,7 @@ const TYPES = {
     accent: '#2563eb',
     accentLight: '#eff6ff',
     accentMid: '#bfdbfe',
-    emoji: '📤',
+    Icon: SendHorizonal,
   },
 };
 
@@ -91,9 +91,10 @@ export default function LetterheadPage() {
   /* ── Refs ── */
   const hiddenPrintRef = useRef(null);
 
-  /* ── Redux ── */
-  const dispatch = useDispatch();
-  const records  = useSelector(selectLetterheads);
+  /* ── RTK Query ── */
+  const { data: records = [] } = useGetQuery({ path: '/letterheads' });
+  const [saveLetterheadMut]   = usePostMutation();
+  const [deleteLetterheadMut] = useDeleteMutation();
 
   /* ── Derived ── */
   const cfg        = TYPES[type];
@@ -139,7 +140,7 @@ export default function LetterheadPage() {
       notes, grandTotal, hasPrice,
     };
 
-    dispatch(saveLetterhead(record));
+    saveLetterheadMut({ path: '/letterheads', body: record });
     saveNum(type, docNum);
 
     setPdfLoading(true);
@@ -172,7 +173,7 @@ export default function LetterheadPage() {
       items: items.map((i) => ({ ...i })),
       notes, grandTotal, hasPrice,
     };
-    dispatch(saveLetterhead(record));
+    saveLetterheadMut({ path: '/letterheads', body: record });
     saveNum(type, docNum);
     toast.success(`${cfg.short} ${docNum} saved to history`);
     setDocNum(getAutoNum(type));
@@ -233,10 +234,12 @@ export default function LetterheadPage() {
   };
 
   /* ── Delete ── */
-  const handleDelete = (id) => {
-    dispatch(deleteLetterhead(id));
-    if (detailRecord?.id === id) setDetailRecord(null);
-    toast.success('Document removed from history');
+  const handleDelete = async (id) => {
+    try {
+      await deleteLetterheadMut({ path: `/letterheads/${id}` }).unwrap();
+      if (detailRecord?.id === id) setDetailRecord(null);
+      toast.success('Document removed from history');
+    } catch (err) { toast.error(err.data?.error || 'Failed to delete'); }
   };
 
   /* ── Load record into editor ── */

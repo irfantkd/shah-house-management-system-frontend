@@ -1,8 +1,22 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { RiAlertLine, RiCloseLine, RiDeleteBinLine } from 'react-icons/ri';
+import { motion } from 'framer-motion';
+import { RiAlertLine, RiCloseLine, RiDeleteBinLine, RiLogoutBoxRLine } from 'react-icons/ri';
 
-export default function ConfirmDialog({ open, onClose, onConfirm, title, message, loading }) {
+const VARIANTS = {
+  danger:  { btn: 'bg-danger-600 hover:bg-danger-700 text-white', icon: RiDeleteBinLine  },
+  warning: { btn: 'bg-amber-500 hover:bg-amber-600 text-white',   icon: RiAlertLine      },
+  logout:  { btn: 'bg-danger-600 hover:bg-danger-700 text-white', icon: RiLogoutBoxRLine },
+};
+
+export default function ConfirmDialog({
+  open, onClose, onConfirm, title, message, loading,
+  confirmLabel, confirmVariant = 'danger',
+}) {
   if (!open) return null;
+
+  const v = VARIANTS[confirmVariant] ?? VARIANTS.danger;
+  const Icon = v.icon;
+  const label = confirmLabel ?? (confirmVariant === 'logout' ? 'Sign Out' : 'Delete');
+
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -18,13 +32,13 @@ export default function ConfirmDialog({ open, onClose, onConfirm, title, message
 
         <div className="p-6">
           <div className="w-14 h-14 rounded-2xl bg-danger-50 flex items-center justify-center mx-auto mb-4">
-            <RiAlertLine className="w-7 h-7 text-danger-500" />
+            <Icon className="w-7 h-7 text-danger-500" />
           </div>
           <h3 className="text-[16px] font-bold text-slate-900 text-center mb-2">
-            {title ?? 'Delete Item'}
+            {title ?? 'Confirm Action'}
           </h3>
           <p className="text-[13px] text-slate-500 text-center leading-relaxed">
-            {message ?? 'Are you sure you want to delete this? This action cannot be undone.'}
+            {message ?? 'Are you sure you want to proceed? This action cannot be undone.'}
           </p>
         </div>
 
@@ -34,14 +48,14 @@ export default function ConfirmDialog({ open, onClose, onConfirm, title, message
             Cancel
           </button>
           <button onClick={onConfirm} disabled={loading}
-            className="flex-1 h-10 rounded-xl bg-danger-600 hover:bg-danger-700 text-white text-[13px] font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+            className={`flex-1 h-10 rounded-xl text-[13px] font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${v.btn}`}>
             {loading ? (
               <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-            ) : <RiDeleteBinLine className="w-4 h-4" />}
-            Delete
+            ) : <Icon className="w-4 h-4" />}
+            {label}
           </button>
         </div>
       </motion.div>
