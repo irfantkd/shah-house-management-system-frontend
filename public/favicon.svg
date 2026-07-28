@@ -1,26 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" fill="none">
-  <!-- Background: deep navy rounded square -->
+
+  <!-- Navy badge background -->
   <rect width="56" height="56" rx="13" fill="#0b1d3a"/>
 
-  <!-- House silhouette: roof + body as one pentagon -->
-  <path d="M7 27L28 10L49 27V50H7Z" fill="white"/>
+  <!-- Roof with eave overhang -->
+  <path d="M8,26 L28,8 L48,26"
+    stroke="#C9A84C" stroke-width="3.5"
+    stroke-linejoin="round" stroke-linecap="round"/>
 
-  <!-- Gold finial at roof peak -->
-  <path d="M28 4L31.5 8.5L28 11L24.5 8.5Z" fill="#C9A227"/>
+  <!-- Body -->
+  <rect x="10" y="25.5" width="36" height="26.5" rx="0.5"
+    stroke="#C9A84C" stroke-width="3.5" fill="none"/>
 
-  <!-- Gold belt: roof to body separator -->
-  <rect x="7" y="27" width="42" height="1.8" fill="#C9A227" opacity="0.78"/>
+  <!-- Arched entrance door -->
+  <path d="M21,52 L21,43 A7,7 0 0,0 35,43 L35,52"
+    stroke="#C9A84C" stroke-width="2.5" stroke-linecap="round"/>
 
-  <!-- Left window -->
-  <rect x="9" y="30.5" width="8" height="6" rx="1" fill="#0b1d3a" opacity="0.30"/>
+  <!-- Finial gem at apex -->
+  <circle cx="28" cy="8" r="4" fill="#E8C870"/>
+  <circle cx="28" cy="8" r="1.8" fill="white" opacity="0.85"/>
 
-  <!-- Right window -->
-  <rect x="39" y="30.5" width="8" height="6" rx="1" fill="#0b1d3a" opacity="0.30"/>
-
-  <!-- Pointed arch door -->
-  <path d="M22 50V42Q22 35.5 28 35.5Q34 35.5 34 42V50Z" fill="#0b1d3a"/>
-
-  <!-- Gold arch accent on door -->
-  <path d="M22 42.5Q22 36 28 36Q34 36 34 42.5" stroke="#C9A227" stroke-width="1.6" opacity="0.82"/>
 </svg>

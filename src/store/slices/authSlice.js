@@ -14,9 +14,11 @@ export const loginUser = createAsyncThunk(
   },
 );
 
-export const logoutUser = createAsyncThunk('auth/logout', async () => {
-  try { await api.post('/auth/logout'); } catch { /* ignore */ }
+export const logoutUser = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
+  // Clear state immediately so the UI reacts before the server responds
+  dispatch(logoutSync());
   localStorage.removeItem('ahms-token');
+  try { await api.post('/auth/logout'); } catch { /* ignore */ }
 });
 
 export const updateAuthProfile = createAsyncThunk('auth/updateProfile', async (payload, { rejectWithValue }) => {
@@ -41,6 +43,14 @@ const authSlice = createSlice({
   initialState: { isAuthenticated: false, user: null, token: null, error: null },
   reducers: {
     clearAuthError: (state) => { state.error = null; },
+    // Synchronous logout — clears Redux state in the same tick.
+    // Used by the 401 interceptor so ProtectedRoute redirects without a hard reload.
+    logoutSync: (state) => {
+      state.isAuthenticated = false;
+      state.user  = null;
+      state.token = null;
+      state.error = null;
+    },
   },
   extraReducers: (b) => {
     b.addCase(loginUser.pending, (state) => { state.error = null; })
@@ -65,7 +75,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearAuthError } = authSlice.actions;
+export const { clearAuthError, logoutSync } = authSlice.actions;
 export const selectIsAuthenticated = (s) => s.auth.isAuthenticated;
 export const selectAuthUser        = (s) => s.auth.user;
 export const selectAuthError       = (s) => s.auth.error;

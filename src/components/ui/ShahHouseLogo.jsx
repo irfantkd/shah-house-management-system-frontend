@@ -1,92 +1,112 @@
 /**
- * Shah House brand mark — two variants:
- *   ShahHouseIconMark  → no background, for use on dark surfaces (sidebar, letterhead header)
- *   ShahHouseIconBadge → with navy rounded-square background, for light surfaces / standalone
+ * Shah House brand mark — elegant gold outline house.
  *
- * Default export: logo icon + "SHAH HOUSE" text row, used in the sidebar.
+ * A pure line-art mark: roof, body, arched entrance, finial.
+ * No solid fills — just clean gold strokes on dark backgrounds.
+ *
+ *   ShahHouseIconMark  — bare mark, for dark surfaces
+ *   ShahHouseIconBadge — mark in a navy badge, for light surfaces
+ *   ShahHouseLogo      — mark + wordmark row, for the sidebar
  */
 
-export function ShahHouseIconMark({ size = 40, style = {}, className = '' }) {
+const G  = "#C9A84C";
+const GL = "#E8C870";
+const BG = "#0b1d3a";
+
+// ── House mark (internal) ─────────────────────────────────────────────────────
+// 56×56 viewBox.
+// Elegant pitched-roof house: a gold line-art silhouette.
+//   • Roof (with 4-px eave overhang on each side)
+//   • Rectangular body
+//   • Arched entrance door (Moorish semicircle)
+//   • Finial gem at the roof peak
+function HouseMark({ size = 36 }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 56 56"
-      width={size}
-      height={size}
-      fill="none"
-      style={style}
-      className={className}
-    >
-      {/* House silhouette */}
-      <path d="M7 27L28 10L49 27V50H7Z" fill="white"/>
-      {/* Gold finial */}
-      <path d="M28 4L31.5 8.5L28 11L24.5 8.5Z" fill="#C9A227"/>
-      {/* Gold belt */}
-      <rect x="7" y="27" width="42" height="1.8" fill="#C9A227" opacity="0.78"/>
-      {/* Left window */}
-      <rect x="9" y="30.5" width="8" height="6" rx="1" fill="#0b1d3a" opacity="0.50"/>
-      {/* Right window */}
-      <rect x="39" y="30.5" width="8" height="6" rx="1" fill="#0b1d3a" opacity="0.50"/>
-      {/* Arch door */}
-      <path d="M22 50V42Q22 35.5 28 35.5Q34 35.5 34 42V50Z" fill="#0b1d3a"/>
-      {/* Gold arch accent */}
-      <path d="M22 42.5Q22 36 28 36Q34 36 34 42.5" stroke="#C9A227" strokeWidth="1.6" opacity="0.82"/>
+    <svg width={size} height={size} viewBox="0 0 56 56" fill="none" aria-hidden="true">
+
+      {/* ── Roof ── eave extends 4 px beyond body on each side */}
+      <path
+        d="M8,26 L28,8 L48,26"
+        stroke={G} strokeWidth="3.5"
+        strokeLinejoin="round" strokeLinecap="round"
+      />
+
+      {/* ── Body ── */}
+      <rect x="10" y="25.5" width="36" height="26.5" rx="0.5"
+        stroke={G} strokeWidth="3.5" fill="none" />
+
+      {/* ── Arched entrance ── semicircle arch + two jamb lines */}
+      {/* arc from (21,43) to (35,43) sweeping upward (CCW), radius=7, top of arch at y=36 */}
+      <path
+        d="M21,52 L21,43 A7,7 0 0,0 35,43 L35,52"
+        stroke={G} strokeWidth="2.5" strokeLinecap="round"
+      />
+
+      {/* ── Finial gem at roof apex ── */}
+      <circle cx="28" cy="8" r="4" fill={GL} />
+      <circle cx="28" cy="8" r="1.8" fill="white" opacity="0.85" />
+
     </svg>
   );
 }
 
-export function ShahHouseIconBadge({ size = 40, rx = 13, style = {}, className = '' }) {
+// ── Public exports ────────────────────────────────────────────────────────────
+
+export function ShahHouseIconMark({ size = 40, style = {}, className = "" }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 56 56"
-      width={size}
-      height={size}
-      fill="none"
-      style={style}
-      className={className}
-    >
-      {/* Navy background */}
-      <rect width="56" height="56" rx={rx} fill="#0b1d3a"/>
-      {/* House silhouette */}
-      <path d="M7 27L28 10L49 27V50H7Z" fill="white"/>
-      {/* Gold finial */}
-      <path d="M28 4L31.5 8.5L28 11L24.5 8.5Z" fill="#C9A227"/>
-      {/* Gold belt */}
-      <rect x="7" y="27" width="42" height="1.8" fill="#C9A227" opacity="0.78"/>
-      {/* Left window */}
-      <rect x="9" y="30.5" width="8" height="6" rx="1" fill="#0b1d3a" opacity="0.30"/>
-      {/* Right window */}
-      <rect x="39" y="30.5" width="8" height="6" rx="1" fill="#0b1d3a" opacity="0.30"/>
-      {/* Arch door */}
-      <path d="M22 50V42Q22 35.5 28 35.5Q34 35.5 34 42V50Z" fill="#0b1d3a"/>
-      {/* Gold arch accent */}
-      <path d="M22 42.5Q22 36 28 36Q34 36 34 42.5" stroke="#C9A227" strokeWidth="1.6" opacity="0.82"/>
-    </svg>
+    <div style={{ lineHeight: 0, ...style }} className={className}>
+      <HouseMark size={size} />
+    </div>
   );
 }
 
-/** Full logo: icon mark + wordmark, for use in the sidebar. */
-export default function ShahHouseLogo({ size = 30, collapsed = false }) {
+export function ShahHouseIconBadge({ size = 40, rx = 13, style = {}, className = "" }) {
+  return (
+    <div
+      className={className}
+      style={{
+        width:          size,
+        height:         size,
+        borderRadius:   rx,
+        background:     BG,
+        display:        "flex",
+        alignItems:     "center",
+        justifyContent: "center",
+        flexShrink:     0,
+        ...style,
+      }}
+    >
+      <HouseMark size={Math.round(size * 0.72)} />
+    </div>
+  );
+}
+
+export default function ShahHouseLogo({ size = 32, collapsed = false }) {
   return (
     <div className="flex items-center gap-3 min-w-0">
       <div
         className="shrink-0 flex items-center justify-center rounded-xl"
         style={{
-          width: size,
-          height: size,
-          background: 'rgba(255,255,255,0.09)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          width:      size,
+          height:     size,
+          background: "rgba(255,255,255,0.07)",
+          border:     `1px solid ${G}28`,
         }}
       >
-        <ShahHouseIconMark size={Math.round(size * 0.7)} />
+        <HouseMark size={Math.round(size * 0.72)} />
       </div>
+
       {!collapsed && (
-        <div className="min-w-0">
+        <div className="min-w-0 leading-none">
           <p className="text-white font-bold text-[13px] leading-tight tracking-wide whitespace-nowrap">
-            SHAH HOUSE
+            Shah House
           </p>
-          <p className="text-white/35 text-[10px] whitespace-nowrap">Property Manager</p>
+          <p
+            className="text-[9px] whitespace-nowrap tracking-[0.18em] uppercase font-medium mt-0.5"
+            style={{ color: G, opacity: 0.65 }}
+          >
+            Management System
+          </p>
         </div>
       )}
     </div>

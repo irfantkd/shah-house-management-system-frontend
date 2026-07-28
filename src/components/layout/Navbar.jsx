@@ -24,9 +24,10 @@ export default function Navbar({ onMenuClick }) {
   const { data: notifications = [] } = useGetQuery({ path: '/notifications', params: { propertyId } }, { skip: !propertyId });
   const [markReadMut] = usePatchMutation();
   const unread = notifications.filter((n) => !n.read).length;
-  const [notifOpen,  setNotifOpen]  = useState(false);
-  const [userOpen,   setUserOpen]   = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [notifOpen,     setNotifOpen]     = useState(false);
+  const [userOpen,      setUserOpen]      = useState(false);
+  const [searchOpen,    setSearchOpen]    = useState(false);
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
   const notifRef = useRef(null);
   const userRef  = useRef(null);
 
@@ -51,8 +52,8 @@ export default function Navbar({ onMenuClick }) {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const handleLogout = () => {
-    setUserOpen(false);
+  const confirmLogout = () => {
+    setLogoutConfirm(false);
     dispatch(logoutUser());
     toast.success('Signed out successfully');
     navigate('/login', { replace: true });
@@ -188,8 +189,10 @@ export default function Navbar({ onMenuClick }) {
                 </Link>
               </div>
               <div className="border-t border-slate-100 py-1">
-                <button onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-50 transition-colors">
+                <button
+                  onClick={() => { setUserOpen(false); setLogoutConfirm(true); }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-semibold text-red-500 hover:bg-red-50 transition-colors"
+                >
                   <RiLogoutBoxRLine className="w-4 h-4" />Sign Out
                 </button>
               </div>
@@ -202,7 +205,71 @@ export default function Navbar({ onMenuClick }) {
       <AnimatePresence>
         {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
       </AnimatePresence>
+
+      {/* Logout confirmation modal */}
+      <AnimatePresence>
+        {logoutConfirm && (
+          <LogoutModal
+            onCancel={() => setLogoutConfirm(false)}
+            onConfirm={confirmLogout}
+          />
+        )}
+      </AnimatePresence>
     </header>
+  );
+}
+
+function LogoutModal({ onCancel, onConfirm }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onCancel(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 backdrop-blur-sm"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.94, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94, y: 12 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm bg-white rounded-2xl overflow-hidden"
+        style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}
+      >
+        {/* Icon */}
+        <div className="flex flex-col items-center pt-8 pb-5 px-6 text-center">
+          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mb-4">
+            <RiLogoutBoxRLine className="w-7 h-7 text-red-500" />
+          </div>
+          <h2 className="text-[17px] font-bold text-slate-800 mb-1.5">Sign Out?</h2>
+          <p className="text-[13px] text-slate-500 leading-relaxed">
+            You will be signed out of Shah House Management System. Any unsaved changes will be lost.
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2.5 px-6 pb-6">
+          <button
+            onClick={onCancel}
+            className="flex-1 h-10 rounded-xl border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 h-10 rounded-xl bg-red-500 text-[13px] font-semibold text-white hover:bg-red-600 active:scale-[0.98] transition-all"
+          >
+            Yes, Sign Out
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 

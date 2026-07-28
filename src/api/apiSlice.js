@@ -1,5 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { logoutUser } from "../store/slices/authSlice";
+import { logoutSync } from "../store/slices/authSlice";
 
 const API_URL = import.meta.env.VITE_API_URL;
 export const API_BASE_URL = API_URL; // exported for imperative fetch calls
@@ -42,9 +42,10 @@ const baseQueryWithReauthAndRedirect = async (args, api, extraOptions) => {
 
   if (is401 && !handlingLogout) {
     handlingLogout = true;
-    api.dispatch(logoutUser());
-    setTimeout(() => { handlingLogout = false; }, 5000);
-    window.location.replace("/login");
+    api.dispatch(logoutSync());          // clears Redux state synchronously
+    localStorage.removeItem('ahms-token'); // clear persisted token key
+    setTimeout(() => { handlingLogout = false; }, 3000);
+    // No hard redirect — ProtectedRoute watches isAuth and navigates via React Router
   }
 
   const contentType = result.meta?.response?.headers.get("content-type");
