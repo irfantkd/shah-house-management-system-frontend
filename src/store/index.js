@@ -8,53 +8,19 @@ const storage = {
   removeItem: (key) => Promise.resolve(localStorage.removeItem(key)),
 };
 
-import authReducer          from './slices/authSlice';
-import uiReducer           from './slices/uiSlice';
-import companiesReducer    from './slices/companiesSlice';
-import contractsReducer    from './slices/contractsSlice';
-import tasksReducer        from './slices/tasksSlice';
-import assetsReducer       from './slices/assetsSlice';
-import areasReducer        from './slices/areasSlice';
-import notificationsReducer from './slices/notificationsSlice';
-import expensesReducer     from './slices/expensesSlice';
-import settingsReducer     from './slices/settingsSlice';
-import carsReducer         from './slices/carsSlice';
-import walletReducer       from './slices/walletSlice';
-import employeesReducer   from './slices/employeesSlice';
-import ownersReducer      from './slices/ownersSlice';
-import propertiesReducer  from './slices/propertiesSlice';
-import letterheadsReducer from './slices/letterheadsSlice';
-import homeInfoReducer    from './slices/homeInfoSlice';
-import usersReducer      from './slices/usersSlice';
-import dashboardReducer from './slices/dashboardSlice';
+import authReducer       from './slices/authSlice';
+import propertiesReducer from './slices/propertiesSlice';
 
 const rootReducer = combineReducers({
-  auth:          authReducer,
-  ui:            uiReducer,
-  companies:     companiesReducer,
-  contracts:     contractsReducer,
-  tasks:         tasksReducer,
-  assets:        assetsReducer,
-  areas:         areasReducer,
-  notifications: notificationsReducer,
-  expenses:      expensesReducer,
-  settings:      settingsReducer,
-  cars:          carsReducer,
-  wallet:        walletReducer,
-  employees:     employeesReducer,
-  owners:        ownersReducer,
-  properties:    propertiesReducer,
-  letterheads:   letterheadsReducer,
-  homeInfo:      homeInfoReducer,
-  users:         usersReducer,
-  dashboard:     dashboardReducer,
-  [apiSlice.reducerPath]: apiSlice.reducer,
+  auth:                    authReducer,
+  properties:              propertiesReducer,
+  [apiSlice.reducerPath]:  apiSlice.reducer,
 });
 
 // Persist only currentId from properties — not the items array (those come from API on boot)
 const propertiesTransform = createTransform(
   (inbound)  => ({ currentId: inbound.currentId }),
-  (outbound) => ({ items: [], currentId: outbound.currentId ?? null, status: 'idle', error: null }),
+  (outbound) => ({ items: [], currentId: outbound.currentId ?? null, status: 'idle' }),
   { whitelist: ['properties'] },
 );
 

@@ -19,8 +19,9 @@ import { selectAuthUser, logoutUser } from '../../store/slices/authSlice';
 import { useGetQuery } from '../../api/apiSlice';
 import {
   selectProperties, selectCurrentProperty, selectCurrentPropertyId,
-  addProperty, setCurrentProperty,
+  setCurrentProperty,
 } from '../../store/slices/propertiesSlice';
+import { usePostMutation } from '../../api/apiSlice';
 import { cn } from '../../utils/cn';
 import { getInitials } from '../../utils/getInitials';
 import toast from 'react-hot-toast';
@@ -409,7 +410,7 @@ function NavItem({ item, collapsed, badge, badgeColor = 'bg-red-500', onClose })
 
 /* ── Add Property Modal ── */
 function AddPropertyModal({ open, onClose }) {
-  const dispatch = useDispatch();
+  const [postMut] = usePostMutation();
   const [form, setForm] = useState({ name: '', type: 'Villa', location: '', emoji: 'landmark' });
   const [errors, setErrors] = useState({});
 
@@ -423,18 +424,22 @@ function AddPropertyModal({ open, onClose }) {
     return !Object.keys(e).length;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    dispatch(addProperty({
-      name:     form.name.trim(),
-      type:     form.type,
-      location: form.location.trim(),
-      emoji:    form.emoji,
-    }));
-    toast.success(`${form.name} added & activated`);
-    setForm({ name: '', type: 'Villa', location: '', emoji: 'landmark' });
-    setErrors({});
-    onClose();
+    try {
+      await postMut({ path: '/properties', body: {
+        name:     form.name.trim(),
+        type:     form.type,
+        location: form.location.trim(),
+        emoji:    form.emoji,
+      }}).unwrap();
+      toast.success(`${form.name} added & activated`);
+      setForm({ name: '', type: 'Villa', location: '', emoji: 'landmark' });
+      setErrors({});
+      onClose();
+    } catch (err) {
+      toast.error(err?.data?.error || 'Failed to add property');
+    }
   };
 
   if (!open) return null;

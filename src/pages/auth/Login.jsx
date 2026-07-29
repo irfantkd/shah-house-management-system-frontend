@@ -19,7 +19,6 @@ import {
   selectAuthError,
   clearAuthError,
 } from "../../store/slices/authSlice";
-import heroImg from "../../assets/hero.png";
 import { ShahHouseIconMark } from "../../components/ui/ShahHouseLogo";
 
 // ─── Brand tokens ────────────────────────────────────────────────────────────

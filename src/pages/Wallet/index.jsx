@@ -4,10 +4,9 @@ import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
   Wallet, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
-  AlertTriangle, Download, ChevronRight,
+  AlertTriangle, ChevronRight, Pencil, Trash2, FileText, Loader2,
 } from 'lucide-react';
-import { downloadCombinedWalletPDF } from '../../utils/pdfReport';
-import { useGetQuery, usePostMutation } from '../../api/apiSlice';
+import { useGetQuery, usePostMutation, usePatchMutation, useDeleteMutation, useDownloadChallanMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
 import Modal  from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -61,13 +60,74 @@ export default function WalletPage() {
   const hWallet = { ...EMPTY_W, ...walletData?.home    };
   const sWallet = { ...EMPTY_W, ...walletData?.salary  };
 
-  const [depositMut] = usePostMutation();
+  const [depositMut, { isLoading: isDepositing }] = usePostMutation();
+  const [patchMut]     = usePatchMutation();
+  const [deleteMut,  { isLoading: isDeleting }]  = useDeleteMutation();
+  const [downloadMut, { isLoading: downloading }] = useDownloadChallanMutation();
 
-  const [showDeposit, setShowDeposit] = useState(false);
-  const [form,        setForm]        = useState(BLANK);
-  const [filter,      setFilter]      = useState('all');
-  const [txnPeriod,   setTxnPeriod]   = useState('month');
+  const [showDeposit,  setShowDeposit]  = useState(false);
+  const [showReport,   setShowReport]   = useState(false);
+  const [form,         setForm]         = useState(BLANK);
+  const [filter,       setFilter]       = useState('all');
+  const [txnPeriod,    setTxnPeriod]    = useState('month');
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Report filter state
+  const REPORT_BLANK = { walletType: 'all', period: 'month', startDate: '', endDate: '' };
+  const [reportForm, setReportForm] = useState(REPORT_BLANK);
+  const setRF = (k, v) => setReportForm((f) => ({ ...f, [k]: v }));
+
+  const handleDownloadReport = async () => {
+    try {
+      const params = { propertyId, walletType: reportForm.walletType, period: reportForm.period };
+      if (reportForm.period === 'custom') {
+        if (!reportForm.startDate || !reportForm.endDate) return toast.error('Please select both start and end dates');
+        params.startDate = reportForm.startDate;
+        params.endDate   = reportForm.endDate;
+      }
+      const wLabel = reportForm.walletType === 'all' ? 'All-Wallets' : reportForm.walletType.charAt(0).toUpperCase() + reportForm.walletType.slice(1);
+      await downloadMut({ path: '/reports/wallet', params, filename: `Shah-Wallet-${wLabel}-${reportForm.period}.pdf` }).unwrap();
+      toast.success('Report downloaded');
+      setShowReport(false);
+    } catch { toast.error('Failed to generate report'); }
+  };
+
+  // edit-deposit state
+  const EDIT_BLANK = { amount: '', date: '', note: '' };
+  const [editTx,   setEditTx]   = useState(null);
+  const [editForm, setEditForm] = useState(EDIT_BLANK);
+  const setEF = (k, v) => setEditForm((f) => ({ ...f, [k]: v }));
+
+  // delete-deposit state
+  const [deleteTx, setDeleteTx] = useState(null);
+
+  const openEdit = (txn) => {
+    setEditTx(txn);
+    setEditForm({ amount: String(txn.amount), date: txn.date, note: txn.note || txn.description || '' });
+  };
+
+  const handleEdit = async (e) => {
+    e.preventDefault();
+    const amt = Number(editForm.amount);
+    if (!amt || amt <= 0) return toast.error('Enter a valid amount');
+    try {
+      await patchMut({ path: `/wallet/transaction/${editTx._id || editTx.id}`, body: { amount: amt, note: editForm.note, description: editForm.note, date: editForm.date } }).unwrap();
+      await Promise.all([refetchWallets(), refetchTxns()]);
+      toast.success('Deposit updated successfully');
+      setEditTx(null);
+      setEditForm(EDIT_BLANK);
+    } catch (err) { toast.error(err.data?.error || 'Failed to update deposit'); }
+  };
+
+  const handleDeleteDeposit = async () => {
+    if (!deleteTx) return;
+    try {
+      await deleteMut({ path: `/wallet/transaction/${deleteTx._id || deleteTx.id}` }).unwrap();
+      await Promise.all([refetchWallets(), refetchTxns()]);
+      toast.success('Deposit deleted');
+      setDeleteTx(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to delete deposit'); }
+  };
 
   const walletsMap = { vehicle: vWallet, home: hWallet, salary: sWallet };
 
@@ -127,7 +187,13 @@ export default function WalletPage() {
           </div>
           <p className="text-slate-500 text-[13px]">Manage expense budgets — deposit and track spending by category</p>
         </div>
-        <Button icon={Plus} onClick={() => openDeposit('vehicle')}>Deposit Funds</Button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowReport(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-[13px] font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-all">
+            <FileText className="w-4 h-4 text-accent-600" /> Generate Report
+          </button>
+          <Button icon={Plus} onClick={() => openDeposit('vehicle')}>Deposit Funds</Button>
+        </div>
       </motion.div>
 
       {/* ── Wallet Cards ── */}
@@ -300,10 +366,9 @@ export default function WalletPage() {
                 {visible.length} records · {periodLabel(txnPeriod)}
               </p>
             </div>
-            <button
-              onClick={() => downloadCombinedWalletPDF({ vWallet, hWallet, transactions: visible.filter((t) => t.walletType !== 'salary'), periodLabel: periodLabel(txnPeriod), propertyName: property?.name, propertyType: property?.type })}
+            <button onClick={() => setShowReport(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all">
-              <Download className="w-3.5 h-3.5" /> Download PDF
+              <FileText className="w-3.5 h-3.5 text-accent-600" /> Report
             </button>
           </div>
 
@@ -351,7 +416,7 @@ export default function WalletPage() {
                   const isDepo = txn.type === 'credit';
                   const WIcon  = wCfg.icon;
                   return (
-                    <div key={txn.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
+                    <div key={txn.id} className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
                       <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
                         isDepo ? 'bg-emerald-50' : 'bg-red-50')}>
                         {isDepo
@@ -371,11 +436,29 @@ export default function WalletPage() {
                           <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className={cn('text-[15px] font-bold tabular-nums', isDepo ? 'text-emerald-600' : 'text-red-500')}>
-                          {isDepo ? '+' : '−'}AED {fmt(txn.amount)}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Bal: AED {fmt(txn.balanceAfter ?? 0)}</p>
+                      <div className="flex items-center gap-1.5">
+                        {isDepo && (
+                          <button
+                            onClick={() => openEdit(txn)}
+                            title="Edit deposit"
+                            className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all shrink-0">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {isDepo && (
+                          <button
+                            onClick={() => setDeleteTx(txn)}
+                            title="Delete deposit"
+                            className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <div className="text-right shrink-0">
+                          <p className={cn('text-[15px] font-bold tabular-nums', isDepo ? 'text-emerald-600' : 'text-red-500')}>
+                            {isDepo ? '+' : '−'}AED {fmt(txn.amount)}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Bal: AED {fmt(txn.balanceAfter ?? 0)}</p>
+                        </div>
                       </div>
                     </div>
                   );
@@ -385,7 +468,7 @@ export default function WalletPage() {
                 <p className="text-[11px] text-slate-400">{visible.length} transactions</p>
                 <div className="flex items-center gap-4">
                   <span className="text-[12px] text-emerald-600 font-bold">
-                    +AED {fmt(visible.filter((t) => t.type === 'credit' || t.type === 'deposit').reduce((s, t) => s + t.amount, 0))}
+                    +AED {fmt(visible.filter((t) => t.type === 'credit').reduce((s, t) => s + t.amount, 0))}
                   </span>
                   <span className="text-[12px] text-red-500 font-bold">
                     −AED {fmt(visible.filter((t) => t.type === 'debit').reduce((s, t) => s + t.amount, 0))}
@@ -397,8 +480,181 @@ export default function WalletPage() {
         </div>
       </motion.div>
 
+      {/* ── Report Modal ── */}
+      <Modal open={showReport} onClose={() => { setShowReport(false); setReportForm(REPORT_BLANK); }}
+        title="Download Wallet Report" subtitle="Choose a wallet and period, then download a PDF statement" size="sm">
+        <div className="space-y-4">
+
+          {/* Wallet */}
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Wallet</label>
+            <select value={reportForm.walletType} onChange={(e) => setRF('walletType', e.target.value)} className={INP}>
+              <option value="all">All Wallets</option>
+              <option value="vehicle">Vehicle Wallet</option>
+              <option value="home">Home Wallet</option>
+              <option value="salary">Salary Wallet</option>
+            </select>
+          </div>
+
+          {/* Period */}
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Period</label>
+            <select value={reportForm.period} onChange={(e) => setRF('period', e.target.value)} className={INP}>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="lastMonth">Last Month</option>
+              <option value="all">All Time</option>
+              <option value="custom">Custom Date Range</option>
+            </select>
+          </div>
+
+          {/* Custom date range — only shown when custom is selected */}
+          {reportForm.period === 'custom' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Start Date</label>
+                <input type="date" value={reportForm.startDate}
+                  onChange={(e) => setRF('startDate', e.target.value)} className={INP} />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">End Date</label>
+                <input type="date" value={reportForm.endDate}
+                  onChange={(e) => setRF('endDate', e.target.value)}
+                  max={new Date().toISOString().split('T')[0]} className={INP} />
+              </div>
+            </div>
+          )}
+
+          {/* What will be generated */}
+          <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+              <FileText className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-[12px] font-bold text-slate-800">PDF Wallet Statement</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {reportForm.walletType === 'all' ? 'All Wallets' : reportForm.walletType.charAt(0).toUpperCase() + reportForm.walletType.slice(1) + ' Wallet'}
+                {' · '}
+                {reportForm.period === 'week' ? 'This Week' : reportForm.period === 'month' ? 'This Month' : reportForm.period === 'lastMonth' ? 'Last Month' : reportForm.period === 'custom' ? 'Custom Range' : 'All Time'}
+                {' · Includes Cash In, Cash Out & Net Total'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
+            <Button variant="outline" type="button" onClick={() => { setShowReport(false); setReportForm(REPORT_BLANK); }}>
+              Cancel
+            </Button>
+            <button onClick={handleDownloadReport} disabled={downloading}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-opacity disabled:opacity-60"
+              style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+              {downloading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
+                : <><FileText className="w-4 h-4" /> Download PDF</>}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Edit Deposit Modal ── */}
+      <Modal open={!!editTx} onClose={() => { setEditTx(null); setEditForm(EDIT_BLANK); }}
+        title="Edit Deposit" subtitle="Correct the amount, date or note of this deposit" size="sm">
+        {editTx && (
+          <form onSubmit={handleEdit} className="space-y-4">
+            {/* Wallet badge (read-only) */}
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
+              {(() => { const wCfg = WALLETS[editTx.walletType] ?? WALLETS.vehicle; const WIcon = wCfg.icon; return (
+                <>
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: wCfg.color }}>
+                    <WIcon className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-bold" style={{ color: wCfg.color }}>{wCfg.label}</p>
+                    <p className="text-[10px] text-slate-400">Wallet cannot be changed after deposit</p>
+                  </div>
+                </>
+              ); })()}
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Amount (AED) *</label>
+              <input value={editForm.amount} onChange={(e) => setEF('amount', e.target.value)}
+                type="number" min="1" step="0.01" required className={INP} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date</label>
+              <input value={editForm.date} onChange={(e) => setEF('date', e.target.value)} type="date" className={INP} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Note / Source</label>
+              <input value={editForm.note} onChange={(e) => setEF('note', e.target.value)}
+                placeholder="e.g. Monthly vehicle budget" className={INP} />
+            </div>
+
+            {editForm.amount && Number(editForm.amount) !== editTx.amount && (
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-blue-50 border border-blue-100">
+                <Pencil className="w-4 h-4 text-blue-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[11px] font-medium text-blue-700">Balance adjustment</p>
+                  <p className="text-[13px] font-bold text-blue-800">
+                    {Number(editForm.amount) > editTx.amount ? '+' : ''}AED {fmt(Number(editForm.amount) - editTx.amount)} vs original AED {fmt(editTx.amount)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
+              <Button variant="outline" type="button" onClick={() => { setEditTx(null); setEditForm(EDIT_BLANK); }}>Cancel</Button>
+              <Button type="submit" icon={Pencil}>Save Changes</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ── Delete Confirm Modal ── */}
+      <Modal open={!!deleteTx} onClose={() => { if (!isDeleting) setDeleteTx(null); }}
+        title="Delete Deposit" subtitle="This will reverse the wallet balance — cannot be undone" size="sm">
+        {deleteTx && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+              <div>
+                <p className="text-[13px] font-bold text-red-700">
+                  AED {fmt(deleteTx.amount)} will be removed from {WALLETS[deleteTx.walletType]?.label}
+                </p>
+                <p className="text-[11px] text-red-500 mt-0.5">
+                  The wallet balance will decrease by AED {fmt(deleteTx.amount)}
+                </p>
+              </div>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Date</p>
+                <p className="text-[13px] font-semibold text-slate-700 mt-0.5">{fmtDate(deleteTx.date)}</p>
+              </div>
+              {(deleteTx.note || deleteTx.description) && (
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">Note</p>
+                  <p className="text-[13px] font-semibold text-slate-700 mt-0.5">{deleteTx.note || deleteTx.description}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
+              <Button variant="outline" type="button" onClick={() => setDeleteTx(null)} disabled={isDeleting}>Cancel</Button>
+              <button onClick={handleDeleteDeposit} disabled={isDeleting}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-opacity disabled:opacity-60 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700">
+                {isDeleting
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</>
+                  : <><Trash2 className="w-4 h-4" /> Delete Deposit</>}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* ── Deposit Modal ── */}
-      <Modal open={showDeposit} onClose={() => setShowDeposit(false)}
+      <Modal open={showDeposit} onClose={() => { if (!isDepositing) setShowDeposit(false); }}
         title="Deposit Funds" subtitle="Receive money from boss and allocate to a wallet" size="sm">
         <form onSubmit={handleDeposit} className="space-y-4">
           <div>
@@ -463,8 +719,14 @@ export default function WalletPage() {
           )}
 
           <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
-            <Button variant="outline" type="button" onClick={() => setShowDeposit(false)}>Cancel</Button>
-            <Button type="submit" icon={Plus}>Deposit</Button>
+            <Button variant="outline" type="button" onClick={() => setShowDeposit(false)} disabled={isDepositing}>Cancel</Button>
+            <button type="submit" disabled={isDepositing}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+              {isDepositing
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Depositing…</>
+                : <><Plus className="w-4 h-4" /> Deposit</>}
+            </button>
           </div>
         </form>
       </Modal>

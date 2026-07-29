@@ -4,7 +4,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import Sidebar from '../components/layout/Sidebar';
 import Navbar  from '../components/layout/Navbar';
 import { selectIsAuthenticated } from '../store/slices/authSlice';
-import { fetchProperties } from '../store/slices/propertiesSlice';
+import { setProperties } from '../store/slices/propertiesSlice';
+import { useGetQuery } from '../api/apiSlice';
 
 const SIDEBAR_FULL = 260;
 const SIDEBAR_MINI = 68;
@@ -22,11 +23,11 @@ export default function AppLayout() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Only load properties globally — all other data is fetched per page
+  const { data: propertiesList } = useGetQuery({ path: '/properties' }, { skip: !isAuth });
+
   useEffect(() => {
-    if (!isAuth) return;
-    dispatch(fetchProperties());
-  }, [isAuth, dispatch]);
+    if (propertiesList) dispatch(setProperties(propertiesList));
+  }, [propertiesList, dispatch]);
 
   const sidebarWidth = collapsed ? SIDEBAR_MINI : SIDEBAR_FULL;
 

@@ -4,9 +4,8 @@ import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
-  Download, AlertTriangle, Wallet, TrendingUp, TrendingDown,
+  AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2,
 } from 'lucide-react';
-import { downloadSingleWalletPDF } from '../../utils/pdfReport';
 import { useGetQuery, usePostMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
 import Modal  from '../../components/ui/Modal';
@@ -23,8 +22,6 @@ const WALLET_CFG = {
   home:    { label: 'Home Wallet',    desc: 'Property services, grocery & household',    icon: Home,    color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
   salary:  { label: 'Salary Wallet',  desc: 'Employee salary payments only',             icon: Banknote, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
 };
-
-const PDF_COLORS = { vehicle: [11, 29, 58], home: [20, 83, 45], salary: [76, 29, 149] };
 
 const PERIODS = [
   { k: 'week',   l: 'This Week'    },
@@ -79,7 +76,7 @@ export default function WalletDetail() {
   const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
   const { data: rawTxns = [], refetch: refetchTxns  } = useGetQuery({ path: '/wallet/transactions', params: { propertyId, walletType: type } }, { skip: !propertyId });
   const wallet = walletData?.[type] ?? emptyWallet;
-  const [depositMut] = usePostMutation();
+  const [depositMut, { isLoading: isDepositing }] = usePostMutation();
 
   const [period,      setPeriod]      = useState('month');
   const [showDeposit, setShowDeposit] = useState(false);
@@ -161,11 +158,6 @@ export default function WalletDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => downloadSingleWalletPDF({ walletLabel: cfg.label, walletColor: PDF_COLORS[type], wallet, transactions: filtered, byMonth, periodLabel: periodLabel(period), propertyName: property?.name, propertyType: property?.type })}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-[12px] font-bold text-slate-600 hover:border-slate-300 hover:shadow-sm transition-all">
-            <Download className="w-3.5 h-3.5" /> Download PDF
-          </button>
           <Button icon={Plus} onClick={() => setShowDeposit(true)}>Deposit Funds</Button>
         </div>
       </motion.div>
@@ -295,16 +287,9 @@ export default function WalletDetail() {
       {/* ── Transaction list ── */}
       <motion.div {...fade(0.2)}>
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
-          <div className="p-5 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-50">
-            <div>
-              <p className="text-[14px] font-bold text-slate-800">Transactions</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">{filtered.length} records · {periodLabel(period)}</p>
-            </div>
-            <button
-              onClick={() => downloadSingleWalletPDF({ walletLabel: cfg.label, walletColor: PDF_COLORS[type], wallet, transactions: filtered, byMonth, periodLabel: periodLabel(period), propertyName: property?.name, propertyType: property?.type })}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors">
-              <Download className="w-3.5 h-3.5" /> Download PDF
-            </button>
+          <div className="p-5 pb-3 border-b border-slate-50">
+            <p className="text-[14px] font-bold text-slate-800">Transactions</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{filtered.length} records · {periodLabel(period)}</p>
           </div>
 
           {filtered.length === 0 ? (
@@ -361,7 +346,7 @@ export default function WalletDetail() {
       </motion.div>
 
       {/* ── Deposit Modal ── */}
-      <Modal open={showDeposit} onClose={() => setShowDeposit(false)}
+      <Modal open={showDeposit} onClose={() => { if (!isDepositing) setShowDeposit(false); }}
         title={`Deposit to ${cfg.label}`} subtitle="Receive funds and add to this wallet" size="sm">
         <form onSubmit={handleDeposit} className="space-y-4">
           <div>
@@ -390,8 +375,14 @@ export default function WalletDetail() {
             </div>
           )}
           <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
-            <Button variant="outline" type="button" onClick={() => setShowDeposit(false)}>Cancel</Button>
-            <Button type="submit" icon={Plus}>Deposit</Button>
+            <Button variant="outline" type="button" onClick={() => setShowDeposit(false)} disabled={isDepositing}>Cancel</Button>
+            <button type="submit" disabled={isDepositing}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: cfg.gradient }}>
+              {isDepositing
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> Depositing…</>
+                : <><Plus className="w-4 h-4" /> Deposit</>}
+            </button>
           </div>
         </form>
       </Modal>

@@ -75,15 +75,6 @@ export default function AreasPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
   const property   = useSelector(selectCurrentProperty);
 
-  const areaParams = {
-    propertyId,
-    ...(floorFilter !== "all" && { floorId: floorFilter }),
-    ...(search && { search }),
-  };
-  const { data: areas      = [] } = useGetQuery({ path: '/areas',       params: areaParams }, { skip: !propertyId });
-  const { data: areaStats  = {} } = useGetQuery({ path: '/areas/stats', params: { propertyId } }, { skip: !propertyId });
-  const { data: floors     = [] } = useGetQuery({ path: '/floors',      params: { propertyId } }, { skip: !propertyId });
-
   const [addAreaMut]    = usePostMutation();
   const [updateAreaMut] = usePutMutation();
   const [deleteAreaMut] = useDeleteMutation();
@@ -93,6 +84,15 @@ export default function AreasPage() {
   const [search,       setSearch]       = useState("");
   const [view,         setView]         = useState("grid");
   const [floorFilter,  setFloorFilter]  = useState("all");
+
+  const areaParams = {
+    propertyId,
+    ...(floorFilter !== "all" && { floorId: floorFilter }),
+    ...(search && { search }),
+  };
+  const { data: areas      = [] } = useGetQuery({ path: '/areas',       params: areaParams }, { skip: !propertyId });
+  const { data: areaStats  = {} } = useGetQuery({ path: '/areas/stats', params: { propertyId } }, { skip: !propertyId });
+  const { data: floors     = [] } = useGetQuery({ path: '/floors',      params: { propertyId } }, { skip: !propertyId });
   const [modal,        setModal]        = useState(null);
   const [delTarget,    setDelTarget]    = useState(null);
   const [page,         setPage]         = useState(1);

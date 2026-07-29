@@ -289,10 +289,10 @@ export function downloadSingleWalletPDF({
   const total = wallet.totalDeposited ?? 0;
   const pct = total > 0 ? Math.round((bal / total) * 100) : 0;
   const cashIn = transactions
-    .filter((t) => t.type === "deposit")
+    .filter((t) => t.type === "credit")
     .reduce((s, t) => s + t.amount, 0);
   const cashOut = transactions
-    .filter((t) => t.type === "expense")
+    .filter((t) => t.type === "debit")
     .reduce((s, t) => s + t.amount, 0);
 
   y = drawStatRow(doc, y, [
@@ -398,11 +398,11 @@ export function downloadSingleWalletPDF({
     body: transactions.length
       ? transactions.map((t) => [
           fd(t.date),
-          t.type === "deposit"
+          t.type === "credit"
             ? t.note || "Deposit received"
             : t.description || "Expense deducted",
-          t.type === "deposit" ? `+AED ${fm(t.amount)}` : "",
-          t.type === "expense" ? `-AED ${fm(t.amount)}` : "",
+          t.type === "credit" ? `+AED ${fm(t.amount)}` : "",
+          t.type === "debit"  ? `-AED ${fm(t.amount)}` : "",
           `AED ${fm(t.balanceAfter ?? 0)}`,
         ])
       : [["", "No transactions recorded for this period.", "", "", ""]],
@@ -485,10 +485,10 @@ export function downloadCombinedWalletPDF({
   const vTotal = vWallet.totalDeposited ?? 0;
   const hTotal = hWallet.totalDeposited ?? 0;
   const cashIn = transactions
-    .filter((t) => t.type === "deposit")
+    .filter((t) => t.type === "credit")
     .reduce((s, t) => s + t.amount, 0);
   const cashOut = transactions
-    .filter((t) => t.type === "expense")
+    .filter((t) => t.type === "debit")
     .reduce((s, t) => s + t.amount, 0);
 
   // Row 1 — wallet balances
@@ -539,12 +539,12 @@ export function downloadCombinedWalletPDF({
     body: transactions.length
       ? transactions.map((t) => [
           fd(t.date),
-          t.wallet === "vehicle" ? "Vehicle" : "Home",
-          t.type === "deposit"
+          t.walletType === "vehicle" ? "Vehicle" : "Home",
+          t.type === "credit"
             ? t.note || "Deposit received"
             : t.description || "Expense deducted",
-          t.type === "deposit" ? `+AED ${fm(t.amount)}` : "",
-          t.type === "expense" ? `-AED ${fm(t.amount)}` : "",
+          t.type === "credit" ? `+AED ${fm(t.amount)}` : "",
+          t.type === "debit"  ? `-AED ${fm(t.amount)}` : "",
           `AED ${fm(t.balanceAfter ?? 0)}`,
         ])
       : [["", "", "No transactions recorded for this period.", "", "", ""]],
@@ -588,6 +588,46 @@ export function downloadCombinedWalletPDF({
   doc.save(
     `${propSlug}-All-Wallets-${periodLabel.replace(/[\s/]+/g, "-")}-Statement.pdf`,
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  WALLET CSV STATEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+export function downloadWalletCSV({ transactions, walletLabel, periodLabel, propertyName }) {
+  const headers = [
+    "Date",
+    "Wallet",
+    "Type",
+    "Description / Note",
+    "Cash In AED",
+    "Cash Out AED",
+    "Balance After AED",
+  ];
+
+  const WALLET_LABEL = { vehicle: "Vehicle", home: "Home", salary: "Salary" };
+
+  const rows = transactions.map((t) => [
+    t.date,
+    WALLET_LABEL[t.walletType] ?? t.walletType,
+    t.type === "credit" ? "Deposit" : "Expense",
+    t.type === "credit" ? (t.note || "Deposit") : (t.description || "Expense"),
+    t.type === "credit" ? t.amount : "",
+    t.type === "debit"  ? t.amount : "",
+    t.balanceAfter ?? "",
+  ]);
+
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [headers, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `${(propertyName ?? "Property").replace(/\s+/g, "-")}-${walletLabel.replace(/\s+/g, "-")}-${periodLabel.replace(/[\s/]+/g, "-")}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

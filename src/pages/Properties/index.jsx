@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 import {
   selectProperties, selectCurrentPropertyId, selectPropertiesStatus,
-  addProperty, updateProperty, deleteProperty, setCurrentProperty,
+  setCurrentProperty,
 } from '../../store/slices/propertiesSlice';
+import { usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import { cn } from '../../utils/cn';
 
@@ -67,6 +68,10 @@ export default function PropertiesPage() {
   const status     = useSelector(selectPropertiesStatus);
   const current    = properties.find((p) => p.id === currentId);
 
+  const [postMut]   = usePostMutation();
+  const [putMut]    = usePutMutation();
+  const [deleteMut] = useDeleteMutation();
+
   const [modal,     setModal]     = useState(null);  // null | 'add' | property-object
   const [delTarget, setDelTarget] = useState(null);
   const [deleting,  setDeleting]  = useState(false);
@@ -85,23 +90,29 @@ export default function PropertiesPage() {
 
   const handleSave = async (data) => {
     const isEdit = modal && modal !== 'add';
-    const thunk  = isEdit ? updateProperty({ id: modal.id, ...data }) : addProperty(data);
-    const res    = await dispatch(thunk);
-    if (res.error) {
-      toast.error(res.payload || (isEdit ? 'Failed to update property' : 'Failed to add property'));
-      return;
+    try {
+      if (isEdit) {
+        await putMut({ path: `/properties/${modal.id}`, body: data }).unwrap();
+      } else {
+        await postMut({ path: '/properties', body: data }).unwrap();
+      }
+      toast.success(isEdit ? 'Property updated' : `${data.name} added`);
+      setModal(null);
+    } catch (err) {
+      toast.error(err?.data?.error || (isEdit ? 'Failed to update property' : 'Failed to add property'));
     }
-    toast.success(isEdit ? 'Property updated' : `${data.name} added`);
-    setModal(null);
   };
 
   const handleDelete = async () => {
     setDeleting(true);
-    const res = await dispatch(deleteProperty(delTarget.id));
+    try {
+      await deleteMut({ path: `/properties/${delTarget.id}` }).unwrap();
+      toast.success(`${delTarget.name} deleted`);
+      setDelTarget(null);
+    } catch (err) {
+      toast.error(err?.data?.error || 'Delete failed');
+    }
     setDeleting(false);
-    if (res.error) { toast.error(res.payload || 'Delete failed'); return; }
-    toast.success(`${delTarget.name} deleted`);
-    setDelTarget(null);
   };
 
   return (

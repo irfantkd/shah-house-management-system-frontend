@@ -80,10 +80,9 @@ export default function Dashboard() {
   const propertyId = useSelector(selectCurrentPropertyId);
   const user       = useSelector(selectAuthUser);
 
-  const { data: dash = EMPTY_DASH, isLoading }    = useGetQuery({ path: '/dashboard',    params: { propertyId } }, { skip: !propertyId });
-  const { data: notifications = [] }              = useGetQuery({ path: '/notifications', params: { propertyId } }, { skip: !propertyId });
+  const { data: dash = EMPTY_DASH, isLoading } = useGetQuery({ path: '/dashboard', params: { propertyId } }, { skip: !propertyId });
 
-  const unread = notifications.filter((n) => !n.read).length;
+  const unread  = dash.unreadNotifications ?? 0;
   const loading = isLoading || !propertyId;
 
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
