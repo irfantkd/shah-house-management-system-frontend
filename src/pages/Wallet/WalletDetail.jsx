@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
-  AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2,
+  AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2, Pencil, Trash2,
 } from 'lucide-react';
-import { useGetQuery, usePostMutation } from '../../api/apiSlice';
+import { useGetQuery, usePostMutation, usePatchMutation, useDeleteMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
-import Modal  from '../../components/ui/Modal';
-import Button from '../../components/ui/Button';
+import Modal   from '../../components/ui/Modal';
+import Button  from '../../components/ui/Button';
+import SwipeableRow from '../../components/ui/SwipeableRow';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
@@ -18,24 +19,29 @@ const LOW_BALANCE_THRESHOLD = 5000;
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.32, delay: d, ease: [0.4, 0, 0.2, 1] } });
 
 const WALLET_CFG = {
-  vehicle: { label: 'Vehicle Wallet', desc: 'Fuel, maintenance, repairs & fleet costs',  icon: Car,     color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-  home:    { label: 'Home Wallet',    desc: 'Property services, grocery & household',    icon: Home,    color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
+  vehicle: { label: 'Vehicle Wallet', desc: 'Fuel, maintenance, repairs & fleet costs',  icon: Car,      color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+  home:    { label: 'Home Wallet',    desc: 'Property services, grocery & household',    icon: Home,     color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
   salary:  { label: 'Salary Wallet',  desc: 'Employee salary payments only',             icon: Banknote, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
 };
 
 const PERIODS = [
-  { k: 'week',   l: 'This Week'    },
-  { k: 'month',  l: 'This Month'   },
-  { k: 'lastm',  l: 'Last Month'   },
-  { k: 'last3',  l: 'Last 3 Months'},
-  { k: 'all',    l: 'All Time'     },
+  { k: 'week',   l: 'This Week'     },
+  { k: 'month',  l: 'This Month'    },
+  { k: 'lastm',  l: 'Last Month'    },
+  { k: 'last3',  l: 'Last 3 Months' },
+  { k: 'all',    l: 'All Time'      },
+  { k: 'custom', l: 'Custom'        },
 ];
 
-const fmt = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
+const fmt     = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-function applyPeriod(txns, period) {
+function applyPeriod(txns, period, customStart, customEnd) {
   if (period === 'all') return txns;
+  if (period === 'custom') {
+    if (!customStart || !customEnd) return txns;
+    return txns.filter((t) => t.date >= customStart && t.date <= customEnd);
+  }
   const now = new Date();
   if (period === 'lastm') {
     const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -49,18 +55,19 @@ function applyPeriod(txns, period) {
   return txns.filter((t) => new Date(t.date) >= cutoff);
 }
 
-function periodLabel(period) {
+function periodLabel(period, customStart, customEnd) {
   const now = new Date();
-  if (period === 'week')  return `Last 7 Days`;
-  if (period === 'month') return now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  if (period === 'lastm') return new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  if (period === 'last3') return 'Last 3 Months';
+  if (period === 'week')   return 'Last 7 Days';
+  if (period === 'month')  return now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  if (period === 'lastm')  return new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  if (period === 'last3')  return 'Last 3 Months';
+  if (period === 'custom') return customStart && customEnd ? `${customStart} → ${customEnd}` : 'Custom Range';
   return 'All Time';
 }
 
-
-const INP = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
-const BLANK = { amount: '', note: '', date: new Date().toISOString().split('T')[0] };
+const INP      = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+const DEP_BLANK = { amount: '', note: '', date: new Date().toISOString().split('T')[0] };
+const EDT_BLANK = { amount: '', note: '', date: '' };
 
 export default function WalletDetail() {
   const { walletType } = useParams();
@@ -72,23 +79,47 @@ export default function WalletDetail() {
   const cfg  = WALLET_CFG[type];
   const Icon = cfg.icon;
 
-  const emptyWallet = { balance: 0, totalDeposited: 0 };
   const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
   const { data: rawTxns = [], refetch: refetchTxns  } = useGetQuery({ path: '/wallet/transactions', params: { propertyId, walletType: type } }, { skip: !propertyId });
-  const wallet = walletData?.[type] ?? emptyWallet;
+  const wallet = walletData?.[type] ?? { balance: 0, totalDeposited: 0 };
+
   const [depositMut, { isLoading: isDepositing }] = usePostMutation();
+  const [patchMut]                                 = usePatchMutation();
+  const [deleteMut,  { isLoading: isDeleting }]   = useDeleteMutation();
 
+  // ── Period filter state ──────────────────────────────────────────────────────
   const [period,      setPeriod]      = useState('month');
-  const [showDeposit, setShowDeposit] = useState(false);
-  const [form,        setForm]        = useState(BLANK);
-  const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd,   setCustomEnd]   = useState('');
 
+  // ── Deposit form ─────────────────────────────────────────────────────────────
+  const [showDeposit, setShowDeposit] = useState(false);
+  const [depForm,     setDepForm]     = useState(DEP_BLANK);
+  const setDF = (k, v) => setDepForm((f) => ({ ...f, [k]: v }));
+
+  // ── Edit deposit state ───────────────────────────────────────────────────────
+  const [editTx,   setEditTx]   = useState(null);
+  const [editForm, setEditForm] = useState(EDT_BLANK);
+  const setEF = (k, v) => setEditForm((f) => ({ ...f, [k]: v }));
+
+  const openEdit = (txn) => {
+    setEditTx(txn);
+    setEditForm({ amount: String(txn.amount), date: txn.date, note: txn.note || txn.description || '' });
+  };
+
+  // ── Delete deposit state ─────────────────────────────────────────────────────
+  const [deleteTx, setDeleteTx] = useState(null);
+
+  // ── Sorted & filtered transactions ──────────────────────────────────────────
   const allTxns = useMemo(() => [...rawTxns].sort((a, b) => {
     const d = new Date(b.date) - new Date(a.date);
     return d !== 0 ? d : String(b.id).localeCompare(String(a.id));
   }), [rawTxns]);
 
-  const filtered = useMemo(() => applyPeriod(allTxns, period), [allTxns, period]);
+  const filtered = useMemo(
+    () => applyPeriod(allTxns, period, customStart, customEnd),
+    [allTxns, period, customStart, customEnd],
+  );
 
   const isCredit = (t) => t.type === 'credit';
   const isDebit  = (t) => t.type === 'debit';
@@ -96,7 +127,7 @@ export default function WalletDetail() {
   const periodSpent     = filtered.filter(isDebit).reduce((s, t) => s + t.amount, 0);
   const periodNet       = periodDeposited - periodSpent;
 
-  // Monthly breakdown for chart (all-time, max 6 months)
+  // ── Monthly chart (all-time, max 6 months) ──────────────────────────────────
   const byMonth = useMemo(() => {
     const map = {};
     allTxns.forEach((t) => {
@@ -117,18 +148,44 @@ export default function WalletDetail() {
   const low     = balance < LOW_BALANCE_THRESHOLD;
   const empty   = balance <= 0;
 
+  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleDeposit = async (e) => {
     e.preventDefault();
-    const amt = Number(form.amount);
+    const amt = Number(depForm.amount);
     if (!amt || amt <= 0) return toast.error('Enter a valid amount');
     try {
-      await depositMut({ path: '/wallet/deposit', body: { propertyId, walletType: type, amount: amt, description: form.note, note: form.note, date: form.date } }).unwrap();
+      await depositMut({ path: '/wallet/deposit', body: { propertyId, walletType: type, amount: amt, description: depForm.note, note: depForm.note, date: depForm.date } }).unwrap();
       await Promise.all([refetchWallet(), refetchTxns()]);
       toast.success(`AED ${fmt(amt)} deposited to ${cfg.label}`);
       setShowDeposit(false);
-      setForm(BLANK);
+      setDepForm(DEP_BLANK);
     } catch (err) { toast.error(err.data?.error || 'Failed to deposit'); }
   };
+
+  const handleEdit = async (e) => {
+    e.preventDefault();
+    const amt = Number(editForm.amount);
+    if (!amt || amt <= 0) return toast.error('Enter a valid amount');
+    try {
+      await patchMut({ path: `/wallet/transaction/${editTx._id || editTx.id}`, body: { amount: amt, note: editForm.note, description: editForm.note, date: editForm.date } }).unwrap();
+      await Promise.all([refetchWallet(), refetchTxns()]);
+      toast.success('Deposit updated');
+      setEditTx(null);
+      setEditForm(EDT_BLANK);
+    } catch (err) { toast.error(err.data?.error || 'Failed to update'); }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTx) return;
+    try {
+      await deleteMut({ path: `/wallet/transaction/${deleteTx._id || deleteTx.id}` }).unwrap();
+      await Promise.all([refetchWallet(), refetchTxns()]);
+      toast.success('Deposit deleted');
+      setDeleteTx(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to delete'); }
+  };
+
+  const pLabel = periodLabel(period, customStart, customEnd);
 
   return (
     <div className="space-y-6">
@@ -165,7 +222,7 @@ export default function WalletDetail() {
       {/* ── Hero wallet card ── */}
       <motion.div {...fade(0.05)}>
         <div className="rounded-2xl overflow-hidden" style={{ background: cfg.gradient, boxShadow: `0 10px 40px ${cfg.color}35` }}>
-          <div className="p-7 pb-5">
+          <div className="p-6 pb-4">
             <div className="flex items-start justify-between mb-5">
               <div>
                 <p className="text-white/50 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Available Balance</p>
@@ -173,9 +230,9 @@ export default function WalletDetail() {
                 <p className="text-white/40 text-[12px] mt-2">{cfg.desc}</p>
               </div>
               {(empty || low) && (
-                <span className={cn('flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-xl',
+                <span className={cn('flex items-center gap-1.5 text-[12px] font-bold px-3 py-1.5 rounded-xl shrink-0',
                   empty ? 'bg-red-500 text-white' : 'bg-amber-400 text-amber-900')}>
-                  <AlertTriangle className="w-3.5 h-3.5" />{empty ? 'Empty — Deposit Now' : `Low Balance`}
+                  <AlertTriangle className="w-3.5 h-3.5" />{empty ? 'Empty' : 'Low'}
                 </span>
               )}
             </div>
@@ -186,41 +243,60 @@ export default function WalletDetail() {
           </div>
           <div className="grid grid-cols-3 border-t border-white/10">
             {[
-              { l: 'Total Deposited', v: fmt(total)             },
-              { l: 'Total Spent',     v: fmt(Math.max(0, spent)) },
-              { l: 'Transactions',    v: allTxns.length          },
+              { l: 'Total Deposited', v: `AED ${fmt(total)}` },
+              { l: 'Total Spent',     v: `AED ${fmt(Math.max(0, spent))}` },
+              { l: 'Transactions',    v: allTxns.length },
             ].map((s, i) => (
-              <div key={i} className={cn('px-6 py-4 text-center', i < 2 && 'border-r border-white/10')}>
+              <div key={i} className={cn('px-3 sm:px-6 py-4 text-center', i < 2 && 'border-r border-white/10')}>
                 <p className="text-white/40 text-[9px] font-bold uppercase tracking-wider">{s.l}</p>
-                <p className="text-white font-bold text-[18px] mt-1">{typeof s.v === 'number' ? s.v : `AED ${s.v}`}</p>
+                <p className="text-white font-bold text-[15px] sm:text-[18px] mt-1">{s.v}</p>
               </div>
             ))}
           </div>
         </div>
       </motion.div>
 
-      {/* ── Period selector ── */}
-      <motion.div {...fade(0.1)} className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1">
-          {PERIODS.map(({ k, l }) => (
-            <button key={k} onClick={() => setPeriod(k)}
-              className={cn('px-3.5 py-1.5 rounded-lg text-[12px] font-bold transition-all whitespace-nowrap',
-                period === k ? 'text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}
-              style={period === k ? { background: cfg.color } : {}}>
-              {l}
-            </button>
-          ))}
+      {/* ── Period selector — horizontally scrollable on mobile ── */}
+      <motion.div {...fade(0.1)}>
+        {/* Scrollable tab strip */}
+        <div className="overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 w-max sm:w-auto">
+            {PERIODS.map(({ k, l }) => (
+              <button key={k} onClick={() => setPeriod(k)}
+                className={cn('px-3 sm:px-3.5 py-1.5 rounded-lg text-[12px] font-bold transition-all whitespace-nowrap',
+                  period === k ? 'text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}
+                style={period === k ? { background: cfg.color } : {}}>
+                {l}
+              </button>
+            ))}
+          </div>
         </div>
-        <p className="text-[12px] text-slate-400">{filtered.length} transactions · {periodLabel(period)}</p>
+
+        {/* Custom date inputs — only shown when custom is selected */}
+        {period === 'custom' && (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Start Date</label>
+              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className={INP} />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">End Date</label>
+              <input type="date" value={customEnd} max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setCustomEnd(e.target.value)} className={INP} />
+            </div>
+          </div>
+        )}
+
+        <p className="text-[12px] text-slate-400 mt-2">{filtered.length} transactions · {pLabel}</p>
       </motion.div>
 
       {/* ── Period stats ── */}
       <motion.div {...fade(0.13)}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { l: 'Received',     v: periodDeposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft },
-            { l: 'Spent',        v: periodSpent,     c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight  },
-            { l: 'Net Balance',  v: periodNet,        c: periodNet >= 0 ? '#2563eb' : '#dc2626', bg: periodNet >= 0 ? '#eff6ff' : '#fef2f2', b: periodNet >= 0 ? '#bfdbfe' : '#fecaca', icon: periodNet >= 0 ? TrendingUp : TrendingDown },
+            { l: 'Received',    v: periodDeposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft },
+            { l: 'Spent',       v: periodSpent,     c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight  },
+            { l: 'Net Balance', v: periodNet,        c: periodNet >= 0 ? '#2563eb' : '#dc2626', bg: periodNet >= 0 ? '#eff6ff' : '#fef2f2', b: periodNet >= 0 ? '#bfdbfe' : '#fecaca', icon: periodNet >= 0 ? TrendingUp : TrendingDown },
           ].map((s) => (
             <div key={s.l} className="bg-white rounded-2xl border p-5" style={{ borderColor: s.b, boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
@@ -230,7 +306,7 @@ export default function WalletDetail() {
               <p className="text-[22px] font-bold leading-tight mt-1" style={{ color: s.c }}>
                 {s.v < 0 ? '−' : ''}AED {fmt(Math.abs(s.v))}
               </p>
-              <p className="text-[10px] text-slate-400 mt-1">{periodLabel(period)}</p>
+              <p className="text-[10px] text-slate-400 mt-1">{pLabel}</p>
             </div>
           ))}
         </div>
@@ -245,34 +321,34 @@ export default function WalletDetail() {
                 <p className="text-[14px] font-bold text-slate-800">Monthly Overview</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">Last {byMonth.length} months — deposits vs expenses</p>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400" /><span className="text-[11px] text-slate-500">Deposits</span></div>
-                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-400" /><span className="text-[11px] text-slate-500">Expenses</span></div>
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400" /><span className="text-[11px] text-slate-500">In</span></div>
+                <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-400" /><span className="text-[11px] text-slate-500">Out</span></div>
               </div>
             </div>
             <div className="space-y-3.5">
               {byMonth.map((m) => {
-                const label   = new Date(m.key + '-01').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-                const dPct    = (m.deposited / maxMonthVal) * 100;
-                const sPct    = (m.spent    / maxMonthVal) * 100;
+                const label = new Date(m.key + '-01').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+                const dPct  = (m.deposited / maxMonthVal) * 100;
+                const sPct  = (m.spent     / maxMonthVal) * 100;
                 return (
-                  <div key={m.key} className="flex items-center gap-4">
-                    <span className="text-[11px] font-semibold text-slate-500 w-16 shrink-0">{label}</span>
-                    <div className="flex-1 space-y-1.5">
+                  <div key={m.key} className="flex items-center gap-2 sm:gap-4">
+                    <span className="text-[11px] font-semibold text-slate-500 w-14 sm:w-16 shrink-0">{label}</span>
+                    <div className="flex-1 space-y-1.5 min-w-0">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 bg-slate-100 rounded-full flex-1 overflow-hidden">
+                        <div className="h-2 bg-slate-100 rounded-full flex-1 overflow-hidden min-w-0">
                           <div className="h-full bg-emerald-400 rounded-full transition-all duration-700" style={{ width: `${dPct}%` }} />
                         </div>
-                        <span className="text-[10px] text-slate-400 w-20 text-right tabular-nums">AED {fmt(m.deposited)}</span>
+                        <span className="text-[10px] text-slate-400 w-16 sm:w-20 text-right tabular-nums shrink-0">{fmt(m.deposited)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="h-2 bg-slate-100 rounded-full flex-1 overflow-hidden">
+                        <div className="h-2 bg-slate-100 rounded-full flex-1 overflow-hidden min-w-0">
                           <div className="h-full bg-red-400 rounded-full transition-all duration-700" style={{ width: `${sPct}%` }} />
                         </div>
-                        <span className="text-[10px] text-slate-400 w-20 text-right tabular-nums">AED {fmt(m.spent)}</span>
+                        <span className="text-[10px] text-slate-400 w-16 sm:w-20 text-right tabular-nums shrink-0">{fmt(m.spent)}</span>
                       </div>
                     </div>
-                    <span className={cn('text-[11px] font-bold w-16 text-right shrink-0 tabular-nums',
+                    <span className={cn('text-[11px] font-bold w-14 sm:w-16 text-right shrink-0 tabular-nums',
                       m.deposited >= m.spent ? 'text-emerald-600' : 'text-red-500')}>
                       {m.deposited >= m.spent ? '+' : '−'}{fmt(Math.abs(m.deposited - m.spent))}
                     </span>
@@ -289,13 +365,13 @@ export default function WalletDetail() {
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
           <div className="p-5 pb-3 border-b border-slate-50">
             <p className="text-[14px] font-bold text-slate-800">Transactions</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{filtered.length} records · {periodLabel(period)}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{filtered.length} records · {pLabel}</p>
           </div>
 
           {filtered.length === 0 ? (
             <div className="py-14 text-center">
               <Wallet className="w-10 h-10 text-slate-200 mx-auto mb-3" strokeWidth={1.5} />
-              <p className="text-slate-400 text-[13px]">No transactions for {periodLabel(period)}</p>
+              <p className="text-slate-400 text-[13px]">No transactions for {pLabel}</p>
             </div>
           ) : (
             <>
@@ -303,39 +379,62 @@ export default function WalletDetail() {
                 {filtered.map((txn) => {
                   const isDepo = isCredit(txn);
                   return (
-                    <div key={txn.id} className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
-                      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                        isDepo ? 'bg-emerald-50' : 'bg-red-50')}>
-                        {isDepo
-                          ? <ArrowDownLeft className="w-5 h-5 text-emerald-600" />
-                          : <ArrowUpRight  className="w-5 h-5 text-red-500" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-800 truncate">
-                          {isDepo ? (txn.note || 'Deposit received') : (txn.description || 'Expense deducted')}
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
-                            isDepo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
-                            {isDepo ? 'Deposit' : 'Expense'}
-                          </span>
-                          <span className="text-[11px] text-slate-300">·</span>
-                          <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
+                    <SwipeableRow
+                      key={txn.id}
+                      onSwipeRight={isDepo ? () => openEdit(txn)    : undefined}
+                      onSwipeLeft={isDepo  ? () => setDeleteTx(txn) : undefined}
+                      leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
+                      leftLabel="Edit"   leftBg="#eff6ff"  leftColor="#2563eb"
+                      rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
+                      rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 hover:bg-slate-50/60 transition-colors">
+                        <div className={cn('w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0',
+                          isDepo ? 'bg-emerald-50' : 'bg-red-50')}>
+                          {isDepo
+                            ? <ArrowDownLeft className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
+                            : <ArrowUpRight  className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-800 truncate">
+                            {isDepo ? (txn.note || 'Deposit received') : (txn.description || 'Expense deducted')}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
+                              isDepo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>
+                              {isDepo ? 'Deposit' : 'Expense'}
+                            </span>
+                            <span className="text-[11px] text-slate-300">·</span>
+                            <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
+                          </div>
+                        </div>
+                        {/* Desktop action buttons — hidden on mobile (use swipe) */}
+                        {isDepo && (
+                          <div className="hidden sm:flex items-center gap-1 shrink-0">
+                            <button onClick={() => openEdit(txn)} title="Edit deposit"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setDeleteTx(txn)} title="Delete deposit"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-600 hover:bg-red-50 transition-all">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                        <div className="text-right shrink-0">
+                          <p className={cn('text-[14px] sm:text-[15px] font-bold tabular-nums', isDepo ? 'text-emerald-600' : 'text-red-500')}>
+                            {isDepo ? '+' : '−'}AED {fmt(txn.amount)}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Bal: AED {fmt(txn.balanceAfter ?? 0)}</p>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className={cn('text-[15px] font-bold tabular-nums', isDepo ? 'text-emerald-600' : 'text-red-500')}>
-                          {isDepo ? '+' : '−'}AED {fmt(txn.amount)}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Bal: AED {fmt(txn.balanceAfter ?? 0)}</p>
-                      </div>
-                    </div>
+                    </SwipeableRow>
                   );
                 })}
               </div>
               <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
-                <p className="text-[12px] text-slate-400">{filtered.length} transactions · {periodLabel(period)}</p>
-                <div className="flex items-center gap-4">
+                <p className="text-[12px] text-slate-400">{filtered.length} transactions</p>
+                <div className="flex items-center gap-3 sm:gap-4">
                   <span className="text-[12px] text-emerald-600 font-bold">+AED {fmt(periodDeposited)}</span>
                   <span className="text-[12px] text-red-500 font-bold">−AED {fmt(periodSpent)}</span>
                 </div>
@@ -345,31 +444,118 @@ export default function WalletDetail() {
         </div>
       </motion.div>
 
+      {/* ── Edit Deposit Modal ── */}
+      <Modal open={!!editTx} onClose={() => { setEditTx(null); setEditForm(EDT_BLANK); }}
+        title="Edit Deposit" subtitle="Correct the amount, date or note" size="sm">
+        {editTx && (
+          <form onSubmit={handleEdit} className="space-y-4">
+            {/* Wallet badge */}
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: cfg.gradient }}>
+                <Icon className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-[12px] font-bold" style={{ color: cfg.color }}>{cfg.label}</p>
+                <p className="text-[10px] text-slate-400">Wallet cannot be changed after deposit</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Amount (AED) *</label>
+              <input value={editForm.amount} onChange={(e) => setEF('amount', e.target.value)}
+                type="number" min="1" step="0.01" required className={INP} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date</label>
+              <input value={editForm.date} onChange={(e) => setEF('date', e.target.value)} type="date" className={INP} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Note / Source</label>
+              <input value={editForm.note} onChange={(e) => setEF('note', e.target.value)}
+                placeholder="e.g. Monthly vehicle budget" className={INP} />
+            </div>
+            {editForm.amount && Number(editForm.amount) !== editTx.amount && (
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-blue-50 border border-blue-100">
+                <Pencil className="w-4 h-4 text-blue-500 shrink-0" />
+                <div>
+                  <p className="text-[11px] font-medium text-blue-700">Balance adjustment</p>
+                  <p className="text-[13px] font-bold text-blue-800">
+                    {Number(editForm.amount) > editTx.amount ? '+' : ''}AED {fmt(Number(editForm.amount) - editTx.amount)} vs original AED {fmt(editTx.amount)}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
+              <Button variant="outline" type="button" onClick={() => { setEditTx(null); setEditForm(EDT_BLANK); }}>Cancel</Button>
+              <Button type="submit" icon={Pencil}>Save Changes</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* ── Delete Confirm Modal ── */}
+      <Modal open={!!deleteTx} onClose={() => { if (!isDeleting) setDeleteTx(null); }}
+        title="Delete Deposit" subtitle="This will reverse the wallet balance — cannot be undone" size="sm">
+        {deleteTx && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+              <div>
+                <p className="text-[13px] font-bold text-red-700">
+                  AED {fmt(deleteTx.amount)} will be removed from {cfg.label}
+                </p>
+                <p className="text-[11px] text-red-500 mt-0.5">The wallet balance will decrease by AED {fmt(deleteTx.amount)}</p>
+              </div>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-2">
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Date</p>
+                <p className="text-[13px] font-semibold text-slate-700 mt-0.5">{fmtDate(deleteTx.date)}</p>
+              </div>
+              {(deleteTx.note || deleteTx.description) && (
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">Note</p>
+                  <p className="text-[13px] font-semibold text-slate-700 mt-0.5">{deleteTx.note || deleteTx.description}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
+              <Button variant="outline" type="button" onClick={() => setDeleteTx(null)} disabled={isDeleting}>Cancel</Button>
+              <button onClick={handleDelete} disabled={isDeleting}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-opacity disabled:opacity-60 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700">
+                {isDeleting
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting…</>
+                  : <><Trash2 className="w-4 h-4" /> Delete Deposit</>}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* ── Deposit Modal ── */}
       <Modal open={showDeposit} onClose={() => { if (!isDepositing) setShowDeposit(false); }}
         title={`Deposit to ${cfg.label}`} subtitle="Receive funds and add to this wallet" size="sm">
         <form onSubmit={handleDeposit} className="space-y-4">
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Amount (AED) *</label>
-            <input value={form.amount} onChange={(e) => setF('amount', e.target.value)}
+            <input value={depForm.amount} onChange={(e) => setDF('amount', e.target.value)}
               type="number" min="1" step="0.01" required placeholder="e.g. 5000" className={INP} />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date</label>
-            <input value={form.date} onChange={(e) => setF('date', e.target.value)} type="date" className={INP} />
+            <input value={depForm.date} onChange={(e) => setDF('date', e.target.value)} type="date" className={INP} />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Note / Source</label>
-            <input value={form.note} onChange={(e) => setF('note', e.target.value)}
+            <input value={depForm.note} onChange={(e) => setDF('note', e.target.value)}
               placeholder="e.g. Monthly budget from Mr. Shah" className={INP} />
           </div>
-          {form.amount && (
+          {depForm.amount && (
             <div className="flex items-center gap-3 p-3.5 rounded-xl border" style={{ background: cfg.bg, borderColor: cfg.border }}>
               <ArrowDownLeft className="w-4 h-4 text-emerald-600 shrink-0" />
               <div className="flex-1">
                 <p className="text-[11px]" style={{ color: cfg.color }}>New balance after deposit</p>
                 <p className="text-[18px] font-bold text-emerald-700">
-                  AED {fmt(balance + (Number(form.amount) || 0))}
+                  AED {fmt(balance + (Number(depForm.amount) || 0))}
                 </p>
               </div>
             </div>
