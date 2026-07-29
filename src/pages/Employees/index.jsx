@@ -6,10 +6,10 @@ import {
   Users, UserPlus, Wallet, Cake, Phone, CalendarDays, BadgeCheck,
   ChevronDown, ChevronUp, Pencil, Banknote, Clock, CheckCircle2,
   AlertCircle, Trash2, ArrowDownLeft, ArrowRight, X, FileText, AlertTriangle,
+  Loader2,
 } from 'lucide-react';
-import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
+import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, useDownloadChallanMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
-import { downloadSalaryPDF } from '../../utils/pdfReport';
 import toast from 'react-hot-toast';
 
 const LOW_BALANCE_THRESHOLD = 5000;
@@ -285,14 +285,15 @@ export default function EmployeesPage() {
   const [updateEmployeeMut] = usePutMutation();
   const [deleteEmployeeMut] = useDeleteMutation();
   const [paymentMut]        = usePostMutation();
-  const [deductWalletMut]   = usePostMutation();
+  const [downloadMut, { isLoading: isDownloading }] = useDownloadChallanMutation();
 
-  const [empDrawer,  setEmpDrawer]  = useState(null);
-  const [payModal,   setPayModal]   = useState(null);
-  const [delConfirm, setDelConfirm] = useState(null);
-  const [historyId,  setHistoryId]  = useState(null);
-  const [empForm,    setEmpForm]    = useState(EMP_BLANK);
-  const [payForm,    setPayForm]    = useState(PAY_BLANK);
+  const [empDrawer,      setEmpDrawer]      = useState(null);
+  const [payModal,       setPayModal]       = useState(null);
+  const [delConfirm,     setDelConfirm]     = useState(null);
+  const [historyId,      setHistoryId]      = useState(null);
+  const [empForm,        setEmpForm]        = useState(EMP_BLANK);
+  const [payForm,        setPayForm]        = useState(PAY_BLANK);
+  const [reportDropdown, setReportDropdown] = useState(false);
 
   const setEF = (k, v) => setEmpForm((f) => ({ ...f, [k]: v }));
   const setPF = (k, v) => setPayForm((f) => ({ ...f, [k]: v }));
@@ -312,6 +313,15 @@ export default function EmployeesPage() {
   const openAdd  = ()    => { setEmpForm(EMP_BLANK); setEmpDrawer('add'); };
   const openEdit = (emp) => { setEmpForm({ ...emp, monthlySalary: String(emp.monthlySalary) }); setEmpDrawer(emp); };
   const openPay  = (emp) => { setPayForm({ ...PAY_BLANK, amount: String(emp.monthlySalary) }); setPayModal(emp); };
+
+  const handleDownloadReport = async (period) => {
+    setReportDropdown(false);
+    try {
+      await downloadMut({ path: '/reports/salary', params: { propertyId, period } }).unwrap();
+    } catch (err) {
+      toast.error(err?.data?.error || 'Failed to download report');
+    }
+  };
 
   const handleSaveEmp = async (e) => {
     e.preventDefault();
@@ -343,14 +353,14 @@ export default function EmployeesPage() {
     const amt    = Number(payForm.amount);
     const paidOn = new Date().toISOString().split('T')[0];
     try {
-      await Promise.all([
-        paymentMut({ path: `/employees/${payModal.id}/payments`, body: { month: payForm.month, amount: amt, wallet: 'salary', paidOn, notes: payForm.notes, type: 'salary' } }).unwrap(),
-        deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: 'salary', amount: amt, description: `Salary — ${payModal.name}`, date: paidOn, category: 'Salary' } }).unwrap(),
-      ]);
+      await paymentMut({
+        path: `/employees/${payModal.id}/pay-salary`,
+        body: { propertyId, month: payForm.month, amount: amt, paidOn, notes: payForm.notes },
+      }).unwrap();
       await refetchWallet();
       toast.success(`AED ${fmtAmt(amt)} paid to ${payModal.name}`);
       setPayModal(null);
-    } catch (err) { toast.error(err.data?.error || 'Failed to record payment'); }
+    } catch (err) { toast.error(err?.data?.error || 'Failed to record payment'); }
   };
 
   return (
@@ -371,11 +381,37 @@ export default function EmployeesPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              onClick={() => downloadSalaryPDF({ employees, salaryWallet, periodLabel: new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), propertyName: 'Shah House', propertyType: 'Villa' })}
-              className="flex items-center gap-2 px-4 h-10 rounded-2xl text-[13px] font-bold text-slate-700 border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] transition-all">
-              <FileText className="w-4 h-4" /> Salary Report
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setReportDropdown((d) => !d)}
+                disabled={isDownloading}
+                className="flex items-center gap-2 px-4 h-10 rounded-2xl text-[13px] font-bold text-slate-700 border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.97] transition-all disabled:opacity-60">
+                {isDownloading
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <FileText className="w-4 h-4" />}
+                Salary Report
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${reportDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {reportDropdown && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setReportDropdown(false)} />
+                  <div className="absolute right-0 top-full mt-1.5 z-30 w-44 bg-white rounded-2xl border border-slate-200 shadow-xl py-1.5 overflow-hidden">
+                    {[
+                      { value: 'month',     label: 'This Month' },
+                      { value: 'lastMonth', label: 'Last Month' },
+                      { value: 'all',       label: 'All Time'   },
+                    ].map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => handleDownloadReport(value)}
+                        className="w-full text-left px-4 py-2.5 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors">
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <button onClick={openAdd}
               className="flex items-center gap-2 px-5 h-10 rounded-2xl text-[13px] font-bold text-white hover:opacity-90 active:scale-[0.97] transition-all"
               style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow:'0 4px 14px rgba(11,29,58,0.3)' }}>
