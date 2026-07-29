@@ -10,6 +10,7 @@ import { useGetQuery, usePostMutation, usePatchMutation, useDeleteMutation, useD
 import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
 import Modal  from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
+import SwipeableRow from '../../components/ui/SwipeableRow';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
@@ -416,51 +417,62 @@ export default function WalletPage() {
                   const isDepo = txn.type === 'credit';
                   const WIcon  = wCfg.icon;
                   return (
-                    <div key={txn.id} className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
-                      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                        isDepo ? 'bg-emerald-50' : 'bg-red-50')}>
-                        {isDepo
-                          ? <ArrowDownLeft className="w-5 h-5 text-emerald-600" />
-                          : <ArrowUpRight  className="w-5 h-5 text-red-500" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">
-                          {isDepo ? (txn.note || 'Deposit') : (txn.description || 'Expense deducted')}
-                        </p>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                            style={{ background: wCfg.bg, color: wCfg.color }}>
-                            <WIcon className="w-2.5 h-2.5" />{wCfg.label}
-                          </span>
-                          <span className="text-[11px] text-slate-300">·</span>
-                          <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
+                    <SwipeableRow
+                      key={txn.id}
+                      onSwipeRight={isDepo ? () => openEdit(txn)      : undefined}
+                      onSwipeLeft={isDepo  ? () => setDeleteTx(txn)   : undefined}
+                      leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
+                      leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                      rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
+                      rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
+                    >
+                      <div className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-50/60 transition-colors">
+                        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+                          isDepo ? 'bg-emerald-50' : 'bg-red-50')}>
+                          {isDepo
+                            ? <ArrowDownLeft className="w-5 h-5 text-emerald-600" />
+                            : <ArrowUpRight  className="w-5 h-5 text-red-500" />}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {isDepo && (
-                          <button
-                            onClick={() => openEdit(txn)}
-                            title="Edit deposit"
-                            className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all shrink-0">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {isDepo && (
-                          <button
-                            onClick={() => setDeleteTx(txn)}
-                            title="Delete deposit"
-                            className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        <div className="text-right shrink-0">
-                          <p className={cn('text-[15px] font-bold tabular-nums', isDepo ? 'text-emerald-600' : 'text-red-500')}>
-                            {isDepo ? '+' : '−'}AED {fmt(txn.amount)}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">
+                            {isDepo ? (txn.note || 'Deposit') : (txn.description || 'Expense deducted')}
                           </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">Bal: AED {fmt(txn.balanceAfter ?? 0)}</p>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              style={{ background: wCfg.bg, color: wCfg.color }}>
+                              <WIcon className="w-2.5 h-2.5" />{wCfg.label}
+                            </span>
+                            <span className="text-[11px] text-slate-300">·</span>
+                            <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {/* Desktop-only action buttons — mobile uses swipe */}
+                          {isDepo && (
+                            <button
+                              onClick={() => openEdit(txn)}
+                              title="Edit deposit"
+                              className="hidden sm:flex w-7 h-7 rounded-lg items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-all shrink-0">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {isDepo && (
+                            <button
+                              onClick={() => setDeleteTx(txn)}
+                              title="Delete deposit"
+                              className="hidden sm:flex w-7 h-7 rounded-lg items-center justify-center text-slate-300 hover:text-red-600 hover:bg-red-50 transition-all shrink-0">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <div className="text-right shrink-0">
+                            <p className={cn('text-[15px] font-bold tabular-nums', isDepo ? 'text-emerald-600' : 'text-red-500')}>
+                              {isDepo ? '+' : '−'}AED {fmt(txn.amount)}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Bal: AED {fmt(txn.balanceAfter ?? 0)}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </SwipeableRow>
                   );
                 })}
               </div>

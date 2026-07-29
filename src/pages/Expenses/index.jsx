@@ -16,6 +16,7 @@ import {
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import {
   Field, Input, Select, Textarea, FormGrid, FormActions,
 } from '../../components/ui/FormField';
@@ -161,6 +162,7 @@ export default function ExpensesPage() {
     try {
       if (modal !== 'add' && modal?.id) {
         await updateMut({ path: `/expenses/${modal.id}`, body: data }).unwrap();
+        await refetchWallet();
         toast.success('Expense updated');
       } else {
         await addMut({ path: '/expenses', body: { ...data, propertyId } }).unwrap();
@@ -190,6 +192,7 @@ export default function ExpensesPage() {
   const handleDelete = async () => {
     try {
       await deleteMut({ path: `/expenses/${delTarget.id}` }).unwrap();
+      await refetchWallet();
       toast.success('Expense deleted');
       setDelTarget(null);
     } catch {
@@ -457,65 +460,74 @@ export default function ExpensesPage() {
                   const segCfg = SEG_CFG[item.segment] ?? SEG_CFG.property;
                   const SegIcon = segCfg.Icon;
                   return (
-                    <motion.div key={item.id}
+                    <MotionSwipeableRow
+                      key={item.id}
                       initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.97 }}
                       transition={{ delay: i * 0.02 }}
-                      className="group flex items-center gap-3.5 px-5 py-3.5 hover:bg-slate-50/70 transition-colors relative">
+                      onSwipeRight={() => setModal(item)}
+                      onSwipeLeft={() => setDelTarget(item)}
+                      leftIcon={<RiEditLine style={{ color: '#2563eb', width: 20, height: 20 }} />}
+                      leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                      rightIcon={<RiDeleteBinLine style={{ color: '#dc2626', width: 20, height: 20 }} />}
+                      rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
+                    >
+                      <div className="group flex items-center gap-3.5 px-5 py-3.5 hover:bg-slate-50/70 transition-colors">
 
-                      {/* Category avatar */}
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ background: cfg.bg }}>
-                        <SegIcon className="w-4 h-4" style={{ color: cfg.color }} />
-                      </div>
+                        {/* Category avatar */}
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                          style={{ background: cfg.bg }}>
+                          <SegIcon className="w-4 h-4" style={{ color: cfg.color }} />
+                        </div>
 
-                      {/* Text */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">
-                          {item.description}
+                        {/* Text */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">
+                            {item.description}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            {item.vendor && (
+                              <>
+                                <RiStore2Line className="w-3 h-3 text-slate-300 shrink-0" />
+                                <span className="text-[11px] text-slate-400 truncate max-w-35">{item.vendor}</span>
+                                <span className="text-slate-200 text-[10px]">·</span>
+                              </>
+                            )}
+                            <span className="text-[11px] text-slate-400">{fmtDate(item.date)}</span>
+                          </div>
+                        </div>
+
+                        {/* Category chip (hidden on mobile) */}
+                        <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0"
+                          style={{ background: cfg.bg, color: cfg.color }}>
+                          {item.category}
+                        </span>
+
+                        {/* Segment chip */}
+                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold shrink-0"
+                          style={{ background: segCfg.bg, color: segCfg.color }}>
+                          <segCfg.Icon className="w-3 h-3" />
+                          {item.segment === 'property' ? 'Property' : 'Household'}
+                        </span>
+
+                        {/* Amount */}
+                        <p className="text-[14px] font-bold text-slate-900 shrink-0 tabular-nums">
+                          {fmtAED(item.amount)}
                         </p>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          {item.vendor && (
-                            <>
-                              <RiStore2Line className="w-3 h-3 text-slate-300 shrink-0" />
-                              <span className="text-[11px] text-slate-400 truncate max-w-35">{item.vendor}</span>
-                              <span className="text-slate-200 text-[10px]">·</span>
-                            </>
-                          )}
-                          <span className="text-[11px] text-slate-400">{fmtDate(item.date)}</span>
+
+                        {/* Actions — desktop only, swipe on mobile */}
+                        <div className="hidden sm:flex items-center gap-1 shrink-0">
+                          <button onClick={() => setModal(item)} title="Edit expense"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                            <RiEditLine className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => setDelTarget(item)} title="Delete expense"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                            <RiDeleteBinLine className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-
-                      {/* Category chip (hidden on mobile) */}
-                      <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0"
-                        style={{ background: cfg.bg, color: cfg.color }}>
-                        {item.category}
-                      </span>
-
-                      {/* Segment chip */}
-                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold shrink-0"
-                        style={{ background: segCfg.bg, color: segCfg.color }}>
-                        <segCfg.Icon className="w-3 h-3" />
-                        {item.segment === 'property' ? 'Property' : 'Household'}
-                      </span>
-
-                      {/* Amount */}
-                      <p className="text-[14px] font-bold text-slate-900 shrink-0 tabular-nums">
-                        {fmtAED(item.amount)}
-                      </p>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setModal(item)}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
-                          <RiEditLine className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => setDelTarget(item)}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
-                          <RiDeleteBinLine className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </motion.div>
+                    </MotionSwipeableRow>
                   );
                 })}
               </AnimatePresence>
@@ -567,7 +579,7 @@ export default function ExpensesPage() {
         onClose={() => setDelTarget(null)}
         onConfirm={handleDelete}
         title="Delete Expense"
-        message={`Delete "${delTarget?.description}" (${fmtAED(delTarget?.amount)})? This cannot be undone and will not adjust your wallet balance.`}
+        message={`Delete "${delTarget?.description}" (${fmtAED(delTarget?.amount)})? The amount will be refunded back to your ${delTarget?.walletType === 'vehicle' ? 'Vehicle' : 'Home'} Wallet.`}
         confirmLabel="Delete"
         destructive
       />
