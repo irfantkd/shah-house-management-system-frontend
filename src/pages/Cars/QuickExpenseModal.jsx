@@ -27,22 +27,31 @@ export default function QuickExpenseModal({ open, onClose }) {
   const [addExpenseMut]   = usePostMutation();
   const [deductWalletMut] = usePostMutation();
 
-  const [carId,  setCarId]  = useState('');
-  const [wallet, setWallet] = useState('vehicle');
-  const [form,   setForm]   = useState(BLANK);
+  const [carId,       setCarId]       = useState('');
+  const [wallet,      setWallet]      = useState('vehicle');
+  const [form,        setForm]        = useState(BLANK);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const selectedCar = cars.find((c) => c.id === carId) ?? cars[0];
   const effectiveId = carId || cars[0]?.id;
 
-  const handleClose = () => { onClose(); setCarId(''); setWallet('vehicle'); setForm(BLANK); };
+  const handleClose = () => {
+    onClose();
+    setCarId('');
+    setWallet('vehicle');
+    setForm(BLANK);
+    setIsSubmitting(false);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!effectiveId)                                   return toast.error('No vehicle available');
+    if (isSubmitting) return;
+    if (!effectiveId)                                    return toast.error('No vehicle available');
     if (!form.description || !form.amount || !form.date) return toast.error('Fill required fields');
     const amt     = Number(form.amount);
     const expType = CAR_EXPENSE_TYPES[form.type]?.label ?? form.type;
+    setIsSubmitting(true);
     try {
       await Promise.all([
         addExpenseMut({ path: `/cars/${effectiveId}/expenses`, body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined } }).unwrap(),
@@ -52,7 +61,10 @@ export default function QuickExpenseModal({ open, onClose }) {
       const walletLabel = wallet === 'vehicle' ? 'Vehicle' : 'Home';
       toast.success(`Expense added to ${selectedCar?.make} ${selectedCar?.model} · deducted from ${walletLabel} Wallet`);
       handleClose();
-    } catch (err) { toast.error(err.data?.error || 'Failed to log expense'); }
+    } catch (err) {
+      toast.error(err.data?.error || 'Failed to log expense');
+      setIsSubmitting(false);
+    }
   };
 
   if (!cars.length) return null;
@@ -171,8 +183,8 @@ export default function QuickExpenseModal({ open, onClose }) {
         </div>
 
         <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
-          <Button variant="outline" type="button" onClick={handleClose}>Cancel</Button>
-          <Button type="submit" icon={Plus}>Add Expense</Button>
+          <Button variant="outline" type="button" onClick={handleClose} disabled={isSubmitting}>Cancel</Button>
+          <Button type="submit" icon={Plus} loading={isSubmitting}>Add Expense</Button>
         </div>
       </form>
     </Modal>

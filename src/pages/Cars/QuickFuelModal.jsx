@@ -28,22 +28,30 @@ export default function QuickFuelModal({ open, onClose }) {
   const [addFuelMut]      = usePostMutation();
   const [deductWalletMut] = usePostMutation();
 
-  const [carId, setCarId] = useState('');
-  const [form,  setForm]  = useState(BLANK);
+  const [carId,        setCarId]        = useState('');
+  const [form,         setForm]         = useState(BLANK);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const effectiveId = carId || cars[0]?.id;
   const selectedCar = cars.find((c) => c.id === effectiveId) ?? cars[0];
 
-  const handleClose = () => { onClose(); setCarId(''); setForm(BLANK); };
+  const handleClose = () => {
+    onClose();
+    setCarId('');
+    setForm(BLANK);
+    setIsSubmitting(false);
+  };
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!effectiveId)     return toast.error('No vehicle available');
     if (!form.totalPrice) return toast.error('Enter total price');
     const totalPrice = Number(form.totalPrice);
     const liters     = form.liters  ? Number(form.liters)  : undefined;
     const mileage    = form.mileage ? Number(form.mileage) : undefined;
+    setIsSubmitting(true);
     try {
       await Promise.all([
         addFuelMut({ path: `/cars/${effectiveId}/fuel-logs`, body: { date: form.date, totalPrice, liters, mileage } }).unwrap(),
@@ -52,7 +60,10 @@ export default function QuickFuelModal({ open, onClose }) {
       await refetchWallet();
       toast.success(`Fuel logged for ${selectedCar?.make} ${selectedCar?.model}`);
       handleClose();
-    } catch (err) { toast.error(err.data?.error || 'Failed to log fuel'); }
+    } catch (err) {
+      toast.error(err.data?.error || 'Failed to log fuel');
+      setIsSubmitting(false);
+    }
   };
 
   if (!cars.length) return null;
@@ -132,8 +143,8 @@ export default function QuickFuelModal({ open, onClose }) {
         </div>
 
         <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
-          <Button variant="outline" type="button" onClick={handleClose}>Cancel</Button>
-          <Button type="submit" icon={Plus}>Log Fill-up</Button>
+          <Button variant="outline" type="button" onClick={handleClose} disabled={isSubmitting}>Cancel</Button>
+          <Button type="submit" icon={Plus} loading={isSubmitting}>Log Fill-up</Button>
         </div>
       </form>
     </Modal>
