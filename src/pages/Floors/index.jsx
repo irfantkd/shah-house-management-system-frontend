@@ -8,12 +8,15 @@ import {
   RiMapPin2Line, RiArrowUpLine, RiArrowDownLine, RiCheckLine,
   RiStackLine,
 } from 'react-icons/ri';
+import { Layers, Search, X, Edit2, Trash2, AlertTriangle } from 'lucide-react';
 import {
   useGetQuery, usePostMutation, usePutMutation, useDeleteMutation,
 } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
-import Modal from '../../components/ui/Modal';
+import Modal         from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import PageLoader    from '../../components/ui/PageLoader';
+import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import { Field, Input, Textarea, FormGrid, FormActions } from '../../components/ui/FormField';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
@@ -30,37 +33,60 @@ const FLOOR_COLORS = [
 ];
 
 function levelLabel(n) {
-  if (n === 0)    return 'Ground Floor';
-  if (n < 0)      return `Basement ${Math.abs(n)}`;
-  if (n === 1)    return '1st Floor';
-  if (n === 2)    return '2nd Floor';
-  if (n === 3)    return '3rd Floor';
+  if (n === 0) return 'Ground Floor';
+  if (n < 0)   return `Basement ${Math.abs(n)}`;
+  if (n === 1) return '1st Floor';
+  if (n === 2) return '2nd Floor';
+  if (n === 3) return '3rd Floor';
   return `${n}th Floor`;
 }
+
+const fade = (d = 0) => ({
+  initial:    { opacity: 0, y: 12 },
+  animate:    { opacity: 1, y: 0  },
+  exit:       { opacity: 0, scale: 0.96 },
+  transition: { duration: 0.3, delay: d, ease: [0.4, 0, 0.2, 1] },
+});
 
 export default function FloorsPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
 
-  const { data: property = {} } = useGetQuery({ path: `/properties/${propertyId}` }, { skip: !propertyId });
-  const { data: floorsRaw = [], isLoading } = useGetQuery(
+  const { data: property = {} } = useGetQuery(
+    { path: `/properties/${propertyId}` },
+    { skip: !propertyId },
+  );
+  const { data: floorsRaw = [], isLoading, isError, refetch } = useGetQuery(
     { path: '/floors', params: { propertyId } },
     { skip: !propertyId },
   );
 
-  const [addMut]    = usePostMutation();
-  const [updateMut] = usePutMutation();
-  const [deleteMut] = useDeleteMutation();
+  const [addMut,    { isLoading: isAdding }]   = usePostMutation();
+  const [updateMut, { isLoading: isUpdating }] = usePutMutation();
+  const [deleteMut, { isLoading: isDeleting }] = useDeleteMutation();
 
-  const [modal,     setModal]     = useState(null); // null | 'add' | floor-object
-  const [delTarget, setDelTarget] = useState(null);
+  const [modal,       setModal]       = useState(null); // null | 'add' | floor-object
+  const [delTarget,   setDelTarget]   = useState(null);
+  const [search,      setSearch]      = useState('');
+  const [levelFilter, setLevelFilter] = useState('all');
 
-  // Sort by level ascending (already sorted by backend, but defensive)
   const floors = [...floorsRaw].sort((a, b) => a.level - b.level);
 
   const totalAreas  = floors.reduce((s, f) => s + (f.areaCount ?? 0), 0);
   const maxLevel    = floors.length ? Math.max(...floors.map((f) => f.level)) : 0;
   const minLevel    = floors.length ? Math.min(...floors.map((f) => f.level)) : 0;
   const hasBasement = minLevel < 0;
+
+  // Client-side filter — floor counts are always tiny for a villa so this is instant
+  const filtered = floors.filter((f) => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || f.name?.toLowerCase().includes(q) || f.description?.toLowerCase().includes(q);
+    const matchLevel  =
+      levelFilter === 'all'      ? true :
+      levelFilter === 'ground'   ? f.level === 0 :
+      levelFilter === 'upper'    ? f.level > 0 :
+      levelFilter === 'basement' ? f.level < 0 : true;
+    return matchSearch && matchLevel;
+  });
 
   const handleSave = async (data) => {
     try {
@@ -86,12 +112,37 @@ export default function FloorsPage() {
   const handleDelete = async () => {
     try {
       await deleteMut({ path: `/floors/${delTarget.id}` }).unwrap();
-      toast.success(`"${delTarget.name}" deleted — areas unassigned`);
+      toast.success(`"${delTarget.name}" deleted`);
       setDelTarget(null);
     } catch (err) {
       toast.error(err.data?.error || 'Failed to delete floor');
+      setDelTarget(null);
     }
   };
+
+  // ── Global loader on first fetch ─────────────────────────────────────────
+  if (isLoading && floors.length === 0) {
+    return <PageLoader icon={Layers} text="Loading floors…" />;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[56vh] gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
+          <AlertTriangle className="w-7 h-7 text-red-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-[15px] font-bold text-slate-800">Failed to load floors</p>
+          <p className="text-[12px] text-slate-400 mt-1 mb-3">Check your connection and try again</p>
+          <button onClick={refetch}
+            className="px-5 py-2 rounded-xl text-white text-[13px] font-bold"
+            style={{ background: '#0b1d3a' }}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
@@ -118,12 +169,13 @@ export default function FloorsPage() {
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Floors',   value: floors.length,  color: '#0b1d3a', bg: '#f0f5ff', icon: RiStackLine     },
-          { label: 'Total Areas',    value: totalAreas,     color: '#1d4ed8', bg: '#eff6ff', icon: RiMapPin2Line    },
-          { label: 'Highest Level',  value: maxLevel,       color: '#0f766e', bg: '#f0fdfa', icon: RiArrowUpLine    },
-          { label: 'Basement Levels',value: hasBasement ? Math.abs(minLevel) : 0, color: '#7c3aed', bg: '#f5f3ff', icon: RiArrowDownLine },
+          { label: 'Total Floors',    value: floors.length,  color: '#0b1d3a', bg: '#f0f5ff', icon: RiStackLine     },
+          { label: 'Total Areas',     value: totalAreas,     color: '#1d4ed8', bg: '#eff6ff', icon: RiMapPin2Line    },
+          { label: 'Highest Level',   value: maxLevel,       color: '#0f766e', bg: '#f0fdfa', icon: RiArrowUpLine    },
+          { label: 'Basement Levels', value: hasBasement ? Math.abs(minLevel) : 0, color: '#7c3aed', bg: '#f5f3ff', icon: RiArrowDownLine },
         ].map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
+          <motion.div key={s.label}
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
             className="bg-white rounded-2xl border border-slate-100 p-5 flex flex-col gap-2"
             style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: s.bg }}>
@@ -137,7 +189,7 @@ export default function FloorsPage() {
         ))}
       </div>
 
-      {/* ── Building diagram ── */}
+      {/* ── Building layout diagram ── */}
       {floors.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-4">Building Layout</p>
@@ -146,15 +198,14 @@ export default function FloorsPage() {
               const barPct = totalAreas > 0 ? Math.round((floor.areaCount / totalAreas) * 100) : 0;
               return (
                 <div key={floor.id} className="flex items-center gap-3">
-                  {/* Level chip */}
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center text-[13px] font-black text-white shrink-0"
                     style={{ background: floor.color ?? '#0b1d3a' }}>
                     {floor.level}
                   </div>
-                  {/* Bar */}
                   <div className="flex-1 flex items-center gap-3 min-w-0">
                     <div className="flex-1 h-8 rounded-xl bg-slate-50 overflow-hidden relative">
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(barPct, 6)}%` }}
+                      <motion.div
+                        initial={{ width: 0 }} animate={{ width: `${Math.max(barPct, 6)}%` }}
                         transition={{ delay: i * 0.08 + 0.2, duration: 0.5, ease: 'easeOut' }}
                         className="absolute inset-y-0 left-0 rounded-xl flex items-center px-3"
                         style={{ background: `${floor.color ?? '#0b1d3a'}18`, border: `1px solid ${floor.color ?? '#0b1d3a'}28` }}>
@@ -174,9 +225,43 @@ export default function FloorsPage() {
         </div>
       )}
 
-      {/* ── Empty state ── */}
-      {!isLoading && floors.length === 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 p-16 text-center" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+      {/* ── Search + Level filter ── */}
+      {floors.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search floors by name or description…"
+              className="w-full pl-9 pr-9 h-10 rounded-xl border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 w-fit">
+            {[
+              { k: 'all',      l: 'All' },
+              { k: 'upper',    l: 'Upper' },
+              { k: 'ground',   l: 'Ground' },
+              { k: 'basement', l: 'Basement' },
+            ].map(({ k, l }) => (
+              <button key={k} onClick={() => setLevelFilter(k)}
+                className={cn('px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all',
+                  levelFilter === k ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700')}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Empty state — no floors at all ── */}
+      {floors.length === 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 p-16 text-center"
+          style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
             <RiStackLine className="w-8 h-8 text-slate-300" />
           </div>
@@ -192,25 +277,65 @@ export default function FloorsPage() {
         </div>
       )}
 
+      {/* ── No results after filter ── */}
+      {floors.length > 0 && filtered.length === 0 && (
+        <div className="text-center py-10">
+          <p className="text-slate-500 font-semibold text-[14px]">No floors match your search</p>
+          <button onClick={() => { setSearch(''); setLevelFilter('all'); }}
+            className="text-[12px] text-blue-600 hover:underline mt-1.5 block mx-auto">
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      {/* ── Swipe hint (mobile only) ── */}
+      {filtered.length > 0 && (
+        <p className="sm:hidden text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center -mb-2">
+          ← Swipe card to edit or delete →
+        </p>
+      )}
+
       {/* ── Floor cards ── */}
-      {floors.length > 0 && (
+      {filtered.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence mode="popLayout">
-            {floors.map((floor, i) => (
-              <motion.div key={floor.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96 }} transition={{ delay: i * 0.05 }}>
-                <FloorCard
-                  floor={floor}
-                  onEdit={() => setModal(floor)}
-                  onDelete={() => setDelTarget(floor)}
-                />
-              </motion.div>
-            ))}
+            {filtered.map((floor, i) => {
+              const canDelete = (floor.areaCount ?? 0) === 0;
+              return (
+                <MotionSwipeableRow
+                  key={floor.id}
+                  {...fade(i * 0.05)}
+                  className="rounded-3xl overflow-hidden"
+                  style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.08)' }}
+                  onSwipeRight={() => setModal(floor)}
+                  onSwipeLeft={() =>
+                    canDelete
+                      ? setDelTarget(floor)
+                      : toast(`Remove all areas from "${floor.name}" before deleting`, { icon: '⚠️' })
+                  }
+                  leftIcon={<Edit2  style={{ color: '#2563eb', width: 20, height: 20 }} />}
+                  leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                  rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
+                  rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
+                >
+                  <FloorCard
+                    floor={floor}
+                    canDelete={canDelete}
+                    onEdit={() => setModal(floor)}
+                    onDelete={() =>
+                      canDelete
+                        ? setDelTarget(floor)
+                        : toast(`Remove all areas from "${floor.name}" before deleting`, { icon: '⚠️' })
+                    }
+                  />
+                </MotionSwipeableRow>
+              );
+            })}
 
             {/* Add card */}
-            <motion.button key="add-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            <motion.button key="add-card" {...fade(filtered.length * 0.05)}
               onClick={() => setModal('add')}
-              className="min-h-[180px] rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all group">
+              className="min-h-45 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all group">
               <div className="w-12 h-12 rounded-2xl bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center transition-all">
                 <RiAddLine className="w-6 h-6" />
               </div>
@@ -230,36 +355,34 @@ export default function FloorsPage() {
         onClose={() => setModal(null)}
         onSave={handleSave}
         floors={floors}
+        isSubmitting={isAdding || isUpdating}
       />
 
       <ConfirmDialog
         open={!!delTarget}
         onClose={() => setDelTarget(null)}
         onConfirm={handleDelete}
+        loading={isDeleting}
         title="Delete Floor"
-        message={
-          delTarget?.areaCount > 0
-            ? `Delete "${delTarget?.name}"? The ${delTarget?.areaCount} area${delTarget?.areaCount !== 1 ? 's' : ''} on this floor will be unassigned from it automatically.`
-            : `Delete "${delTarget?.name}"? This cannot be undone.`
-        }
+        message={`Delete "${delTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete Floor"
       />
     </motion.div>
   );
 }
 
-/* ── Floor Card ── */
-function FloorCard({ floor, onEdit, onDelete }) {
+/* ── Floor Card — inner content only, MotionSwipeableRow provides the shell ── */
+function FloorCard({ floor, canDelete, onEdit, onDelete }) {
   const accent = floor.color ?? '#0b1d3a';
 
   return (
-    <div className="group rounded-3xl overflow-hidden bg-white flex flex-col"
-      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.08)' }}>
+    <div className="bg-white flex flex-col">
 
       {/* Header */}
       <div className="relative px-5 pt-5 pb-5 overflow-hidden"
         style={{ background: `linear-gradient(150deg, ${accent}f0 0%, ${accent} 100%)` }}>
 
-        {/* Top accent line */}
+        {/* Top shine */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.3)' }} />
         {/* Decorative ring */}
         <div style={{ position: 'absolute', top: -40, right: -40, width: 140, height: 140, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
@@ -275,49 +398,59 @@ function FloorCard({ floor, onEdit, onDelete }) {
           {levelLabel(floor.level)}
         </div>
 
-        <h3 className="text-[20px] font-black text-white leading-tight tracking-tight relative z-10">{floor.name}</h3>
+        <h3 className="text-[20px] font-black text-white leading-tight tracking-tight relative z-10">
+          {floor.name}
+        </h3>
 
         {floor.description && (
           <p className="text-[12px] mt-1 relative z-10" style={{ color: 'rgba(255,255,255,0.55)' }}>
             {floor.description}
           </p>
         )}
-
-        {/* Edit / delete */}
-        <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex: 10 }}>
-          <button onClick={onEdit}
-            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 border border-white/15 transition-all">
-            <RiEditLine className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onDelete}
-            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-red-300 hover:bg-red-500/25 border border-white/15 transition-all">
-            <RiDeleteBinLine className="w-3.5 h-3.5" />
-          </button>
-        </div>
       </div>
 
-      {/* Body */}
-      <div className="px-5 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-[13px] font-bold" style={{ color: accent }}>
-            <RiMapPin2Line className="w-4 h-4" />
-            {floor.areaCount} area{floor.areaCount !== 1 ? 's' : ''}
-          </div>
+      {/* Body — area count + level badge */}
+      <div className="px-5 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[13px] font-bold" style={{ color: accent }}>
+          <RiMapPin2Line className="w-4 h-4" />
+          {floor.areaCount} area{floor.areaCount !== 1 ? 's' : ''}
         </div>
-        <div className="flex items-center gap-1">
-          {/* Color swatch */}
+        <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded-full border-2 border-white shadow-sm" style={{ background: accent }} />
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
             L{floor.level >= 0 ? '+' : ''}{floor.level}
           </span>
         </div>
+      </div>
+
+      {/* Action bar — desktop only; mobile uses swipe */}
+      <div className="hidden sm:flex border-t border-slate-100 px-4 py-2 items-center justify-end gap-1">
+        <button onClick={onEdit}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-blue-600 hover:bg-blue-50 transition-all">
+          <RiEditLine className="w-3.5 h-3.5" />
+          Edit
+        </button>
+        {canDelete ? (
+          <button onClick={onDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-red-500 hover:bg-red-50 transition-all">
+            <RiDeleteBinLine className="w-3.5 h-3.5" />
+            Delete
+          </button>
+        ) : (
+          <button onClick={onDelete}
+            title={`${floor.areaCount} area${floor.areaCount !== 1 ? 's' : ''} — move them first`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-slate-300 cursor-not-allowed select-none">
+            <RiDeleteBinLine className="w-3.5 h-3.5" />
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 /* ── Add / Edit Modal ── */
-function FloorModal({ open, floor, onClose, onSave, floors }) {
+function FloorModal({ open, floor, onClose, onSave, floors, isSubmitting }) {
   const { register, handleSubmit, reset, watch, setValue } = useForm();
   const selectedColor = watch('color', floor?.color ?? '#0b1d3a');
 
@@ -326,7 +459,6 @@ function FloorModal({ open, floor, onClose, onSave, floors }) {
     if (floor) {
       reset({ name: floor.name, level: floor.level ?? 0, description: floor.description ?? '', color: floor.color ?? '#0b1d3a' });
     } else {
-      // Suggest next level
       const nextLevel = floors.length > 0 ? Math.max(...floors.map((f) => f.level)) + 1 : 0;
       reset({ name: '', level: nextLevel, description: '', color: '#0b1d3a' });
     }
@@ -359,9 +491,9 @@ function FloorModal({ open, floor, onClose, onSave, floors }) {
               <button key={c.value} type="button" onClick={() => setValue('color', c.value)}
                 className="relative w-9 h-9 rounded-xl border-2 transition-all"
                 style={{
-                  background: c.value,
+                  background:  c.value,
                   borderColor: selectedColor === c.value ? '#fff' : c.value,
-                  boxShadow: selectedColor === c.value ? `0 0 0 2px ${c.value}` : 'none',
+                  boxShadow:   selectedColor === c.value ? `0 0 0 2px ${c.value}` : 'none',
                 }}
                 title={c.label}>
                 {selectedColor === c.value && (
@@ -370,7 +502,8 @@ function FloorModal({ open, floor, onClose, onSave, floors }) {
               </button>
             ))}
           </div>
-          {/* Preview */}
+
+          {/* Live preview */}
           <div className="mt-3 flex items-center gap-3 px-4 py-3 rounded-xl"
             style={{ background: `${selectedColor}12`, border: `1px solid ${selectedColor}30` }}>
             <div className="w-7 h-7 rounded-lg" style={{ background: selectedColor }} />
@@ -383,11 +516,11 @@ function FloorModal({ open, floor, onClose, onSave, floors }) {
               </p>
             </div>
           </div>
-          {/* Hidden input so react-hook-form tracks it */}
+
           <input type="hidden" {...register('color')} />
         </Field>
 
-        <FormActions onCancel={onClose} submitLabel={floor ? 'Update Floor' : 'Add Floor'} />
+        <FormActions onCancel={onClose} submitLabel={floor ? 'Update Floor' : 'Add Floor'} loading={isSubmitting} />
       </form>
     </Modal>
   );

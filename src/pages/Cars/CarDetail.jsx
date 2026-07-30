@@ -1,13 +1,12 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Edit, AlertCircle, Fuel, Gauge, FileText,
-  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, Wrench, BarChart2,
+  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, Wrench, BarChart2, Loader2,
 } from 'lucide-react';
+import PageLoader from '../../components/ui/PageLoader';
 import { useGetQuery, usePutMutation } from '../../api/apiSlice';
-import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Badge   from '../../components/ui/Badge';
 import Button  from '../../components/ui/Button';
 import { cn }  from '../../utils/cn';
@@ -18,6 +17,7 @@ import FuelTab         from './tabs/FuelTab';
 import DocumentsTab    from './tabs/DocumentsTab';
 import MaintenanceTab  from './tabs/MaintenanceTab';
 import StatsTab        from './tabs/StatsTab';
+import { CAR_CATEGORIES } from '../../data/mockCars';
 
 const TABS = [
   { id: 'overview',     label: 'Overview',     icon: Car       },
@@ -29,6 +29,7 @@ const TABS = [
 ];
 
 const INP_E = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white';
+const LBL_E = 'block text-[10.5px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider';
 
 function parseMakeModelYear(input) {
   const tokens = (input || '').trim().split(/\s+/);
@@ -40,11 +41,9 @@ function parseMakeModelYear(input) {
   }
   return { make: tokens[0] ?? '', model: tokens.slice(1).join(' ') || tokens[0] || '', year: new Date().getFullYear() };
 }
-const LBL_E = 'block text-[10.5px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider';
-const CAR_CATS = ['SUV', 'Sedan', 'Sports', 'Pickup', 'Van', 'Minivan', 'Luxury', 'Other'];
 
-const getDays    = (d) => Math.ceil((new Date(d) - new Date()) / 86400000);
-const regStatus  = (expiry) => {
+const getDays   = (d) => Math.ceil((new Date(d) - new Date()) / 86400000);
+const regStatus = (expiry) => {
   const days = getDays(expiry);
   if (days < 0)   return { label: 'Expired',       variant: 'danger',  days };
   if (days <= 30) return { label: 'Expiring Soon', variant: 'warning', days };
@@ -54,28 +53,34 @@ const regStatus  = (expiry) => {
 export default function CarDetail() {
   const { id }      = useParams();
   const navigate    = useNavigate();
-  const propertyId  = useSelector(selectCurrentPropertyId);
   const fileRef     = useRef(null);
 
-  const [tab,         setTab]        = useState('overview');
-  const [imgIdx,      setImgIdx]     = useState(0);
-  const [showEdit,    setShowEdit]   = useState(false);
-  const [editForm,    setEditForm]   = useState({});
-  const [localImages, setLocalImages] = useState([]);
+  const [tab,          setTab]        = useState('overview');
+  const [imgIdx,       setImgIdx]     = useState(0);
+  const [showEdit,     setShowEdit]   = useState(false);
+  const [editForm,     setEditForm]   = useState({});
+  const [localImages,  setLocalImages] = useState([]);
 
-  const { data: car, isLoading } = useGetQuery({ path: `/cars/${id}` });
-  const [updateCarMut] = usePutMutation();
+  const { data: car, isLoading, isError } = useGetQuery({ path: `/cars/${id}` });
+  const [updateCarMut, { isLoading: isSaving }] = usePutMutation();
 
-  if (isLoading) return null;
-  if (!car) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center gap-3">
-      <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
-        <Car className="w-8 h-8 text-slate-300" strokeWidth={1.5} />
+  if (isLoading) return <PageLoader icon={Car} text="Loading vehicle…" />;
+
+  if (isError || !car) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center gap-3">
+        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+          <Car className="w-8 h-8 text-slate-300" strokeWidth={1.5} />
+        </div>
+        <p className="text-slate-600 font-semibold">Vehicle not found</p>
+        <p className="text-[12px] text-slate-400">{isError ? 'Could not load vehicle data.' : 'This vehicle may have been removed.'}</p>
+        <button onClick={() => navigate('/cars')}
+          className="flex items-center gap-2 text-[13px] text-accent-600 hover:underline font-medium">
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to Fleet
+        </button>
       </div>
-      <p className="text-slate-600 font-semibold">Vehicle not found</p>
-      <Link to="/cars" className="text-accent-600 text-sm hover:underline font-medium">← Back to Fleet</Link>
-    </div>
-  );
+    );
+  }
 
   const reg     = regStatus(car.registrationExpiry);
   const ins     = regStatus(car.insuranceExpiry);
@@ -112,13 +117,26 @@ export default function CarDetail() {
 
   const startEdit = () => {
     setEditForm({
-      makeModel: [car.make, car.model, car.year].filter(Boolean).join(' '),
-      category: car.category ?? '', nickname: car.nickname ?? '',
-      plateNumber: car.plateNumber ?? '', color: car.color ?? '',
-      colorName: car.colorName ?? '', odometer: car.odometer ?? 0,
-      driverName: car.driverName ?? '', driverContact: car.driverContact ?? '',
+      makeModel:          [car.make, car.model, car.year].filter(Boolean).join(' '),
+      category:           car.category           ?? 'SUV',
+      nickname:           car.nickname           ?? '',
+      plateNumber:        car.plateNumber        ?? '',
+      color:              car.color              ?? '#94a3b8',
+      colorName:          car.colorName          ?? '',
+      odometer:           car.odometer           ?? 0,
+      driverName:         car.driverName         ?? '',
+      driverPhone:        car.driverPhone        ?? '',
+      vin:                car.vin                ?? '',
+      registrationNumber: car.registrationNumber ?? '',
       registrationExpiry: car.registrationExpiry ?? '',
-      insuranceExpiry: car.insuranceExpiry ?? '',
+      registrationFee:    car.registrationFee    ?? 0,
+      insuranceCompany:   car.insuranceCompany   ?? '',
+      insurancePolicy:    car.insurancePolicy    ?? '',
+      insuranceExpiry:    car.insuranceExpiry    ?? '',
+      purchaseDate:       car.purchaseDate       ?? '',
+      purchasePrice:      car.purchasePrice      ?? 0,
+      notes:              car.notes              ?? '',
+      status:             car.status             ?? 'active',
     });
     setShowEdit(true);
   };
@@ -129,7 +147,10 @@ export default function CarDetail() {
     const { make, model, year } = parseMakeModelYear(editForm.makeModel);
     const { makeModel, ...rest } = editForm;
     try {
-      await updateCarMut({ path: `/cars/${id}`, body: { ...rest, make, model, year, odometer: +editForm.odometer } }).unwrap();
+      await updateCarMut({
+        path: `/cars/${id}`,
+        body: { ...rest, make, model, year, odometer: +editForm.odometer, purchasePrice: +editForm.purchasePrice, registrationFee: +editForm.registrationFee },
+      }).unwrap();
       toast.success(`${make} ${model} updated`);
       setShowEdit(false);
     } catch (err) { toast.error(err.data?.error || 'Failed to update vehicle'); }
@@ -139,9 +160,10 @@ export default function CarDetail() {
 
   return (
     <div className="space-y-5">
-      {/* Back */}
+
+      {/* ── Back button (mobile-prominent) ── */}
       <button onClick={() => navigate('/cars')}
-        className="flex items-center gap-2 text-[13px] text-slate-500 hover:text-slate-800 font-medium transition-colors">
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[13px] text-slate-700 font-semibold transition-colors sm:bg-transparent sm:px-0 sm:py-0 sm:text-slate-500 sm:hover:bg-transparent sm:hover:text-slate-800">
         <ArrowLeft className="w-4 h-4" /> Back to Fleet
       </button>
 
@@ -149,7 +171,6 @@ export default function CarDetail() {
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <div className="relative rounded-3xl overflow-hidden min-h-45">
 
-          {/* Background — image or gradient */}
           {activeImg ? (
             <>
               <img src={activeImg} alt={`${car.make} ${car.model}`}
@@ -168,7 +189,6 @@ export default function CarDetail() {
             </>
           )}
 
-          {/* Image nav arrows (only when >1 image) */}
           {images.length > 1 && (
             <>
               <button onClick={prevImg}
@@ -182,7 +202,6 @@ export default function CarDetail() {
             </>
           )}
 
-          {/* Image counter */}
           {images.length > 0 && (
             <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/35 backdrop-blur-sm border border-white/15">
               <Camera className="w-3 h-3 text-white/70" />
@@ -190,7 +209,6 @@ export default function CarDetail() {
             </div>
           )}
 
-          {/* Upload camera button */}
           <button onClick={() => fileRef.current?.click()}
             className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/35 hover:bg-black/55 border border-white/20 backdrop-blur-sm transition-all">
             <Camera className="w-3.5 h-3.5 text-white" />
@@ -200,7 +218,6 @@ export default function CarDetail() {
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
 
-          {/* Main content */}
           <div className="relative z-10 p-7">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
               <div>
@@ -208,6 +225,11 @@ export default function CarDetail() {
                   <Badge variant={reg.variant} dot>{reg.label}</Badge>
                   <Badge variant={ins.variant}>Insurance {ins.label}</Badge>
                   {car.nickname && <Badge variant="navy">{car.nickname}</Badge>}
+                  {car.status === 'inactive' && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/25 text-slate-200 border border-slate-400/30">
+                      Inactive
+                    </span>
+                  )}
                 </div>
                 <h1 className="text-white font-bold text-2xl sm:text-3xl leading-tight">
                   {car.make} {car.model}
@@ -228,7 +250,6 @@ export default function CarDetail() {
               </div>
             </div>
 
-            {/* Alerts */}
             {regDays >= 0 && regDays <= 30 && (
               <div className="mt-5 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-amber-500/15 border border-amber-400/25 w-fit">
                 <AlertCircle className="w-4 h-4 text-amber-300 shrink-0" />
@@ -268,7 +289,6 @@ export default function CarDetail() {
                 </button>
               </div>
             ))}
-            {/* Add more button */}
             <button onClick={() => fileRef.current?.click()}
               className="shrink-0 w-20 h-14 rounded-xl border-2 border-dashed border-slate-200 hover:border-accent-400 hover:bg-accent-50 flex flex-col items-center justify-center gap-0.5 transition-all group">
               <Plus className="w-4 h-4 text-slate-300 group-hover:text-accent-500" />
@@ -278,12 +298,13 @@ export default function CarDetail() {
         </motion.div>
       )}
 
-      {/* ── Tabs ── */}
-      <div className="flex gap-1 bg-white border border-slate-100 rounded-2xl p-1.5" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+      {/* ── Tabs (scrollable on mobile) ── */}
+      <div className="flex gap-1 bg-white border border-slate-100 rounded-2xl p-1.5 overflow-x-auto"
+        style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)', scrollbarWidth: 'none' }}>
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={cn(
-              'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] sm:text-[13px] font-semibold transition-all duration-150',
+              'shrink-0 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[12px] sm:text-[13px] font-semibold transition-all duration-150',
               tab === t.id ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800',
             )}>
             <t.icon className="w-3.5 h-3.5" />
@@ -303,13 +324,13 @@ export default function CarDetail() {
         {tab === 'documents'   && <DocumentsTab   car={car} />}
       </motion.div>
 
-      {/* ── Edit Vehicle Modal ── */}
+      {/* ── Edit Vehicle Modal (comprehensive) ── */}
       {showEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowEdit(false)} />
-          <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div className="relative w-full sm:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
             {/* Header */}
-            <div className="px-6 py-4 flex items-center justify-between"
+            <div className="px-6 py-4 flex items-center justify-between shrink-0"
               style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
               <div>
                 <p className="text-white font-bold text-[16px]">Edit Vehicle</p>
@@ -321,62 +342,146 @@ export default function CarDetail() {
               </button>
             </div>
             {/* Form */}
-            <div className="p-6 overflow-y-auto max-h-[65vh]">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className={LBL_E}>Make & Model *</label>
-                  <input value={editForm.makeModel ?? ''} onChange={(e) => setF('makeModel', e.target.value)} className={INP_E} placeholder="e.g. Land Rover Range Rover 2024" />
-                </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="space-y-5">
+
+                {/* Vehicle Details */}
+                <Section>
+                  <p className={LBL_E}>Vehicle Details</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className={LBL_E}>Make & Model *</label>
+                      <input value={editForm.makeModel ?? ''} onChange={(e) => setF('makeModel', e.target.value)} className={INP_E} placeholder="e.g. Land Rover Range Rover 2024" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Category</label>
+                      <select value={editForm.category} onChange={(e) => setF('category', e.target.value)} className={INP_E}>
+                        {CAR_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Plate Number *</label>
+                      <input value={editForm.plateNumber} onChange={(e) => setF('plateNumber', e.target.value)} className={INP_E} placeholder="e.g. B 12345" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Nickname</label>
+                      <input value={editForm.nickname} onChange={(e) => setF('nickname', e.target.value)} className={INP_E} placeholder="e.g. Family Cruiser" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Color Name</label>
+                      <input value={editForm.colorName} onChange={(e) => setF('colorName', e.target.value)} className={INP_E} placeholder="e.g. Pearl White" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>VIN</label>
+                      <input value={editForm.vin} onChange={(e) => setF('vin', e.target.value)} className={INP_E} placeholder="17-char VIN" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Odometer (km)</label>
+                      <input type="number" min="0" value={editForm.odometer} onChange={(e) => setF('odometer', e.target.value)} className={INP_E} />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Purchase Date</label>
+                      <input type="date" value={editForm.purchaseDate} onChange={(e) => setF('purchaseDate', e.target.value)} className={INP_E} />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Purchase Price (AED)</label>
+                      <input type="number" min="0" value={editForm.purchasePrice} onChange={(e) => setF('purchasePrice', e.target.value)} className={INP_E} />
+                    </div>
+                  </div>
+                </Section>
+
+                {/* Driver */}
+                <Section>
+                  <p className={LBL_E}>Driver Information</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={LBL_E}>Driver Name</label>
+                      <input value={editForm.driverName} onChange={(e) => setF('driverName', e.target.value)} className={INP_E} placeholder="Driver's full name" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Driver Phone</label>
+                      <input value={editForm.driverPhone} onChange={(e) => setF('driverPhone', e.target.value)} className={INP_E} placeholder="+971 50 …" />
+                    </div>
+                  </div>
+                </Section>
+
+                {/* Registration */}
+                <Section>
+                  <p className={LBL_E}>Registration</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={LBL_E}>Registration Number</label>
+                      <input value={editForm.registrationNumber} onChange={(e) => setF('registrationNumber', e.target.value)} className={INP_E} placeholder="RN-XXXXX" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Registration Expiry</label>
+                      <input type="date" value={editForm.registrationExpiry} onChange={(e) => setF('registrationExpiry', e.target.value)} className={INP_E} />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Registration Fee (AED)</label>
+                      <input type="number" min="0" value={editForm.registrationFee} onChange={(e) => setF('registrationFee', e.target.value)} className={INP_E} />
+                    </div>
+                  </div>
+                </Section>
+
+                {/* Insurance */}
+                <Section>
+                  <p className={LBL_E}>Insurance</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={LBL_E}>Insurance Company</label>
+                      <input value={editForm.insuranceCompany} onChange={(e) => setF('insuranceCompany', e.target.value)} className={INP_E} placeholder="e.g. AXA Insurance" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Policy Number</label>
+                      <input value={editForm.insurancePolicy} onChange={(e) => setF('insurancePolicy', e.target.value)} className={INP_E} placeholder="Policy no." />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Insurance Expiry</label>
+                      <input type="date" value={editForm.insuranceExpiry} onChange={(e) => setF('insuranceExpiry', e.target.value)} className={INP_E} />
+                    </div>
+                  </div>
+                </Section>
+
+                {/* Status */}
+                <Section>
+                  <p className={LBL_E}>Vehicle Status</p>
+                  <div className="flex gap-2">
+                    {['active', 'inactive'].map((s) => (
+                      <button key={s} type="button" onClick={() => setF('status', s)}
+                        className={cn(
+                          'flex-1 py-2.5 rounded-xl text-[13px] font-semibold border transition-all capitalize',
+                          editForm.status === s
+                            ? s === 'active' ? 'bg-green-50 border-green-300 text-green-700' : 'bg-slate-100 border-slate-300 text-slate-600'
+                            : 'border-slate-200 text-slate-400 hover:border-slate-300',
+                        )}>
+                        {s === 'active' ? '● Active' : '○ Inactive'}
+                      </button>
+                    ))}
+                  </div>
+                </Section>
+
+                {/* Notes */}
                 <div>
-                  <label className={LBL_E}>Category</label>
-                  <select value={editForm.category} onChange={(e) => setF('category', e.target.value)} className={INP_E}>
-                    {CAR_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <label className={LBL_E}>Notes</label>
+                  <textarea value={editForm.notes} onChange={(e) => setF('notes', e.target.value)} rows={3}
+                    placeholder="Any additional notes…"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white resize-none" />
                 </div>
-                <div>
-                  <label className={LBL_E}>Plate Number *</label>
-                  <input value={editForm.plateNumber} onChange={(e) => setF('plateNumber', e.target.value)} className={INP_E} placeholder="e.g. B 12345" />
-                </div>
-                <div>
-                  <label className={LBL_E}>Nickname</label>
-                  <input value={editForm.nickname} onChange={(e) => setF('nickname', e.target.value)} className={INP_E} placeholder="e.g. Family Cruiser" />
-                </div>
-                <div>
-                  <label className={LBL_E}>Color Name</label>
-                  <input value={editForm.colorName} onChange={(e) => setF('colorName', e.target.value)} className={INP_E} placeholder="e.g. Pearl White" />
-                </div>
-                <div>
-                  <label className={LBL_E}>Odometer (km)</label>
-                  <input type="number" min="0" value={editForm.odometer} onChange={(e) => setF('odometer', e.target.value)} className={INP_E} />
-                </div>
-                <div>
-                  <label className={LBL_E}>Driver Name</label>
-                  <input value={editForm.driverName} onChange={(e) => setF('driverName', e.target.value)} className={INP_E} placeholder="Driver's full name" />
-                </div>
-                <div>
-                  <label className={LBL_E}>Driver Contact</label>
-                  <input value={editForm.driverContact} onChange={(e) => setF('driverContact', e.target.value)} className={INP_E} placeholder="+971 50 …" />
-                </div>
-                <div>
-                  <label className={LBL_E}>Registration Expiry</label>
-                  <input type="date" value={editForm.registrationExpiry} onChange={(e) => setF('registrationExpiry', e.target.value)} className={INP_E} />
-                </div>
-                <div>
-                  <label className={LBL_E}>Insurance Expiry</label>
-                  <input type="date" value={editForm.insuranceExpiry} onChange={(e) => setF('insuranceExpiry', e.target.value)} className={INP_E} />
-                </div>
+
               </div>
             </div>
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end">
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end shrink-0">
               <button onClick={() => setShowEdit(false)}
                 className="px-5 py-2.5 rounded-xl text-[13px] font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-all">
                 Cancel
               </button>
-              <button onClick={handleEditSave}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all"
+              <button onClick={handleEditSave} disabled={isSaving}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-60"
                 style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
-                <Save className="w-3.5 h-3.5" /> Save Changes
+                {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {isSaving ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           </div>
@@ -384,4 +489,8 @@ export default function CarDetail() {
       )}
     </div>
   );
+}
+
+function Section({ children }) {
+  return <div className="space-y-3">{children}</div>;
 }

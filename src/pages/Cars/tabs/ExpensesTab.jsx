@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { AnimatePresence } from 'framer-motion';
 import { Plus, Wrench, Trash2, Wallet, Edit2, ChevronRight } from 'lucide-react';
+import PageLoader from '../../../components/ui/PageLoader';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../../store/slices/propertiesSlice';
 import { CAR_EXPENSE_TYPES } from '../../../data/mockCars';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 import EmptyState from '../../../components/ui/EmptyState';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import { MotionSwipeableRow } from '../../../components/ui/SwipeableRow';
 import { cn } from '../../../utils/cn';
 import toast from 'react-hot-toast';
 
@@ -22,19 +26,26 @@ const BLANK = { type: 'service', description: '', amount: '', vendor: '', date: 
 export default function ExpensesTab({ carId }) {
   const propertyId = useSelector(selectCurrentPropertyId);
 
-  const { data: expenses = [], refetch } = useGetQuery({ path: `/cars/${carId}/expenses` }, { skip: !carId });
-  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const { data: expenses = [], isLoading, isError, refetch } = useGetQuery(
+    { path: `/cars/${carId}/expenses` },
+    { skip: !carId },
+  );
+  const { data: walletData, refetch: refetchWallet } = useGetQuery(
+    { path: '/wallet', params: { propertyId } },
+    { skip: !propertyId },
+  );
   const vehicleBalance = walletData?.vehicle?.balance ?? 0;
 
-  const [addExpenseMut]    = usePostMutation();
-  const [updateExpenseMut] = usePutMutation();
-  const [deductWalletMut]  = usePostMutation();
-  const [deleteExpenseMut] = useDeleteMutation();
+  const [addExpenseMut]                        = usePostMutation();
+  const [updateExpenseMut]                     = usePutMutation();
+  const [deductWalletMut]                      = usePostMutation();
+  const [deleteExpenseMut, { isLoading: isDel }] = useDeleteMutation();
 
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [showAdd,    setShowAdd]    = useState(false);
-  const [editingExp, setEditingExp] = useState(null);
-  const [form,       setForm]       = useState(BLANK);
+  const [typeFilter,    setTypeFilter]   = useState('all');
+  const [showAdd,       setShowAdd]      = useState(false);
+  const [editingExp,    setEditingExp]   = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [form,          setForm]         = useState(BLANK);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const total  = expenses.reduce((s, e) => s + (e.amount || 0), 0);
@@ -72,12 +83,12 @@ export default function ExpensesTab({ carId }) {
           path: `/cars/${carId}/expenses/${editingExp.id ?? editingExp._id}`,
           body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined },
         }).unwrap();
-        toast.success('Expense updated');
+        toast.success('Expense updated — wallet balance adjusted');
       } else {
         await Promise.all([
           addExpenseMut({
             path: `/cars/${carId}/expenses`,
-            body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined },
+            body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined, walletType: 'vehicle' },
           }).unwrap(),
           deductWalletMut({
             path: '/wallet/deduct',
@@ -94,13 +105,26 @@ export default function ExpensesTab({ carId }) {
     } catch (err) { toast.error(err.data?.error || 'Failed to save expense'); }
   };
 
-  const handleDelete = async (exp) => {
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
     try {
-      await deleteExpenseMut({ path: `/cars/${carId}/expenses/${exp.id ?? exp._id}` }).unwrap();
-      await refetch();
-      toast.success('Expense removed');
-    } catch { toast.error('Failed to remove expense'); }
+      await deleteExpenseMut({ path: `/cars/${carId}/expenses/${deleteConfirm.id ?? deleteConfirm._id}` }).unwrap();
+      await Promise.all([refetch(), refetchWallet()]);
+      toast.success('Expense removed — wallet refunded');
+      setDeleteConfirm(null);
+    } catch { toast.error('Failed to remove expense'); setDeleteConfirm(null); }
   };
+
+  if (isLoading) return <PageLoader icon={Wrench} text="Loading expenses…" className="py-16" />;
+
+  if (isError) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-slate-600 font-semibold mb-1">Failed to load expenses</p>
+        <button onClick={refetch} className="text-[12px] text-accent-600 hover:underline">Try again</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -157,40 +181,59 @@ export default function ExpensesTab({ carId }) {
           action={openAdd} actionLabel="Add Expense" />
       ) : (
         <div className="space-y-2">
-          {sorted.map((exp) => {
-            const cfg = CAR_EXPENSE_TYPES[exp.type] ?? CAR_EXPENSE_TYPES.other;
-            return (
-              <div key={exp.id ?? exp._id}
-                className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-4 hover:shadow-sm transition-all"
-                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: cfg.bg }}>
-                  <Wrench className="w-4 h-4" style={{ color: cfg.color }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-slate-800 truncate">{exp.description}</p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
-                    {exp.vendor  && <span className="text-[11px] text-slate-400">{exp.vendor}</span>}
-                    {exp.mileage && <><span className="text-slate-200 text-xs">·</span><span className="text-[11px] text-slate-400">{Number(exp.mileage).toLocaleString()} km</span></>}
+          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide px-1 sm:hidden">
+            ← Swipe row to edit or delete →
+          </p>
+          <AnimatePresence mode="popLayout">
+            {sorted.map((exp, i) => {
+              const cfg = CAR_EXPENSE_TYPES[exp.type] ?? CAR_EXPENSE_TYPES.other;
+              return (
+                <MotionSwipeableRow
+                  key={exp.id ?? exp._id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ delay: i * 0.02 }}
+                  className="rounded-2xl overflow-hidden"
+                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+                  onSwipeRight={() => openEdit(exp)}
+                  onSwipeLeft={() => setDeleteConfirm(exp)}
+                  leftIcon={<Edit2 style={{ color: '#2563eb', width: 18, height: 18 }} />}
+                  leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                  rightIcon={<Trash2 style={{ color: '#dc2626', width: 18, height: 18 }} />}
+                  rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
+                >
+                  <div className="bg-white p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: cfg.bg }}>
+                      <Wrench className="w-4 h-4" style={{ color: cfg.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-800 truncate">{exp.description}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+                        {exp.vendor  && <span className="text-[11px] text-slate-400">{exp.vendor}</span>}
+                        {exp.mileage && <><span className="text-slate-200 text-xs">·</span><span className="text-[11px] text-slate-400">{Number(exp.mileage).toLocaleString()} km</span></>}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[14px] font-bold text-slate-900">AED {Number(exp.amount).toLocaleString()}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(exp.date)}</p>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-1 shrink-0">
+                      <button onClick={() => openEdit(exp)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setDeleteConfirm(exp)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[14px] font-bold text-slate-900">AED {Number(exp.amount).toLocaleString()}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(exp.date)}</p>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => openEdit(exp)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => handleDelete(exp)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                </MotionSwipeableRow>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
@@ -199,7 +242,7 @@ export default function ExpensesTab({ carId }) {
         open={showAdd}
         onClose={() => { setShowAdd(false); setEditingExp(null); setForm(BLANK); }}
         title={editingExp ? 'Edit Expense' : 'Log Expense'}
-        subtitle={editingExp ? 'Update expense details' : 'Record a vehicle expense — deducted from Vehicle Wallet'}>
+        subtitle={editingExp ? 'Update expense details — wallet balance will be adjusted' : 'Record a vehicle expense — deducted from Vehicle Wallet'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {!editingExp && <VehicleWalletPanel balance={vehicleBalance} deduction={Number(form.amount) || 0} />}
           <div className="grid grid-cols-2 gap-3">
@@ -248,6 +291,17 @@ export default function ExpensesTab({ carId }) {
           </div>
         </form>
       </Modal>
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDelete}
+        loading={isDel}
+        title="Remove Expense"
+        message={deleteConfirm ? `Remove "${deleteConfirm.description}" (AED ${Number(deleteConfirm.amount).toLocaleString()})? The amount will be refunded to the Vehicle Wallet.` : ''}
+        confirmLabel="Remove & Refund"
+      />
     </div>
   );
 }
@@ -274,7 +328,6 @@ function VehicleWalletBanner({ balance, transactions }) {
 
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1d3a 0%, #152d5e 100%)', boxShadow: '0 4px 20px rgba(11,29,58,0.22)' }}>
-      {/* Balance row */}
       <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-2.5 flex-wrap">
@@ -299,8 +352,6 @@ function VehicleWalletBanner({ balance, transactions }) {
           Wallet
         </Link>
       </div>
-
-      {/* Recent transactions */}
       <div className="border-t border-white/8">
         {txns.length === 0 ? (
           <p className="px-5 py-4 text-[11px] text-white/30 text-center">No transactions yet — log an expense to get started</p>
@@ -335,7 +386,6 @@ function VehicleWalletPanel({ balance, deduction }) {
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1d3a 0%, #152d5e 100%)', boxShadow: '0 4px 20px rgba(11,29,58,0.25)' }}>
       <div className="px-5 py-4">
-        {/* Label row */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Wallet className="w-3.5 h-3.5 text-white/40" />
@@ -352,15 +402,11 @@ function VehicleWalletPanel({ balance, deduction }) {
             </Link>
           ) : null}
         </div>
-
-        {/* Balance */}
         <p className={cn('text-[32px] font-black leading-none tracking-tight', isNeg ? 'text-red-300' : 'text-white')}>
           {isNeg ? `− AED ${fmt(Math.abs(balance))}` : `AED ${fmt(balance)}`}
         </p>
         <p className="text-[11px] text-white/35 mt-1.5 font-medium">Current Balance</p>
       </div>
-
-      {/* Deduction row — only shown when amount is entered */}
       {deduction > 0 && (
         <div className="px-5 py-3 border-t border-white/8 bg-black/12 flex items-center justify-between">
           <span className="text-[11px] font-semibold text-white/45">This expense</span>

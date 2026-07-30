@@ -15,6 +15,18 @@ const DASHBOARD_DEPS = new Set([
   "cars", "repairs", "home-info", "assets",
 ]);
 
+// When resource A is mutated, also invalidate these related resource caches.
+// Handles cross-collection relationships (e.g. assets ↔ areas share areaId/assetCount).
+const CROSS_INVALIDATION = {
+  assets:       ["areas"],               // asset assign/unassign changes area assetCount
+  areas:        ["assets"],              // area rename cascades to asset.areaName
+  repairs:      ["cars"],                // repairs are linked to cars
+  expenses:     ["wallet", "transactions"],
+  transactions: ["wallet", "expenses"],
+  tasks:        ["assets", "areas"],     // tasks may reference assets or areas
+  floors:       ["areas"],               // floor rename affects area.floorName
+};
+
 // All resource tag types known to this app
 const TAG_TYPES = [
   "properties", "cars", "employees", "expenses", "expense-categories",
@@ -67,12 +79,24 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   return result;
 };
 
+// Build the full invalidation tag list for a given path
+function buildInvalidationTags(path) {
+  const tag = resourceTag(path);
+  const tags = [{ type: tag, id: "LIST" }];
+  if (DASHBOARD_DEPS.has(tag)) tags.push({ type: "dashboard", id: "LIST" });
+  for (const cross of (CROSS_INVALIDATION[tag] ?? [])) {
+    tags.push({ type: cross, id: "LIST" });
+  }
+  return tags;
+}
+
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  keepUnusedDataFor: 300,   // cache for 5 minutes — navigating between pages won't re-fetch
-  refetchOnFocus: false,    // don't re-fetch just because the window regained focus
-  refetchOnReconnect: true, // do re-fetch after network reconnects
+  keepUnusedDataFor: 60,          // drop unused cache after 1 min (was 5 min)
+  refetchOnMountOrArgChange: 30,  // background-refetch if data is >30s old on mount
+  refetchOnFocus: false,
+  refetchOnReconnect: true,
   tagTypes: TAG_TYPES,
   endpoints: (builder) => ({
 
@@ -105,12 +129,7 @@ export const apiSlice = createApi({
             : { headers: { "Content-Type": "application/json", Accept: "application/json" } }),
         };
       },
-      invalidatesTags: (result, error, { path }) => {
-        const tag = resourceTag(path);
-        const tags = [{ type: tag, id: "LIST" }];
-        if (DASHBOARD_DEPS.has(tag)) tags.push({ type: "dashboard", id: "LIST" });
-        return tags;
-      },
+      invalidatesTags: (result, error, { path }) => buildInvalidationTags(path),
     }),
 
     // ── PUT (mutation) ─────────────────────────────────────────────────────
@@ -121,12 +140,7 @@ export const apiSlice = createApi({
         body,
         headers: { Accept: "application/json" },
       }),
-      invalidatesTags: (result, error, { path }) => {
-        const tag = resourceTag(path);
-        const tags = [{ type: tag, id: "LIST" }];
-        if (DASHBOARD_DEPS.has(tag)) tags.push({ type: "dashboard", id: "LIST" });
-        return tags;
-      },
+      invalidatesTags: (result, error, { path }) => buildInvalidationTags(path),
     }),
 
     // ── PATCH (mutation) ───────────────────────────────────────────────────
@@ -137,12 +151,7 @@ export const apiSlice = createApi({
         body,
         headers: { Accept: "application/json" },
       }),
-      invalidatesTags: (result, error, { path }) => {
-        const tag = resourceTag(path);
-        const tags = [{ type: tag, id: "LIST" }];
-        if (DASHBOARD_DEPS.has(tag)) tags.push({ type: "dashboard", id: "LIST" });
-        return tags;
-      },
+      invalidatesTags: (result, error, { path }) => buildInvalidationTags(path),
     }),
 
     // ── DELETE (mutation) ──────────────────────────────────────────────────
@@ -152,12 +161,7 @@ export const apiSlice = createApi({
         method: "DELETE",
         headers: { Accept: "application/json" },
       }),
-      invalidatesTags: (result, error, { path }) => {
-        const tag = resourceTag(path);
-        const tags = [{ type: tag, id: "LIST" }];
-        if (DASHBOARD_DEPS.has(tag)) tags.push({ type: "dashboard", id: "LIST" });
-        return tags;
-      },
+      invalidatesTags: (result, error, { path }) => buildInvalidationTags(path),
     }),
 
     // ── Smart POST — handles both JSON and file (PDF/blob) responses ───────
@@ -197,12 +201,7 @@ export const apiSlice = createApi({
           return { error: { status: "FETCH_ERROR", error: error.message } };
         }
       },
-      invalidatesTags: (result, error, { path }) => {
-        const tag = resourceTag(path);
-        const tags = [{ type: tag, id: "LIST" }];
-        if (DASHBOARD_DEPS.has(tag)) tags.push({ type: "dashboard", id: "LIST" });
-        return tags;
-      },
+      invalidatesTags: (result, error, { path }) => buildInvalidationTags(path),
     }),
 
     // ── PDF download via POST ──────────────────────────────────────────────

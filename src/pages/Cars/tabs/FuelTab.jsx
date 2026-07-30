@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { AnimatePresence } from 'framer-motion';
 import { Fuel, Plus, Trash2, Droplets, TrendingUp, Hash, Wallet, Edit2, ChevronRight } from 'lucide-react';
+import PageLoader from '../../../components/ui/PageLoader';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../../store/slices/propertiesSlice';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 import EmptyState from '../../../components/ui/EmptyState';
+import ConfirmDialog from '../../../components/ui/ConfirmDialog';
+import { MotionSwipeableRow } from '../../../components/ui/SwipeableRow';
 import { cn } from '../../../utils/cn';
 import toast from 'react-hot-toast';
 
@@ -25,18 +29,25 @@ const BLANK = {
 export default function FuelTab({ carId }) {
   const propertyId = useSelector(selectCurrentPropertyId);
 
-  const { data: logs = [], refetch } = useGetQuery({ path: `/cars/${carId}/fuel-logs` }, { skip: !carId });
-  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const { data: logs = [], isLoading, isError, refetch } = useGetQuery(
+    { path: `/cars/${carId}/fuel-logs` },
+    { skip: !carId },
+  );
+  const { data: walletData, refetch: refetchWallet } = useGetQuery(
+    { path: '/wallet', params: { propertyId } },
+    { skip: !propertyId },
+  );
   const vehicleBalance = walletData?.vehicle?.balance ?? 0;
 
-  const [addFuelMut]      = usePostMutation();
-  const [updateFuelMut]   = usePutMutation();
-  const [deductWalletMut] = usePostMutation();
-  const [deleteFuelMut]   = useDeleteMutation();
+  const [addFuelMut]                           = usePostMutation();
+  const [updateFuelMut]                        = usePutMutation();
+  const [deductWalletMut]                      = usePostMutation();
+  const [deleteFuelMut, { isLoading: isDel }]  = useDeleteMutation();
 
-  const [showAdd,    setShowAdd]    = useState(false);
-  const [editingLog, setEditingLog] = useState(null);
-  const [form,       setForm]       = useState(BLANK);
+  const [showAdd,      setShowAdd]      = useState(false);
+  const [editingLog,   setEditingLog]   = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [form,         setForm]         = useState(BLANK);
 
   const sorted   = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
   const totalL   = logs.reduce((s, f) => s + (f.liters || 0), 0);
@@ -78,7 +89,7 @@ export default function FuelTab({ carId }) {
           path: `/cars/${carId}/fuel-logs/${editingLog.id ?? editingLog._id}`,
           body: { date: form.date, totalPrice, liters, mileage },
         }).unwrap();
-        toast.success('Fuel log updated');
+        toast.success('Fuel log updated — wallet balance adjusted');
       } else {
         await Promise.all([
           addFuelMut({
@@ -100,16 +111,26 @@ export default function FuelTab({ carId }) {
     } catch (err) { toast.error(err.data?.error || 'Failed to save fuel log'); }
   };
 
-  const handleDelete = async (log) => {
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
     try {
-      await deleteFuelMut({ path: `/cars/${carId}/fuel-logs/${log.id ?? log._id}` }).unwrap();
-      await refetch();
-      toast.success('Fuel log removed');
-    } catch { toast.error('Failed to remove fuel log'); }
+      await deleteFuelMut({ path: `/cars/${carId}/fuel-logs/${deleteConfirm.id ?? deleteConfirm._id}` }).unwrap();
+      await Promise.all([refetch(), refetchWallet()]);
+      toast.success('Fuel log removed — wallet refunded');
+      setDeleteConfirm(null);
+    } catch { toast.error('Failed to remove fuel log'); setDeleteConfirm(null); }
   };
 
-  const cost  = Number(form.totalPrice) || 0;
-  const after = vehicleBalance - cost;
+  if (isLoading) return <PageLoader icon={Fuel} text="Loading fuel logs…" className="py-16" />;
+
+  if (isError) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-slate-600 font-semibold mb-1">Failed to load fuel logs</p>
+        <button onClick={refetch} className="text-[12px] text-accent-600 hover:underline">Try again</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -146,52 +167,73 @@ export default function FuelTab({ carId }) {
           description="Log your first fuel fill-up to track monthly cost."
           action={openAdd} actionLabel="Log Fuel Fill" />
       ) : (
-        Object.entries(byMonth).map(([month, data]) => (
-          <div key={month}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[13px] font-bold text-slate-800">{month}</p>
-              <div className="flex items-center gap-4">
-                {data.totalL > 0 && (
-                  <span className="flex items-center gap-1.5 text-[12px] text-slate-500">
-                    <Droplets className="w-3.5 h-3.5 text-cyan-500" />{data.totalL.toFixed(1)} L
-                  </span>
-                )}
-                <span className="text-[12px] font-bold text-slate-800">AED {fmt(data.totalAED)}</span>
+        <div className="space-y-6">
+          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide px-1 sm:hidden">
+            ← Swipe row to edit or delete →
+          </p>
+          {Object.entries(byMonth).map(([month, data]) => (
+            <div key={month}>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[13px] font-bold text-slate-800">{month}</p>
+                <div className="flex items-center gap-4">
+                  {data.totalL > 0 && (
+                    <span className="flex items-center gap-1.5 text-[12px] text-slate-500">
+                      <Droplets className="w-3.5 h-3.5 text-cyan-500" />{data.totalL.toFixed(1)} L
+                    </span>
+                  )}
+                  <span className="text-[12px] font-bold text-slate-800">AED {fmt(data.totalAED)}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <AnimatePresence mode="popLayout">
+                  {data.logs.map((log, i) => (
+                    <MotionSwipeableRow
+                      key={log.id ?? log._id}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.97 }}
+                      transition={{ delay: i * 0.02 }}
+                      className="rounded-2xl overflow-hidden"
+                      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+                      onSwipeRight={() => openEdit(log)}
+                      onSwipeLeft={() => setDeleteConfirm(log)}
+                      leftIcon={<Edit2 style={{ color: '#2563eb', width: 18, height: 18 }} />}
+                      leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                      rightIcon={<Trash2 style={{ color: '#dc2626', width: 18, height: 18 }} />}
+                      rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
+                    >
+                      <div className="bg-white p-4 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                          <Fuel className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-700">{fmtDate(log.date)}</p>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap text-[11px] text-slate-400">
+                            {log.liters  ? <span>{log.liters} L filled</span> : null}
+                            {log.mileage ? <span>{Number(log.mileage).toLocaleString()} km</span> : null}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[15px] font-bold text-amber-700">AED {Number(log.totalPrice).toFixed(0)}</p>
+                        </div>
+                        <div className="hidden sm:flex items-center gap-1 shrink-0">
+                          <button onClick={() => openEdit(log)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => setDeleteConfirm(log)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </MotionSwipeableRow>
+                  ))}
+                </AnimatePresence>
               </div>
             </div>
-            <div className="space-y-2">
-              {data.logs.map((log) => (
-                <div key={log.id ?? log._id}
-                  className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-4"
-                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
-                    <Fuel className="w-4 h-4 text-amber-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-slate-700">{fmtDate(log.date)}</p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap text-[11px] text-slate-400">
-                      {log.liters  ? <span>{log.liters} L filled</span> : null}
-                      {log.mileage ? <span>{Number(log.mileage).toLocaleString()} km</span> : null}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[15px] font-bold text-amber-700">AED {Number(log.totalPrice).toFixed(0)}</p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => openEdit(log)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button onClick={() => handleDelete(log)}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
 
       {/* Add / Edit Fuel Modal */}
@@ -199,10 +241,9 @@ export default function FuelTab({ carId }) {
         open={showAdd}
         onClose={() => { setShowAdd(false); setEditingLog(null); setForm(BLANK); }}
         title={editingLog ? 'Edit Fuel Log' : 'Log Fuel Fill-up'}
-        subtitle={editingLog ? 'Update fill-up details' : 'Total price deducted from Vehicle Wallet'}>
+        subtitle={editingLog ? 'Update fill-up details — wallet balance will be adjusted' : 'Total price deducted from Vehicle Wallet'}>
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Wallet panel — only for new entry */}
           {!editingLog && <VehicleWalletPanel balance={vehicleBalance} deduction={Number(form.totalPrice) || 0} />}
 
           <div>
@@ -238,6 +279,17 @@ export default function FuelTab({ carId }) {
           </div>
         </form>
       </Modal>
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={handleDelete}
+        loading={isDel}
+        title="Remove Fuel Log"
+        message={deleteConfirm ? `Remove fuel log from ${fmtDate(deleteConfirm.date)} (AED ${Number(deleteConfirm.totalPrice).toFixed(0)})? The amount will be refunded to the Vehicle Wallet.` : ''}
+        confirmLabel="Remove & Refund"
+      />
     </div>
   );
 }
@@ -257,7 +309,6 @@ function VehicleWalletBanner({ balance, transactions }) {
 
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1d3a 0%, #152d5e 100%)', boxShadow: '0 4px 20px rgba(11,29,58,0.22)' }}>
-      {/* Balance row */}
       <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-2.5 flex-wrap">
@@ -282,8 +333,6 @@ function VehicleWalletBanner({ balance, transactions }) {
           Wallet
         </Link>
       </div>
-
-      {/* Recent transactions */}
       <div className="border-t border-white/8">
         {txns.length === 0 ? (
           <p className="px-5 py-4 text-[11px] text-white/30 text-center">No transactions yet — log a fuel fill-up to get started</p>
@@ -318,7 +367,6 @@ function VehicleWalletPanel({ balance, deduction }) {
   return (
     <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1d3a 0%, #152d5e 100%)', boxShadow: '0 4px 20px rgba(11,29,58,0.25)' }}>
       <div className="px-5 py-4">
-        {/* Label row */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Wallet className="w-3.5 h-3.5 text-white/40" />
@@ -335,15 +383,11 @@ function VehicleWalletPanel({ balance, deduction }) {
             </Link>
           ) : null}
         </div>
-
-        {/* Balance */}
         <p className={cn('text-[32px] font-black leading-none tracking-tight', isNeg ? 'text-red-300' : 'text-white')}>
           {isNeg ? `− AED ${fmt(Math.abs(balance))}` : `AED ${fmt(balance)}`}
         </p>
         <p className="text-[11px] text-white/35 mt-1.5 font-medium">Current Balance</p>
       </div>
-
-      {/* Deduction row — only shown when amount is entered */}
       {deduction > 0 && (
         <div className="px-5 py-3 border-t border-white/8 bg-black/12 flex items-center justify-between">
           <span className="text-[11px] font-semibold text-white/45">This fill-up</span>

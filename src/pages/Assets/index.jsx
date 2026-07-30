@@ -18,12 +18,14 @@ import {
 import {
   BedDouble, ShowerHead, UtensilsCrossed, Sofa, Utensils,
   TreeDeciduous, Waves, Car, Briefcase, Package, Wrench,
-  Wind, Sun, MapPin,
+  Wind, Sun, MapPin, Edit2, Trash2, AlertTriangle,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import PageLoader from '../../components/ui/PageLoader';
+import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import { Field, Input, Select, Textarea, FormGrid, FormSection, FormActions } from '../../components/ui/FormField';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
@@ -79,14 +81,11 @@ export default function AssetsPage() {
   const [assignTarget, setAssignTarget] = useState(null);
   const [bulkAssign,   setBulkAssign]   = useState(false);
 
-  // Debounce search input → API param
+  // Debounce search input → API param, resets page when search term fires
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput), 400);
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [searchInput]);
-
-  // Reset page when any filter changes
-  useEffect(() => { setPage(1); }, [search, catFilt, statusFilt]);
 
   // ── Build API params ───────────────────────────────────────────────────────
   const catParam    = catFilt !== 'All'    ? catFilt                        : undefined;
@@ -101,7 +100,7 @@ export default function AssetsPage() {
   };
 
   // Paginated list — response shape: { items, total, page, pages, limit }
-  const { data: assetsResult = {} } = useGetQuery(
+  const { data: assetsResult = {}, isLoading, isError, refetch } = useGetQuery(
     { path: '/assets', params: assetParams },
     { skip: !propertyId },
   );
@@ -115,15 +114,15 @@ export default function AssetsPage() {
   // Stats from backend (total, unassigned, etc.)
   const { data: assetStats = {} } = useGetQuery({ path: '/assets/stats', params: { propertyId } }, { skip: !propertyId });
 
-  // All assets unfiltered — needed only for BulkAssign modal (shows full list for selection)
+  // All assets unfiltered — fetched ONLY when BulkAssign modal is open
   const { data: allAssetsFlat = [] } = useGetQuery(
     { path: '/assets', params: { propertyId } },
-    { skip: !propertyId },
+    { skip: !propertyId || !bulkAssign },
   );
 
-  const [addAssetMut]    = usePostMutation();
-  const [updateAssetMut] = usePutMutation();
-  const [deleteAssetMut] = useDeleteMutation();
+  const [addAssetMut,    { isLoading: isAdding }]   = usePostMutation();
+  const [updateAssetMut, { isLoading: isUpdating }] = usePutMutation();
+  const [deleteAssetMut, { isLoading: isDeleting }] = useDeleteMutation();
 
   // Stats from backend
   const unassigned      = assetStats.unassigned       ?? 0;
@@ -133,6 +132,7 @@ export default function AssetsPage() {
   const overallTotal    = assetStats.total             ?? 0;
 
   const handleSave = async (data) => {
+    if (isAdding || isUpdating) return;
     try {
       if (modal !== 'add') {
         await updateAssetMut({
@@ -160,6 +160,23 @@ export default function AssetsPage() {
     } catch (err) { toast.error(err.data?.error || 'Failed to assign'); }
   };
 
+  const handleDeleteAsset = async () => {
+    if (isDeleting) return;
+    try {
+      await deleteAssetMut({ path: `/assets/${delTarget.id}` }).unwrap();
+      toast.success('Asset deleted');
+      setDelTarget(null);
+    } catch (err) { toast.error(err.data?.error || 'Failed to delete'); setDelTarget(null); }
+  };
+
+  const handleDeleteRequest = (asset) => {
+    if (asset.areaId) {
+      toast(`Unassign "${asset.name}" from "${asset.areaName}" before deleting`, { icon: '⚠️' });
+      return;
+    }
+    setDelTarget(asset);
+  };
+
   const handleBulkAssign = async (area, selectedAssetIds) => {
     const toAssign = allAssetsFlat.filter((a) => selectedAssetIds.has(a.id));
     try {
@@ -170,6 +187,28 @@ export default function AssetsPage() {
       setBulkAssign(false);
     } catch (err) { toast.error(err.data?.error || 'Failed to assign'); }
   };
+
+  // ── Global loader & error ─────────────────────────────────────────────────
+  if (isLoading && assets.length === 0) {
+    return <PageLoader icon={Package} text="Loading assets…" />;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[56vh] gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
+          <AlertTriangle className="w-7 h-7 text-red-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-[15px] font-bold text-slate-800">Failed to load assets</p>
+          <p className="text-[12px] text-slate-400 mt-1 mb-3">Check your connection and try again</p>
+          <button onClick={refetch} className="px-5 py-2 rounded-xl text-white text-[13px] font-bold" style={{ background: '#0b1d3a' }}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="space-y-6">
@@ -250,7 +289,7 @@ export default function AssetsPage() {
             const m = catMeta(cat);
             const active = catFilt === cat;
             return (
-              <button key={cat} onClick={() => setCatFilt(cat)}
+              <button key={cat} onClick={() => { setCatFilt(cat); setPage(1); }}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold whitespace-nowrap border transition-all shrink-0"
                 style={active
                   ? { background: '#0b1d3a', color: '#fff', borderColor: '#0b1d3a' }
@@ -271,7 +310,7 @@ export default function AssetsPage() {
             const active = statusFilt === s;
             const sm = s !== 'All' ? statusMeta(STATUS_FILTER_MAP[s]) : null;
             return (
-              <button key={s} onClick={() => setStatusFilt(s)}
+              <button key={s} onClick={() => { setStatusFilt(s); setPage(1); }}
                 className="px-3 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap border transition-all shrink-0"
                 style={active
                   ? { background: sm?.color ?? '#0b1d3a', color: '#fff', borderColor: sm?.color ?? '#0b1d3a' }
@@ -301,29 +340,62 @@ export default function AssetsPage() {
             <button onClick={() => setModal('add')} className="mt-3 text-[13px] font-semibold hover:underline" style={{ color: '#2563eb' }}>+ Add first asset</button>
           )}
         </div>
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          <AnimatePresence mode="popLayout">
-            {assets.map((a, i) => (
-              <motion.div key={a.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ delay: i * 0.04 }}>
-                <AssetCard asset={a} areas={areas}
-                  onEdit={() => setModal(a)}
-                  onDelete={() => setDelTarget(a)}
-                  onAssign={() => setAssignTarget(a)} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
-          {assets.map((a, i) => (
-            <AssetRow key={a.id} asset={a}
-              last={i === assets.length - 1}
-              onEdit={() => setModal(a)}
-              onDelete={() => setDelTarget(a)}
-              onAssign={() => setAssignTarget(a)} />
-          ))}
-        </div>
+        <>
+          {/* Swipe hint — mobile only */}
+          <p className="sm:hidden text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center -mb-2">
+            ← Swipe card to edit or delete →
+          </p>
+
+          {view === 'grid' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <AnimatePresence mode="popLayout">
+                {assets.map((a, i) => (
+                  <MotionSwipeableRow
+                    key={a.id}
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96 }} transition={{ delay: i * 0.04 }}
+                    className="rounded-3xl overflow-hidden"
+                    style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.10)' }}
+                    onSwipeRight={() => setModal(a)}
+                    onSwipeLeft={() => handleDeleteRequest(a)}
+                    leftIcon={<Edit2  style={{ color: '#2563eb', width: 20, height: 20 }} />}
+                    leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                    rightIcon={<Trash2 style={{ color: !a.areaId ? '#dc2626' : '#94a3b8', width: 20, height: 20 }} />}
+                    rightLabel="Delete" rightBg={!a.areaId ? '#fef2f2' : '#f8fafc'} rightColor={!a.areaId ? '#dc2626' : '#94a3b8'}
+                  >
+                    <AssetCard asset={a} areas={areas}
+                      canDelete={!a.areaId}
+                      onEdit={() => setModal(a)}
+                      onDelete={() => handleDeleteRequest(a)}
+                      onAssign={() => setAssignTarget(a)} />
+                  </MotionSwipeableRow>
+                ))}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+              {assets.map((a, i) => (
+                <MotionSwipeableRow
+                  key={a.id}
+                  onSwipeRight={() => setModal(a)}
+                  onSwipeLeft={() => handleDeleteRequest(a)}
+                  leftIcon={<Edit2  style={{ color: '#2563eb', width: 18, height: 18 }} />}
+                  leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                  rightIcon={<Trash2 style={{ color: !a.areaId ? '#dc2626' : '#94a3b8', width: 18, height: 18 }} />}
+                  rightLabel="Delete" rightBg={!a.areaId ? '#fef2f2' : '#f8fafc'} rightColor={!a.areaId ? '#dc2626' : '#94a3b8'}
+                >
+                  <AssetRow asset={a}
+                    last={i === assets.length - 1}
+                    canDelete={!a.areaId}
+                    onEdit={() => setModal(a)}
+                    onDelete={() => handleDeleteRequest(a)}
+                    onAssign={() => setAssignTarget(a)} />
+                </MotionSwipeableRow>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Pagination ── */}
@@ -345,7 +417,7 @@ export default function AssetsPage() {
 
       {/* ── Modals ── */}
       <AssetModal open={modal !== null} asset={modal !== 'add' ? modal : null} areas={areas}
-        onClose={() => setModal(null)} onSave={handleSave} />
+        onClose={() => setModal(null)} onSave={handleSave} isSubmitting={isAdding || isUpdating} />
 
       <AssignAreaModal open={!!assignTarget} asset={assignTarget} areas={areas}
         onClose={() => setAssignTarget(null)}
@@ -356,20 +428,17 @@ export default function AssetsPage() {
         onAssign={handleBulkAssign} />
 
       <ConfirmDialog open={!!delTarget} onClose={() => setDelTarget(null)}
-        onConfirm={async () => {
-          try {
-            await deleteAssetMut({ path: `/assets/${delTarget.id}` }).unwrap();
-            toast.success('Asset deleted');
-            setDelTarget(null);
-          } catch (err) { toast.error(err.data?.error || 'Failed to delete'); }
-        }}
-        title="Delete Asset" message={`Delete "${delTarget?.name}"? This cannot be undone.`} />
+        onConfirm={handleDeleteAsset}
+        loading={isDeleting}
+        title="Delete Asset"
+        message={`Delete "${delTarget?.name}"? This cannot be undone.`}
+        confirmLabel="Delete Asset" />
     </motion.div>
   );
 }
 
 /* ═══ Asset Card ═══ */
-function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
+function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign, canDelete = true }) {
   const cm  = catMeta(a.category);
   const sm  = statusMeta(a.status);
   const days = daysUntil(a.warranty?.expiryDate);
@@ -378,9 +447,7 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
   const hasArea = !!a.areaId;
 
   return (
-    <div
-      className="group rounded-3xl overflow-hidden bg-white flex flex-col"
-      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)' }}>
+    <div className="bg-white flex flex-col">
 
       {/* ══ HEADER — dark navy ══ */}
       <div
@@ -424,16 +491,6 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
           </div>
         </div>
 
-        <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
-          <button onClick={onEdit}
-            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/15 border border-white/10 transition-all">
-            <RiEditLine className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={onDelete}
-            className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-red-300 hover:bg-red-500/25 border border-white/10 transition-all">
-            <RiDeleteBinLine className="w-3.5 h-3.5" />
-          </button>
-        </div>
       </div>
 
       {/* ══ BODY ══ */}
@@ -495,17 +552,40 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign }) {
           </Link>
         </div>
       </div>
+
+      {/* Action bar — desktop only; mobile uses swipe */}
+      <div className="hidden sm:flex border-t border-slate-100 px-4 py-2 items-center justify-between gap-1">
+        {!canDelete && (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">
+            <RiMapPin2Line className="w-3 h-3" />Assigned · unassign to delete
+          </span>
+        )}
+        <div className="flex items-center gap-1 ml-auto">
+          <button onClick={onEdit}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-blue-600 hover:bg-blue-50 transition-all">
+            <RiEditLine className="w-3.5 h-3.5" />Edit
+          </button>
+          <button onClick={onDelete}
+            title={!canDelete ? `Unassign from "${a.areaName}" before deleting` : undefined}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all',
+              canDelete ? 'text-red-500 hover:bg-red-50' : 'text-slate-300 cursor-not-allowed',
+            )}>
+            <RiDeleteBinLine className="w-3.5 h-3.5" />Delete
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ═══ Asset List Row ═══ */
-function AssetRow({ asset: a, last, onEdit, onDelete, onAssign }) {
+function AssetRow({ asset: a, last, onEdit, onDelete, onAssign, canDelete = true }) {
   const cm = catMeta(a.category);
   const sm = statusMeta(a.status);
   const hasArea = !!a.areaId;
   return (
-    <div className={cn('flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors group', !last && 'border-b border-slate-50')}>
+    <div className={cn('bg-white flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors', !last && 'border-b border-slate-50')}>
       <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: cm.bg }}>
         <cm.icon className="w-4 h-4" style={{ color: cm.color }} />
       </div>
@@ -537,14 +617,20 @@ function AssetRow({ asset: a, last, onEdit, onDelete, onAssign }) {
       <span className="hidden md:block text-[12px] font-bold shrink-0" style={{ color: '#0b1d3a' }}>
         AED {(a.currentValue ?? a.purchasePrice ?? 0).toLocaleString()}
       </span>
-      <div className="flex items-center gap-1 shrink-0">
-        <button onClick={onEdit} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all sm:opacity-0 sm:group-hover:opacity-100">
+      {/* Desktop action buttons — mobile uses swipe */}
+      <div className="hidden sm:flex items-center gap-1 shrink-0">
+        <button onClick={onEdit} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
           <RiEditLine className="w-3.5 h-3.5" />
         </button>
-        <button onClick={onDelete} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all sm:opacity-0 sm:group-hover:opacity-100">
+        <button onClick={onDelete}
+          title={!canDelete ? `Unassign from "${a.areaName}" first` : undefined}
+          className={cn(
+            'w-7 h-7 rounded-lg flex items-center justify-center transition-all',
+            canDelete ? 'text-slate-400 hover:text-red-500 hover:bg-red-50' : 'text-slate-200 cursor-not-allowed',
+          )}>
           <RiDeleteBinLine className="w-3.5 h-3.5" />
         </button>
-        <Link to={`/assets/${a.id}`} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all sm:opacity-0 sm:group-hover:opacity-100">
+        <Link to={`/assets/${a.id}`} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all">
           <RiArrowRightLine className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -553,7 +639,7 @@ function AssetRow({ asset: a, last, onEdit, onDelete, onAssign }) {
 }
 
 /* ═══ Add / Edit Asset Modal ═══ */
-function AssetModal({ open, onClose, asset, onSave, areas }) {
+function AssetModal({ open, onClose, asset, onSave, areas, isSubmitting }) {
   const { register, handleSubmit, reset } = useForm();
   const isEdit = !!asset;
 
@@ -570,8 +656,14 @@ function AssetModal({ open, onClose, asset, onSave, areas }) {
       wProvider: asset.warranty?.provider ?? '', wPhone: asset.warranty?.phone ?? '',
       wType: asset.warranty?.type ?? 'Parts & Labor',
       wStart: asset.warranty?.startDate ?? '', wExpiry: asset.warranty?.expiryDate ?? '',
-    } : { condition: 'good', status: 'operational', wType: 'Parts & Labor', areaId: '' });
-  }, [open, asset]);
+    } : {
+      name: '', category: '', status: 'operational', condition: 'good',
+      brand: '', model: '', serial: '',
+      purchaseDate: '', purchasePrice: '', currentValue: '',
+      notes: '', areaId: '',
+      wProvider: '', wPhone: '', wType: 'Parts & Labor', wStart: '', wExpiry: '',
+    });
+  }, [open, asset, reset]);
 
   const onSubmit = (d) => {
     const assignedArea = areas.find((a) => a.id === d.areaId);
@@ -662,7 +754,7 @@ function AssetModal({ open, onClose, asset, onSave, areas }) {
         </FormSection>
         <Field label="Notes"><Textarea {...register('notes')} rows={2} placeholder="Additional notes…" /></Field>
 
-        <FormActions onCancel={onClose} submitLabel={isEdit ? 'Update Asset' : 'Add Asset'} />
+        <FormActions onCancel={onClose} submitLabel={isEdit ? 'Update Asset' : 'Add Asset'} loading={isSubmitting} />
       </form>
     </Modal>
   );
@@ -726,7 +818,7 @@ function AssignAreaModal({ open, onClose, asset, areas, onAssign }) {
 
               <div className="border-t border-slate-100 pt-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Areas</p>
-                <div className="space-y-1 max-h-56 overflow-y-auto">
+                <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
                   {areas.map((area) => {
                     const isActive = selected === area.id;
                     return (
@@ -891,7 +983,7 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-1.5">
+                <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 space-y-1.5">
                   {filteredAreas.length === 0 ? (
                     <div className="py-10 text-center text-slate-400 text-[13px]">No areas found</div>
                   ) : filteredAreas.map((area) => {
@@ -957,7 +1049,7 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-1.5">
+                <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-2 space-y-1.5">
                   {filteredAssets.length === 0 ? (
                     <div className="py-10 text-center text-slate-400 text-[13px]">No assets found</div>
                   ) : filteredAssets.map((asset) => {
