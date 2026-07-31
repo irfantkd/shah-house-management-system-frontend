@@ -61,7 +61,7 @@ function fmtDate(s) {
   return new Date(s + 'T00:00:00').toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
@@ -165,8 +165,9 @@ export default function ExpensesPage() {
         await refetchWallet();
         toast.success('Expense updated');
       } else {
-        await addMut({ path: '/expenses', body: { ...data, propertyId } }).unwrap();
-        // Deduct from wallet
+        // Create expense first to get its id, then link the wallet transaction via sourceId
+        const result = await addMut({ path: '/expenses', body: { ...data, propertyId } }).unwrap();
+        const sourceId = result.data?.id ?? '';
         if (Number(data.amount) > 0) {
           await deductMut({
             path: '/wallet/deduct',
@@ -177,6 +178,7 @@ export default function ExpensesPage() {
               description: data.description,
               date: data.date,
               category: data.category,
+              sourceId,
             },
           }).unwrap();
           await refetchWallet();

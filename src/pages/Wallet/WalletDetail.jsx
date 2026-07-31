@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -69,6 +69,52 @@ const INP      = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px
 const DEP_BLANK = { amount: '', note: '', date: new Date().toISOString().split('T')[0] };
 const EDT_BLANK = { amount: '', note: '', date: '' };
 
+function PaginationBar({ page, pages, total, isFetching, onPage, color = '#0b1d3a' }) {
+  if (pages <= 1) return null;
+  const nums = getPagNums(page, pages);
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/40">
+      <p className="text-[11px] text-slate-400 tabular-nums">{total} total · Page {page}/{pages}</p>
+      <div className="flex items-center gap-1">
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(1)}>«</PagBtn>
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(page - 1)}>‹</PagBtn>
+        {nums.map((n, idx) => n === '…' ? (
+          <span key={`ellipsis-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
+        ) : (
+          <button key={n} onClick={() => onPage(n)} disabled={isFetching}
+            className={`w-7 h-7 rounded-lg text-[12px] font-bold transition-all ${n === page ? 'text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 disabled:opacity-40'}`}
+            style={n === page ? { background: color } : {}}>
+            {n}
+          </button>
+        ))}
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(page + 1)}>›</PagBtn>
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(pages)}>»</PagBtn>
+      </div>
+    </div>
+  );
+}
+function PagBtn({ onClick, disabled, children }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+      {children}
+    </button>
+  );
+}
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const set = new Set([1, pages, page]);
+  if (page > 1) set.add(page - 1);
+  if (page < pages) set.add(page + 1);
+  const sorted = [...set].sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+    result.push(n);
+  });
+  return result;
+}
+
 export default function WalletDetail() {
   const { walletType } = useParams();
   const navigate       = useNavigate();
@@ -80,8 +126,15 @@ export default function WalletDetail() {
   const Icon = cfg.icon;
 
   const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
-  const { data: rawTxns = [], refetch: refetchTxns  } = useGetQuery({ path: '/wallet/transactions', params: { propertyId, walletType: type } }, { skip: !propertyId });
+  const { data: summaryResult, refetch: refetchTxns } = useGetQuery(
+    { path: '/wallet/transactions', params: { propertyId, walletType: type, limit: 500 } },
+    { skip: !propertyId },
+  );
+  const rawTxns = summaryResult?.items ?? [];
   const wallet = walletData?.[type] ?? { balance: 0, totalDeposited: 0 };
+
+  const [listPage, setListPage] = useState(1);
+  const LIST_LIMIT = 10;
 
   const [depositMut, { isLoading: isDepositing }] = usePostMutation();
   const [patchMut]                                 = usePatchMutation();
@@ -91,6 +144,42 @@ export default function WalletDetail() {
   const [period,      setPeriod]      = useState('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd,   setCustomEnd]   = useState('');
+
+  const listRange = useMemo(() => {
+    const now   = new Date();
+    const today = now.toISOString().split('T')[0];
+    if (period === 'week') {
+      const s = new Date(now); s.setDate(now.getDate() - 7);
+      return { startDate: s.toISOString().split('T')[0], endDate: today };
+    }
+    if (period === 'month') {
+      const s = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { startDate: s.toISOString().split('T')[0], endDate: today };
+    }
+    if (period === 'lastm') {
+      const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const e = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { startDate: s.toISOString().split('T')[0], endDate: e.toISOString().split('T')[0] };
+    }
+    if (period === 'last3') {
+      const s = new Date(now); s.setMonth(now.getMonth() - 3);
+      return { startDate: s.toISOString().split('T')[0], endDate: today };
+    }
+    if (period === 'custom' && customStart && customEnd) {
+      return { startDate: customStart, endDate: customEnd };
+    }
+    return {};
+  }, [period, customStart, customEnd]);
+
+  const { data: listResult, isFetching: listFetching } = useGetQuery(
+    { path: '/wallet/transactions', params: { propertyId, walletType: type, page: listPage, limit: LIST_LIMIT, ...listRange } },
+    { skip: !propertyId },
+  );
+  const listTxns  = listResult?.items  ?? [];
+  const listTotal = listResult?.total  ?? 0;
+  const listPages = listResult?.pages  ?? 1;
+
+  useEffect(() => { setListPage(1); }, [period, customStart, customEnd]);
 
   // ── Deposit form ─────────────────────────────────────────────────────────────
   const [showDeposit, setShowDeposit] = useState(false);
@@ -287,7 +376,7 @@ export default function WalletDetail() {
           </div>
         )}
 
-        <p className="text-[12px] text-slate-400 mt-2">{filtered.length} transactions · {pLabel}</p>
+        <p className="text-[12px] text-slate-400 mt-2">{listTotal} transactions · {pLabel}</p>
       </motion.div>
 
       {/* ── Period stats ── */}
@@ -365,10 +454,10 @@ export default function WalletDetail() {
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
           <div className="p-5 pb-3 border-b border-slate-50">
             <p className="text-[14px] font-bold text-slate-800">Transactions</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{filtered.length} records · {pLabel}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{listTotal} records · {pLabel}</p>
           </div>
 
-          {filtered.length === 0 ? (
+          {listTxns.length === 0 ? (
             <div className="py-14 text-center">
               <Wallet className="w-10 h-10 text-slate-200 mx-auto mb-3" strokeWidth={1.5} />
               <p className="text-slate-400 text-[13px]">No transactions for {pLabel}</p>
@@ -376,7 +465,7 @@ export default function WalletDetail() {
           ) : (
             <>
               <div className="divide-y divide-slate-50">
-                {filtered.map((txn) => {
+                {listTxns.map((txn) => {
                   const isDepo = isCredit(txn);
                   const txnKey = txn._id ?? txn.id;
 
@@ -437,9 +526,12 @@ export default function WalletDetail() {
                   return <div key={txnKey}>{rowInner}</div>;
                 })}
               </div>
+              {listPages > 1 && (
+                <PaginationBar page={listPage} pages={listPages} total={listTotal} isFetching={listFetching} onPage={setListPage} color={cfg.color} />
+              )}
               <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
-                <p className="text-[12px] text-slate-400">{filtered.length} transactions</p>
-                <div className="flex items-center gap-3 sm:gap-4">
+                <p className="text-[11px] text-slate-400">{listTotal} total · {pLabel}</p>
+                <div className="flex items-center gap-3">
                   <span className="text-[12px] text-emerald-600 font-bold">+AED {fmt(periodDeposited)}</span>
                   <span className="text-[12px] text-red-500 font-bold">−AED {fmt(periodSpent)}</span>
                 </div>

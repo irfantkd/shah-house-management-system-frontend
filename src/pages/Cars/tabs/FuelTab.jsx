@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { AnimatePresence } from 'framer-motion';
@@ -28,15 +28,21 @@ const BLANK = {
 
 export default function FuelTab({ carId }) {
   const propertyId = useSelector(selectCurrentPropertyId);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
-  const { data: logs = [], isLoading, isError, refetch } = useGetQuery(
-    { path: `/cars/${carId}/fuel-logs` },
+  const { data: fuelResult, isLoading, isFetching, isError, refetch } = useGetQuery(
+    { path: `/cars/${carId}/fuel-logs`, params: { page, limit: PAGE_SIZE } },
     { skip: !carId },
   );
+  const logs       = fuelResult?.items ?? [];
+  const totalPages = fuelResult?.pages ?? 1;
+  const totalCount = fuelResult?.total ?? 0;
   const { data: walletData, refetch: refetchWallet } = useGetQuery(
     { path: '/wallet', params: { propertyId } },
     { skip: !propertyId },
   );
+  const { data: carStats } = useGetQuery({ path: `/cars/${carId}/stats` }, { skip: !carId });
   const vehicleBalance = walletData?.vehicle?.balance ?? 0;
 
   const [addFuelMut]                           = usePostMutation();
@@ -50,9 +56,10 @@ export default function FuelTab({ carId }) {
   const [form,         setForm]         = useState(BLANK);
 
   const sorted   = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const totalL   = logs.reduce((s, f) => s + (f.liters || 0), 0);
-  const totalAED = logs.reduce((s, f) => s + (f.totalPrice || 0), 0);
-  const avgFill  = logs.length ? totalAED / logs.length : 0;
+  const totalL   = carStats?.allTime?.liters    ?? 0;
+  const totalAED = carStats?.allTime?.fuel      ?? 0;
+  const avgFill  = carStats?.allTime?.avgFill   ?? 0;
+  const fillCount = carStats?.allTime?.fillCount ?? 0;
 
   const byMonth = sorted.reduce((acc, f) => {
     const key = new Date(f.date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -91,16 +98,15 @@ export default function FuelTab({ carId }) {
         }).unwrap();
         toast.success('Fuel log updated — wallet balance adjusted');
       } else {
-        await Promise.all([
-          addFuelMut({
-            path: `/cars/${carId}/fuel-logs`,
-            body: { date: form.date, totalPrice, liters, mileage },
-          }).unwrap(),
-          deductWalletMut({
-            path: '/wallet/deduct',
-            body: { propertyId, walletType: 'vehicle', amount: totalPrice, description: `Fuel${liters ? ` — ${liters}L` : ''}`, date: form.date, category: 'Fuel', carId },
-          }).unwrap(),
-        ]);
+        const carData = await addFuelMut({
+          path: `/cars/${carId}/fuel-logs`,
+          body: { date: form.date, totalPrice, liters, mileage },
+        }).unwrap();
+        const sourceId = carData.data?.fuelLogs?.[0]?.id ?? carData.data?.fuelLogs?.[0]?._id ?? '';
+        await deductWalletMut({
+          path: '/wallet/deduct',
+          body: { propertyId, walletType: 'vehicle', amount: totalPrice, description: `Fuel${liters ? ` — ${liters}L` : ''}`, date: form.date, category: 'Fuel', carId, sourceId },
+        }).unwrap();
         await refetchWallet();
         toast.success('Fuel logged & deducted from Vehicle Wallet');
       }
@@ -108,6 +114,7 @@ export default function FuelTab({ carId }) {
       setShowAdd(false);
       setEditingLog(null);
       setForm(BLANK);
+      setPage(1);
     } catch (err) { toast.error(err.data?.error || 'Failed to save fuel log'); }
   };
 
@@ -144,7 +151,7 @@ export default function FuelTab({ carId }) {
           { label: 'Total Liters',  value: totalL > 0 ? `${totalL.toFixed(1)} L` : '—',  icon: Droplets,   color: '#0891b2', bg: '#ecfeff' },
           { label: 'Total Spent',   value: `AED ${fmt(totalAED)}`,                          icon: Fuel,       color: '#d97706', bg: '#fffbeb' },
           { label: 'Avg per Fill',  value: `AED ${avgFill.toFixed(0)}`,                    icon: TrendingUp, color: '#16a34a', bg: '#f0fdf4' },
-          { label: 'Fill-ups',      value: logs.length,                                     icon: Hash,       color: '#0b1d3a', bg: '#f0f5ff' },
+          { label: 'Fill-ups',      value: totalCount,                                      icon: Hash,       color: '#0b1d3a', bg: '#f0f5ff' },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5" style={{ background: s.bg }}>
@@ -233,6 +240,9 @@ export default function FuelTab({ carId }) {
               </div>
             </div>
           ))}
+          {totalPages > 1 && (
+            <PaginationBar page={page} pages={totalPages} total={totalCount} isFetching={isFetching} onPage={setPage} />
+          )}
         </div>
       )}
 
@@ -295,6 +305,51 @@ export default function FuelTab({ carId }) {
 }
 
 const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+
+function PaginationBar({ page, pages, total, isFetching, onPage }) {
+  if (pages <= 1) return null;
+  const nums = getPagNums(page, pages);
+  return (
+    <div className="flex items-center justify-between px-1 pt-2">
+      <p className="text-[11px] text-slate-400 tabular-nums">{total} total · Page {page}/{pages}</p>
+      <div className="flex items-center gap-1">
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(1)}>«</PagBtn>
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(page - 1)}>‹</PagBtn>
+        {nums.map((n, idx) => n === '…' ? (
+          <span key={`ellipsis-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
+        ) : (
+          <button key={n} onClick={() => onPage(n)} disabled={isFetching}
+            className={`w-7 h-7 rounded-lg text-[12px] font-bold transition-all ${n === page ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 disabled:opacity-40'}`}>
+            {n}
+          </button>
+        ))}
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(page + 1)}>›</PagBtn>
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(pages)}>»</PagBtn>
+      </div>
+    </div>
+  );
+}
+function PagBtn({ onClick, disabled, children }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+      {children}
+    </button>
+  );
+}
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const nums = new Set([1, pages, page]);
+  if (page > 1) nums.add(page - 1);
+  if (page < pages) nums.add(page + 1);
+  const sorted = [...nums].sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+    result.push(n);
+  });
+  return result;
+}
 
 function VehicleWalletBanner({ balance, transactions }) {
   const isNeg = balance < 0;

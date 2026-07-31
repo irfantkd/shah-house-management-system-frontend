@@ -53,10 +53,9 @@ export default function QuickExpenseModal({ open, onClose }) {
     const expType = CAR_EXPENSE_TYPES[form.type]?.label ?? form.type;
     setIsSubmitting(true);
     try {
-      await Promise.all([
-        addExpenseMut({ path: `/cars/${effectiveId}/expenses`, body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined } }).unwrap(),
-        deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: wallet, amount: amt, description: form.description, date: form.date, category: expType, carId: effectiveId } }).unwrap(),
-      ]);
+      const carData = await addExpenseMut({ path: `/cars/${effectiveId}/expenses`, body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined } }).unwrap();
+      const sourceId = carData.data?.expenses?.[0]?.id ?? carData.data?.expenses?.[0]?._id ?? '';
+      await deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: wallet, amount: amt, description: form.description, date: form.date, category: expType, carId: effectiveId, sourceId } }).unwrap();
       await refetchWallet();
       const walletLabel = wallet === 'vehicle' ? 'Vehicle' : 'Home';
       toast.success(`Expense added to ${selectedCar?.make} ${selectedCar?.model} · deducted from ${walletLabel} Wallet`);

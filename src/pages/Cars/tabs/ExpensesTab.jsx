@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { AnimatePresence } from 'framer-motion';
@@ -25,15 +25,21 @@ const BLANK = { type: 'service', description: '', amount: '', vendor: '', date: 
 
 export default function ExpensesTab({ carId }) {
   const propertyId = useSelector(selectCurrentPropertyId);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
-  const { data: expenses = [], isLoading, isError, refetch } = useGetQuery(
-    { path: `/cars/${carId}/expenses` },
+  const { data: expResult, isLoading, isFetching, isError, refetch } = useGetQuery(
+    { path: `/cars/${carId}/expenses`, params: { page, limit: PAGE_SIZE } },
     { skip: !carId },
   );
+  const expenses   = expResult?.items ?? [];
+  const totalPages = expResult?.pages ?? 1;
+  const totalCount = expResult?.total ?? 0;
   const { data: walletData, refetch: refetchWallet } = useGetQuery(
     { path: '/wallet', params: { propertyId } },
     { skip: !propertyId },
   );
+  const { data: carStats } = useGetQuery({ path: `/cars/${carId}/stats` }, { skip: !carId });
   const vehicleBalance = walletData?.vehicle?.balance ?? 0;
 
   const [addExpenseMut]                        = usePostMutation();
@@ -48,14 +54,14 @@ export default function ExpensesTab({ carId }) {
   const [form,          setForm]         = useState(BLANK);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const total  = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+  const total  = carStats?.allTime?.expenses ?? 0;
   const sorted = [...expenses]
     .filter((e) => typeFilter === 'all' || e.type === typeFilter)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  const byType = Object.entries(
-    expenses.reduce((acc, e) => { acc[e.type] = (acc[e.type] ?? 0) + (e.amount || 0); return acc; }, {}),
-  ).sort((a, b) => b[1] - a[1]);
+  const byType = Object.entries(carStats?.expenseByType ?? {}).sort((a, b) => b[1] - a[1]);
+
+  useEffect(() => { setPage(1); }, [typeFilter]);
 
   const openAdd = () => { setEditingExp(null); setForm(BLANK); setShowAdd(true); };
   const openEdit = (exp) => {
@@ -85,16 +91,15 @@ export default function ExpensesTab({ carId }) {
         }).unwrap();
         toast.success('Expense updated — wallet balance adjusted');
       } else {
-        await Promise.all([
-          addExpenseMut({
-            path: `/cars/${carId}/expenses`,
-            body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined, walletType: 'vehicle' },
-          }).unwrap(),
-          deductWalletMut({
-            path: '/wallet/deduct',
-            body: { propertyId, walletType: 'vehicle', amount: amt, description: form.description, date: form.date, category: expType, carId },
-          }).unwrap(),
-        ]);
+        const carData = await addExpenseMut({
+          path: `/cars/${carId}/expenses`,
+          body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined, walletType: 'vehicle' },
+        }).unwrap();
+        const sourceId = carData.data?.expenses?.[0]?.id ?? carData.data?.expenses?.[0]?._id ?? '';
+        await deductWalletMut({
+          path: '/wallet/deduct',
+          body: { propertyId, walletType: 'vehicle', amount: amt, description: form.description, date: form.date, category: expType, carId, sourceId },
+        }).unwrap();
         await refetchWallet();
         toast.success('Expense added & deducted from Vehicle Wallet');
       }
@@ -102,6 +107,7 @@ export default function ExpensesTab({ carId }) {
       setShowAdd(false);
       setEditingExp(null);
       setForm(BLANK);
+      setPage(1);
     } catch (err) { toast.error(err.data?.error || 'Failed to save expense'); }
   };
 
@@ -137,7 +143,7 @@ export default function ExpensesTab({ carId }) {
         <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
           <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">Total Expenses</p>
           <p className="text-3xl font-bold text-slate-900 leading-none">AED {total.toLocaleString()}</p>
-          <p className="text-[12px] text-slate-500 mt-1.5">{expenses.length} transaction{expenses.length !== 1 ? 's' : ''}</p>
+          <p className="text-[12px] text-slate-500 mt-1.5">{totalCount} transaction{totalCount !== 1 ? 's' : ''}</p>
         </div>
         <div className="bg-white rounded-2xl border border-slate-100 p-5 sm:col-span-2" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
           <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-3">By Category</p>
@@ -234,6 +240,9 @@ export default function ExpensesTab({ carId }) {
               );
             })}
           </AnimatePresence>
+          {totalPages > 1 && (
+            <PaginationBar page={page} pages={totalPages} total={totalCount} isFetching={isFetching} onPage={setPage} />
+          )}
         </div>
       )}
 
@@ -418,3 +427,48 @@ function VehicleWalletPanel({ balance, deduction }) {
 }
 
 const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+
+function PaginationBar({ page, pages, total, isFetching, onPage }) {
+  if (pages <= 1) return null;
+  const nums = getPagNums(page, pages);
+  return (
+    <div className="flex items-center justify-between px-1 pt-2">
+      <p className="text-[11px] text-slate-400 tabular-nums">{total} total · Page {page}/{pages}</p>
+      <div className="flex items-center gap-1">
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(1)}>«</PagBtn>
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(page - 1)}>‹</PagBtn>
+        {nums.map((n, idx) => n === '…' ? (
+          <span key={`ellipsis-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
+        ) : (
+          <button key={n} onClick={() => onPage(n)} disabled={isFetching}
+            className={`w-7 h-7 rounded-lg text-[12px] font-bold transition-all ${n === page ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 disabled:opacity-40'}`}>
+            {n}
+          </button>
+        ))}
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(page + 1)}>›</PagBtn>
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(pages)}>»</PagBtn>
+      </div>
+    </div>
+  );
+}
+function PagBtn({ onClick, disabled, children }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+      {children}
+    </button>
+  );
+}
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const nums = new Set([1, pages, page]);
+  if (page > 1) nums.add(page - 1);
+  if (page < pages) nums.add(page + 1);
+  const sorted = [...nums].sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+    result.push(n);
+  });
+  return result;
+}

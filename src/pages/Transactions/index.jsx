@@ -857,11 +857,13 @@ export default function TransactionsPage() {
     { path: '/wallet', params: { propertyId } },
     { skip: !propertyId },
   );
-  const { data: transactions = [], refetch: refetchTxns } = useGetQuery(
-    { path: '/wallet/transactions', params: { propertyId } },
+  const { data: txnResult, refetch: refetchTxns } = useGetQuery(
+    { path: '/wallet/transactions', params: { propertyId, limit: 500 } },
     { skip: !propertyId },
   );
-  const { data: expenses  = [] } = useGetQuery({ path: '/expenses',  params: { propertyId } }, { skip: !propertyId });
+  const transactions = txnResult?.items ?? [];
+  const { data: expResult } = useGetQuery({ path: '/expenses', params: { propertyId, limit: 500 } }, { skip: !propertyId });
+  const expenses = expResult?.items ?? [];
   const { data: contracts = [] } = useGetQuery({ path: '/contracts', params: { propertyId } }, { skip: !propertyId });
   const { data: employees = [] } = useGetQuery({ path: '/employees', params: { propertyId } }, { skip: !propertyId });
 

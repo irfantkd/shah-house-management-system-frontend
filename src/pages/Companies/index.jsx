@@ -123,32 +123,27 @@ export default function CompaniesPage() {
   };
 
   // ── Mutations ────────────────────────────────────────────────────────────────
-  const [addCompanyMut,    { isLoading: isAdding }]   = usePostMutation();
-  const [updateCompanyMut, { isLoading: isUpdating }] = usePutMutation();
-  const [deleteCompanyMut]                             = useDeleteMutation();
-  const [addCatMut]                                   = usePostMutation();
+  const [addCompanyMut]    = usePostMutation();
+  const [updateCompanyMut] = usePutMutation();
+  const [deleteCompanyMut] = useDeleteMutation();
+  const [addCatMut]        = usePostMutation();
 
   const handleAddCategory = async (name) => {
     await addCatMut({ path: '/company-categories', body: { name } }).unwrap();
     refetchCats();
   };
 
-  // ── Save (create / update) ───────────────────────────────────────────────────
+  // ── Save (create / update) — errors propagate to CompanyModal's catch ────────
   const handleSave = async (data, isEdit) => {
-    if (isAdding || isUpdating) return;
-    try {
-      if (isEdit) {
-        await updateCompanyMut({ path: `/companies/${modal._id ?? modal.id}`, body: data }).unwrap();
-        toast.success('Company updated!');
-      } else {
-        await addCompanyMut({ path: '/companies', body: data }).unwrap();
-        toast.success('Company added!');
-      }
-      setModal(null);
-      refetchStats();
-    } catch (err) {
-      toast.error(err.data?.error || err.data?.message || 'Failed to save company');
+    if (isEdit) {
+      await updateCompanyMut({ path: `/companies/${modal._id ?? modal.id}`, body: data }).unwrap();
+      toast.success('Company updated!');
+    } else {
+      await addCompanyMut({ path: '/companies', body: data }).unwrap();
+      toast.success('Company added!');
     }
+    setModal(null);
+    refetchStats();
   };
 
   // ── Delete ───────────────────────────────────────────────────────────────────
@@ -409,7 +404,6 @@ export default function CompaniesPage() {
         categories={categories}
         onAddCategory={handleAddCategory}
         onClose={() => setModal(null)}
-        isSubmitting={isAdding || isUpdating}
         onSave={(data) => handleSave(data, modal !== 'add')}
       />
 
@@ -586,53 +580,64 @@ const FORM_DEFAULTS = {
   person: '', phone: '', mobile: '', email: '', whatsapp: '', address: '', notes: '',
 };
 
-function CompanyModal({ open, onClose, company, onSave, isSubmitting, categories, onAddCategory }) {
+function CompanyModal({ open, onClose, company, onSave, categories, onAddCategory }) {
   const { register, handleSubmit, reset, control, setValue, formState: { errors } } = useForm({
     defaultValues: FORM_DEFAULTS,
   });
 
-  const categoryVal = useWatch({ control, name: 'category' });
+  const categoryVal                    = useWatch({ control, name: 'category' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setIsSubmitting(false); // always reset when modal opens
     if (company) {
       reset({
-        name:       company.name        ?? '',
-        category:   company.category    ?? '',
-        tagline:    company.tagline     ?? '',
-        rating:     company.rating      ?? 0,
-        yearsActive: company.yearsActive ?? 0,
-        status:     company.status      ?? 'active',
-        person:     company.contact?.person   ?? '',
-        phone:      company.contact?.phone    ?? '',
-        mobile:     company.contact?.mobile   ?? '',
-        email:      company.contact?.email    ?? '',
-        whatsapp:   company.contact?.whatsapp ?? '',
-        address:    company.address     ?? '',
-        notes:      company.notes       ?? '',
+        name:        company.name             ?? '',
+        category:    company.category         ?? '',
+        tagline:     company.tagline          ?? '',
+        rating:      company.rating           ?? 0,
+        yearsActive: company.yearsActive      ?? 0,
+        status:      company.status           ?? 'active',
+        person:      company.contact?.person  ?? '',
+        phone:       company.contact?.phone   ?? '',
+        mobile:      company.contact?.mobile  ?? '',
+        email:       company.contact?.email   ?? '',
+        whatsapp:    company.contact?.whatsapp ?? '',
+        address:     company.address          ?? '',
+        notes:       company.notes            ?? '',
       });
     } else {
       reset({ ...FORM_DEFAULTS });
     }
   }, [open, company, reset]);
 
-  const onSubmit = (d) => onSave({
-    name:       d.name,
-    category:   d.category,
-    tagline:    d.tagline   ?? '',
-    rating:     parseFloat(d.rating)  || 0,
-    yearsActive: parseInt(d.yearsActive) || 0,
-    status:     d.status    ?? 'active',
-    contact: {
-      person:   d.person   ?? '',
-      phone:    d.phone    ?? '',
-      mobile:   d.mobile   ?? '',
-      email:    d.email    ?? '',
-      whatsapp: d.whatsapp ?? '',
-    },
-    address: d.address ?? '',
-    notes:   d.notes   ?? '',
-  });
+  const onSubmit = async (d) => {
+    setIsSubmitting(true);
+    try {
+      await onSave({
+        name:        d.name,
+        category:    d.category,
+        tagline:     d.tagline      ?? '',
+        rating:      parseFloat(d.rating)     || 0,
+        yearsActive: parseInt(d.yearsActive)  || 0,
+        status:      d.status       ?? 'active',
+        contact: {
+          person:   d.person   ?? '',
+          phone:    d.phone    ?? '',
+          mobile:   d.mobile   ?? '',
+          email:    d.email    ?? '',
+          whatsapp: d.whatsapp ?? '',
+        },
+        address: d.address ?? '',
+        notes:   d.notes   ?? '',
+      });
+      // success: modal closes via setModal(null) in parent; isSubmitting stays true
+    } catch (err) {
+      toast.error(err.data?.error || err.data?.message || 'Failed to save company');
+      setIsSubmitting(false); // only reset on error so user can retry
+    }
+  };
 
   return (
     <Modal

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -49,12 +49,27 @@ function periodLabel(period) {
   return 'All Time';
 }
 
+function periodToRange(period) {
+  const now   = new Date();
+  const today = now.toISOString().split('T')[0];
+  if (period === 'week') {
+    const s = new Date(now); s.setDate(now.getDate() - 7);
+    return { startDate: s.toISOString().split('T')[0], endDate: today };
+  }
+  if (period === 'month') {
+    const s = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { startDate: s.toISOString().split('T')[0], endDate: today };
+  }
+  return {};
+}
+
 export default function WalletPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
   const property   = useSelector(selectCurrentProperty);
 
   const { data: walletData, refetch: refetchWallets } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
-  const { data: rawTxns = [], refetch: refetchTxns  } = useGetQuery({ path: '/wallet/transactions', params: { propertyId } }, { skip: !propertyId });
+  const [txnPage, setTxnPage] = useState(1);
+  const TXN_LIMIT = 10;
 
   const EMPTY_W = { balance: 0, totalDeposited: 0 };
   const vWallet = { ...EMPTY_W, ...walletData?.vehicle };
@@ -72,6 +87,27 @@ export default function WalletPage() {
   const [filter,       setFilter]       = useState('all');
   const [txnPeriod,    setTxnPeriod]    = useState('month');
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const txnParams = useMemo(() => {
+    const p = { propertyId, page: txnPage, limit: TXN_LIMIT };
+    const range = periodToRange(txnPeriod);
+    if (range.startDate) p.startDate = range.startDate;
+    if (range.endDate)   p.endDate   = range.endDate;
+    if (filter === 'deposits') p.txnType = 'credit';
+    else if (filter === 'expenses') p.txnType = 'debit';
+    else if (['vehicle', 'home', 'salary'].includes(filter)) p.walletType = filter;
+    return p;
+  }, [propertyId, txnPage, txnPeriod, filter]);
+
+  const { data: txnResult, isFetching: txnFetching, refetch: refetchTxns } = useGetQuery(
+    { path: '/wallet/transactions', params: txnParams },
+    { skip: !propertyId },
+  );
+  const txnItems = txnResult?.items ?? [];
+  const txnTotal = txnResult?.total ?? 0;
+  const txnPages = txnResult?.pages ?? 1;
+
+  useEffect(() => { setTxnPage(1); }, [filter, txnPeriod]);
 
   // Report filter state
   const REPORT_BLANK = { walletType: 'all', period: 'month', startDate: '', endDate: '' };
@@ -131,22 +167,6 @@ export default function WalletPage() {
   };
 
   const walletsMap = { vehicle: vWallet, home: hWallet, salary: sWallet };
-
-  const allTransactions = useMemo(() =>
-    [...rawTxns].sort((a, b) => {
-      const diff = new Date(b.date) - new Date(a.date);
-      return diff !== 0 ? diff : String(b.id).localeCompare(String(a.id));
-    }),
-  [rawTxns]);
-
-  const periodFiltered = useMemo(() => applyPeriod(allTransactions, txnPeriod), [allTransactions, txnPeriod]);
-
-  const visible = useMemo(() => {
-    if (filter === 'all')      return periodFiltered;
-    if (filter === 'deposits') return periodFiltered.filter((t) => t.type === 'credit');
-    if (filter === 'expenses') return periodFiltered.filter((t) => t.type === 'debit');
-    return periodFiltered.filter((t) => t.walletType === filter);
-  }, [periodFiltered, filter]);
 
   const handleDeposit = async (e) => {
     e.preventDefault();
@@ -364,7 +384,7 @@ export default function WalletPage() {
             <div>
               <p className="text-[14px] font-bold text-slate-800">Transaction History</p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                {visible.length} records · {periodLabel(txnPeriod)}
+                {txnTotal} records · {periodLabel(txnPeriod)}
               </p>
             </div>
             <button onClick={() => setShowReport(true)}
@@ -404,7 +424,7 @@ export default function WalletPage() {
             </div>
           </div>
 
-          {visible.length === 0 ? (
+          {txnItems.length === 0 ? (
             <div className="py-14 text-center">
               <Wallet className="w-10 h-10 text-slate-200 mx-auto mb-3" strokeWidth={1.5} />
               <p className="text-slate-400 text-[13px]">No transactions for {periodLabel(txnPeriod)}</p>
@@ -412,7 +432,7 @@ export default function WalletPage() {
           ) : (
             <>
               <div className="divide-y divide-slate-50">
-                {visible.map((txn) => {
+                {txnItems.map((txn) => {
                   const wCfg   = WALLETS[txn.walletType] ?? WALLETS.vehicle;
                   const isDepo = txn.type === 'credit';
                   const WIcon  = wCfg.icon;
@@ -477,16 +497,11 @@ export default function WalletPage() {
                   return <div key={txnKey}>{rowInner}</div>;
                 })}
               </div>
-              <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
-                <p className="text-[11px] text-slate-400">{visible.length} transactions</p>
-                <div className="flex items-center gap-4">
-                  <span className="text-[12px] text-emerald-600 font-bold">
-                    +AED {fmt(visible.filter((t) => t.type === 'credit').reduce((s, t) => s + t.amount, 0))}
-                  </span>
-                  <span className="text-[12px] text-red-500 font-bold">
-                    −AED {fmt(visible.filter((t) => t.type === 'debit').reduce((s, t) => s + t.amount, 0))}
-                  </span>
-                </div>
+              {txnPages > 1 && (
+                <PaginationBar page={txnPage} pages={txnPages} total={txnTotal} isFetching={txnFetching} onPage={setTxnPage} />
+              )}
+              <div className="px-5 py-3 bg-slate-50/60 border-t border-slate-100">
+                <p className="text-[11px] text-slate-400">{txnTotal} transactions · {periodLabel(txnPeriod)}</p>
               </div>
             </>
           )}
@@ -745,6 +760,51 @@ export default function WalletPage() {
       </Modal>
     </div>
   );
+}
+
+function PaginationBar({ page, pages, total, isFetching, onPage }) {
+  if (pages <= 1) return null;
+  const nums = getPagNums(page, pages);
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50/40">
+      <p className="text-[11px] text-slate-400 tabular-nums">{total} total · Page {page}/{pages}</p>
+      <div className="flex items-center gap-1">
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(1)}>«</PagBtn>
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(page - 1)}>‹</PagBtn>
+        {nums.map((n, idx) => n === '…' ? (
+          <span key={`ellipsis-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
+        ) : (
+          <button key={n} onClick={() => onPage(n)} disabled={isFetching}
+            className={`w-7 h-7 rounded-lg text-[12px] font-bold transition-all ${n === page ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 disabled:opacity-40'}`}>
+            {n}
+          </button>
+        ))}
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(page + 1)}>›</PagBtn>
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(pages)}>»</PagBtn>
+      </div>
+    </div>
+  );
+}
+function PagBtn({ onClick, disabled, children }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+      {children}
+    </button>
+  );
+}
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const nums = new Set([1, pages, page]);
+  if (page > 1) nums.add(page - 1);
+  if (page < pages) nums.add(page + 1);
+  const sorted = [...nums].sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+    result.push(n);
+  });
+  return result;
 }
 
 const INP = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
