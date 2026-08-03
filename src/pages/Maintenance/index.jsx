@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { MotionSwipeableRow } from "../../components/ui/SwipeableRow";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { useForm } from "react-hook-form";
@@ -37,6 +38,8 @@ import {
   TreeDeciduous,
   Shield,
   PaintBucket,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   useGetQuery,
@@ -249,6 +252,56 @@ function daysUntil(dateStr) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MobileTaskRow — compact swipeable row for mobile list view
+// ─────────────────────────────────────────────────────────────────────────────
+function MobileTaskRow({ task, allCats, onClick }) {
+  const catCfg  = getCatCfg(task.category, allCats);
+  const CatIcon = catCfg.Icon;
+  const prioHex = PRIORITY_CFG[task.priority]?.hex ?? "#64748b";
+  const sBadge  = STATUS_CFG[task.status]          ?? STATUS_CFG.scheduled;
+  const daysLeft = daysUntil(task.scheduledDate);
+
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3.5 bg-white hover:bg-slate-50/60 active:bg-slate-50 transition-colors cursor-pointer"
+      style={{ borderLeft: `3px solid ${prioHex}` }}
+      onClick={onClick}
+    >
+      <div
+        className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center"
+        style={{ background: `${catCfg.hex}15`, color: catCfg.hex }}
+      >
+        <CatIcon className="w-4 h-4" strokeWidth={1.5} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-bold text-slate-900 truncate">{task.title}</p>
+        <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+          {task.category}
+          {task.areaName ? ` · ${task.areaName}` : ""}
+          {task.companyName ? ` · ${task.companyName}` : ""}
+        </p>
+      </div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <span
+          className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+          style={{ background: sBadge.bg, color: sBadge.color, border: sBadge.border }}
+        >
+          {sBadge.label}
+        </span>
+        {daysLeft !== null && (
+          <span className={cn(
+            "text-[10px] font-semibold",
+            daysLeft < 0 ? "text-red-500" : daysLeft <= 7 ? "text-amber-500" : "text-slate-400",
+          )}>
+            {daysLeft < 0 ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? "Today" : `${daysLeft}d`}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function MaintenancePage() {
@@ -312,7 +365,7 @@ export default function MaintenancePage() {
   const [newCatInput, setNewCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
-  // Category-filtered tasks — stats panel + calendar (backend filters by category)
+  // Category-filtered tasks — calendar view (backend filters by category)
   const { data: catItems = [] } = useGetQuery(
     {
       path: "/tasks",
@@ -323,6 +376,27 @@ export default function MaintenancePage() {
     },
     { skip: !propertyId },
   );
+
+  // Stats from backend — replaces client-side useMemo calculation
+  const { data: taskStatsRaw = {} } = useGetQuery(
+    {
+      path: "/tasks/stats",
+      params: {
+        propertyId,
+        ...(catTab !== "all" && { category: catTab }),
+      },
+    },
+    { skip: !propertyId },
+  );
+  const stats = {
+    total:      taskStatsRaw.total                       ?? 0,
+    scheduled:  taskStatsRaw.byStatus?.scheduled         ?? 0,
+    inProgress: taskStatsRaw.byStatus?.inProgress        ?? 0,
+    onHold:     taskStatsRaw.byStatus?.onHold            ?? 0,
+    overdue:    taskStatsRaw.byStatus?.overdue           ?? 0,
+    completed:  taskStatsRaw.byStatus?.completed         ?? 0,
+    cancelled:  taskStatsRaw.byStatus?.cancelled         ?? 0,
+  };
 
   useEffect(() => { setPage(1); }, [catTab, statusFilter]);
 
@@ -342,20 +416,6 @@ export default function MaintenancePage() {
   );
   const filtered    = filteredRaw?.items ?? (Array.isArray(filteredRaw) ? filteredRaw : []);
   const totalPages  = filteredRaw?.pages ?? 1;
-
-  // Stats computed from category-filtered items (all statuses)
-  const stats = useMemo(
-    () => ({
-      total:      catItems.length,
-      scheduled:  catItems.filter((t) => t.status === "scheduled").length,
-      inProgress: catItems.filter((t) => t.status === "in-progress").length,
-      onHold:     catItems.filter((t) => t.status === "on-hold").length,
-      overdue:    catItems.filter((t) => t.status === "overdue").length,
-      completed:  catItems.filter((t) => t.status === "completed").length,
-      cancelled:  catItems.filter((t) => t.status === "cancelled").length,
-    }),
-    [catItems],
-  );
 
   const year = viewDate.getFullYear(),
     month = viewDate.getMonth();
@@ -854,9 +914,62 @@ export default function MaintenancePage() {
       {/* ── GRID / LIST CONTENT WRAPPER ── */}
       <div className={cn("transition-opacity duration-200", isFilteredFetching ? "opacity-50" : "opacity-100")}>
 
-      {/* ── EMPTY STATE ── */}
+      {/* ── MOBILE SWIPE LIST — md:hidden ── */}
+      {view !== "calendar" && (
+        <div className="md:hidden rounded-2xl border border-slate-100 overflow-hidden bg-white divide-y divide-slate-50">
+          {filtered.length === 0 ? (
+            <div className="p-10 text-center">
+              <ClipboardList className="w-10 h-10 text-slate-200 mx-auto mb-2" />
+              <p className="text-[13px] font-semibold text-slate-400">
+                No {catTab === "all" ? "" : catTab.toLowerCase()} tasks
+                {statusFilter !== "all" ? ` · ${STATUS_CFG[statusFilter]?.label ?? statusFilter}` : ""}
+              </p>
+              <button onClick={() => setModal("add")} className="mt-2 text-accent-600 text-[12px] font-semibold hover:underline">
+                + Add task
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-[10px] text-slate-400 text-center py-1.5 bg-slate-50/80">
+                Swipe right to edit · Swipe left to delete (pending only)
+              </p>
+              <AnimatePresence mode="popLayout">
+                {filtered.map((task) => {
+                  const isPending = task.status !== "completed" && task.status !== "cancelled";
+                  if (isPending) {
+                    return (
+                      <MotionSwipeableRow
+                        key={task.id}
+                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        onSwipeRight={() => setModal(task)}
+                        onSwipeLeft={() => setDelTarget(task)}
+                        leftIcon={<Pencil style={{ color: "#2563eb", width: 20, height: 20 }} />}
+                        leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                        rightIcon={<Trash2 style={{ color: "#dc2626", width: 20, height: 20 }} />}
+                        rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
+                      >
+                        <MobileTaskRow task={task} allCats={categories} onClick={() => setDetailTask(task)} />
+                      </MotionSwipeableRow>
+                    );
+                  }
+                  return (
+                    <motion.div key={task.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <MobileTaskRow task={task} allCats={categories} onClick={() => setDetailTask(task)} />
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── DESKTOP EMPTY STATE — hidden md:block ── */}
       {view !== "calendar" && filtered.length === 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
+        <div className="hidden md:block bg-white rounded-2xl border border-slate-100 p-12 text-center">
           <div className="w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-slate-100">
             {catTab === "Maintenance" ? (
               <Settings2 className="w-7 h-7 text-slate-400" />
@@ -881,9 +994,9 @@ export default function MaintenancePage() {
         </div>
       )}
 
-      {/* ── GRID VIEW ── */}
+      {/* ── DESKTOP GRID VIEW — hidden md:grid ── */}
       {view === "grid" && filtered.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           <AnimatePresence mode="popLayout">
             {filtered.map((task, i) => (
               <motion.div
@@ -911,10 +1024,10 @@ export default function MaintenancePage() {
         </div>
       )}
 
-      {/* ── LIST VIEW ── */}
+      {/* ── DESKTOP LIST VIEW — hidden md:block ── */}
       {view === "list" && filtered.length > 0 && (
         <div
-          className="bg-white rounded-2xl border border-slate-100 overflow-hidden"
+          className="hidden md:block bg-white rounded-2xl border border-slate-100 overflow-hidden"
           style={{ boxShadow: "0 1px 8px rgb(0 0 0/0.06)" }}
         >
           {filtered.map((task, i) => (

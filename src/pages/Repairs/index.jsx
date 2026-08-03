@@ -10,10 +10,10 @@ import {
   RiBuilding2Line, RiCheckLine, RiLayoutGridLine, RiListCheck2,
   RiArrowLeftSLine, RiArrowRightSLine,
 } from 'react-icons/ri';
-import { Wrench } from 'lucide-react';
+import { Wrench, Pencil, Trash2 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, usePatchMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
-import { REPAIR_STATUS_CFG } from '../../data/mockRepairs';
+import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import PageLoader from '../../components/ui/PageLoader';
@@ -40,6 +40,14 @@ const STATUS_BADGE = {
   'in-progress':    { bg:'rgba(37,99,235,0.14)',  color:'#93c5fd', border:'1px solid rgba(37,99,235,0.25)'   },
   'awaiting-parts': { bg:'rgba(147,51,234,0.14)', color:'#c4b5fd', border:'1px solid rgba(147,51,234,0.25)'  },
   completed:        { bg:'rgba(22,163,74,0.14)',  color:'#86efac', border:'1px solid rgba(22,163,74,0.25)'   },
+};
+
+// Used by RepairRow list view for badge classes + progress step
+const REPAIR_STATUS_CFG = {
+  reported:         { bg: 'bg-amber-100',   text: 'text-amber-700',   step: 0 },
+  'in-progress':    { bg: 'bg-blue-100',    text: 'text-blue-700',    step: 1 },
+  'awaiting-parts': { bg: 'bg-purple-100',  text: 'text-purple-700',  step: 2 },
+  completed:        { bg: 'bg-green-100',   text: 'text-green-700',   step: 3 },
 };
 
 function fmtDate(s) { return s ? new Date(s+'T00:00:00').toLocaleDateString('en-AE',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
@@ -84,6 +92,58 @@ function PaginationBar({ page, pages, onPage }) {
       <PagBtn onClick={() => onPage(page + 1)} disabled={page >= pages}>
         <RiArrowRightSLine className="w-4 h-4" />
       </PagBtn>
+    </div>
+  );
+}
+
+function MobileRepairRow({ repair: r, onClick }) {
+  const accent  = PRIORITY_HEX[r.priority]  ?? '#2563eb';
+  const pBadge  = PRIORITY_BADGE[r.priority] ?? PRIORITY_BADGE.medium;
+  const sBadge  = STATUS_BADGE[r.status]     ?? STATUS_BADGE.reported;
+  const steps   = ['reported', 'in-progress', 'awaiting-parts', 'completed'];
+  const stepIdx = steps.indexOf(r.status);
+  const cost    = r.actualCost > 0 ? r.actualCost : r.estimatedCost ?? 0;
+
+  return (
+    <div
+      className="flex items-center gap-3.5 px-4 py-4 bg-white hover:bg-slate-50/60 active:bg-slate-50 transition-colors cursor-pointer"
+      style={{ borderLeft: `3px solid ${accent}` }}
+      onClick={onClick}
+    >
+      <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center"
+        style={{ background: `${accent}18` }}>
+        <Wrench className="w-5 h-5" style={{ color: accent }} strokeWidth={1.5} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <p className="text-[13px] font-bold text-slate-900 truncate">{r.title}</p>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+            style={{ background: pBadge.bg, color: pBadge.color, border: pBadge.border }}>
+            {pBadge.label}
+          </span>
+        </div>
+        <p className="text-[11px] text-slate-400 truncate">
+          {r.areaName || '—'}{r.assetName ? ` › ${r.assetName}` : ''}
+          {r.companyName ? ` · ${r.companyName}` : ''}
+        </p>
+        <div className="flex items-center gap-0.5 mt-1.5">
+          {steps.map((s, i) => (
+            <div key={s} className="flex-1 h-1 rounded-full transition-all"
+              style={{ background: stepIdx >= i ? accent : '#f1f5f9' }} />
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+          style={{ background: sBadge.bg, color: sBadge.color, border: sBadge.border }}>
+          {STATUS_LABELS[r.status]}
+        </span>
+        {cost > 0 && (
+          <span className="text-[10px] font-semibold text-slate-500">
+            AED {cost.toLocaleString()}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -264,14 +324,65 @@ export default function RepairsPage() {
 
       {/* Content */}
       <div className={cn('transition-opacity duration-200', isFetching ? 'opacity-50' : 'opacity-100')}>
-        {repairs.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
+
+        {/* ── MOBILE SWIPE LIST — md:hidden ── */}
+        <div className="md:hidden rounded-2xl border border-slate-100 overflow-hidden bg-white divide-y divide-slate-50">
+          {repairs.length === 0 ? (
+            <div className="p-10 text-center">
+              <RiToolsLine className="w-10 h-10 text-slate-200 mx-auto mb-2" />
+              <p className="text-[13px] font-semibold text-slate-400">No repairs in this filter</p>
+              <button onClick={() => setModal('add')} className="mt-2 text-accent-600 text-[12px] font-semibold hover:underline">+ Report first issue</button>
+            </div>
+          ) : (
+            <>
+              <p className="text-[10px] text-slate-400 text-center py-1.5 bg-slate-50/80">
+                Swipe right to edit · Swipe left to delete (pending only)
+              </p>
+              <AnimatePresence mode="popLayout">
+                {repairs.map((r) => {
+                  const isPending = r.status !== 'completed';
+                  if (isPending) {
+                    return (
+                      <MotionSwipeableRow
+                        key={r.id}
+                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0, x: -20 }}
+                        onSwipeRight={() => setModal(r)}
+                        onSwipeLeft={() => setDelTarget(r)}
+                        leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
+                        leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                        rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
+                        rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
+                      >
+                        <MobileRepairRow repair={r} onClick={() => setModal(r)} />
+                      </MotionSwipeableRow>
+                    );
+                  }
+                  return (
+                    <motion.div key={r.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <MobileRepairRow repair={r} onClick={() => {}} />
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </>
+          )}
+        </div>
+
+        {/* ── DESKTOP EMPTY STATE — hidden md:block ── */}
+        {repairs.length === 0 && (
+          <div className="hidden md:block bg-white rounded-2xl border border-slate-100 p-12 text-center">
             <RiToolsLine className="w-12 h-12 text-slate-200 mx-auto mb-3" />
             <p className="font-semibold text-slate-400">No repairs in this filter</p>
             <button onClick={() => setModal('add')} className="mt-3 text-accent-600 text-[13px] font-semibold hover:underline">+ Report first issue</button>
           </div>
-        ) : view === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        )}
+
+        {/* ── DESKTOP GRID VIEW — hidden md:grid ── */}
+        {view === 'grid' && repairs.length > 0 && (
+          <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence mode="popLayout">
               {repairs.map((r, i) => (
                 <motion.div key={r.id} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }} transition={{ delay:i*0.04 }}>
@@ -282,8 +393,11 @@ export default function RepairsPage() {
               ))}
             </AnimatePresence>
           </div>
-        ) : (
-          <div className="space-y-3">
+        )}
+
+        {/* ── DESKTOP LIST VIEW — hidden md:block ── */}
+        {view === 'list' && repairs.length > 0 && (
+          <div className="hidden md:block space-y-3">
             <AnimatePresence mode="popLayout">
               {repairs.map((r, i) => (
                 <motion.div key={r.id} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, x:20 }} transition={{ delay:i*0.04 }}>
