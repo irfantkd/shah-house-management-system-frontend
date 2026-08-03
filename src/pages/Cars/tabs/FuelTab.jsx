@@ -102,10 +102,10 @@ export default function FuelTab({ carId }) {
           path: `/cars/${carId}/fuel-logs`,
           body: { date: form.date, totalPrice, liters, mileage },
         }).unwrap();
-        const sourceId = carData.data?.fuelLogs?.[0]?.id ?? carData.data?.fuelLogs?.[0]?._id ?? '';
+        const sourceId = carData.data?.id ?? '';
         await deductWalletMut({
           path: '/wallet/deduct',
-          body: { propertyId, walletType: 'vehicle', amount: totalPrice, description: `Fuel${liters ? ` — ${liters}L` : ''}`, date: form.date, category: 'Fuel', carId, sourceId },
+          body: { propertyId, walletType: 'vehicle', amount: totalPrice, description: `Fuel${liters ? ` — ${liters}L` : ''}`, date: form.date, category: 'Fuel', carId, sourceId, sourceModel: 'FuelLog' },
         }).unwrap();
         await refetchWallet();
         toast.success('Fuel logged & deducted from Vehicle Wallet');

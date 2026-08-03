@@ -89,9 +89,33 @@ const fmt = (n) => (n ?? 0).toLocaleString('en-AE', { minimumFractionDigits: 0, 
 export default function ContractsPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
 
-  const { data: contracts  = [] } = useGetQuery({ path: '/contracts',  params: { propertyId } }, { skip: !propertyId });
+  const [filter,      setFilter]      = useState('all');
+  const [page,        setPage]        = useState(1);
+  const [modal,       setModal]       = useState(null);
+  const [delTarget,   setDelTarget]   = useState(null);
+  const [payTarget,   setPayTarget]   = useState(null);
+  const [renewTarget, setRenewTarget] = useState(null);
+
+  useEffect(() => { setPage(1); }, [filter]);
+
+  const { data: contractData, isFetching: isContractFetching } = useGetQuery(
+    {
+      path: '/contracts',
+      params: {
+        propertyId,
+        page,
+        limit: 10,
+        ...(filter !== 'all' && { status: filter }),
+      },
+    },
+    { skip: !propertyId },
+  );
+  const { data: contractStats = {} } = useGetQuery(
+    { path: '/contracts/stats', params: { propertyId } },
+    { skip: !propertyId },
+  );
   const { data: companies  = [] } = useGetQuery({ path: '/companies' });
-  const { data: allTasks   = [] } = useGetQuery({ path: '/tasks',      params: { propertyId } }, { skip: !propertyId });
+  const { data: allTasks   = [] } = useGetQuery({ path: '/tasks',  params: { propertyId } }, { skip: !propertyId });
   const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
 
   const homeWallet    = { balance: walletData?.home?.balance    ?? 0 };
@@ -103,27 +127,18 @@ export default function ContractsPage() {
   const [payMut]            = usePostMutation();
   const [renewMut]          = usePostMutation();
 
-  const [filter,    setFilter]    = useState('all');
-  const [modal,     setModal]     = useState(null);
-  const [delTarget, setDelTarget] = useState(null);
-  const [payTarget, setPayTarget] = useState(null);
-  const [renewTarget, setRenewTarget] = useState(null);
-
-  const expiringCount = contracts.filter((c) => c.status === 'expiring').length;
-  const filtered = contracts.filter((c) => filter === 'all' || c.status === filter);
+  const contracts     = contractData?.items ?? (Array.isArray(contractData) ? contractData : []);
+  const totalPages    = contractData?.pages ?? 1;
+  const totalContracts = contractData?.total ?? contracts.length;
 
   const stats = {
-    total:    contracts.length,
-    active:   contracts.filter((c) => c.status === 'active').length,
-    expiring: expiringCount,
-    expired:  contracts.filter((c) => c.status === 'expired').length,
-    totalMonthly: contracts
-      .filter((c) => c.status === 'active')
-      .reduce((s, c) => {
-        const m = { monthly:1, quarterly:1/3, 'bi-annual':1/6, annual:1/12, yearly:1/12, 'one-time':0 };
-        return s + (c.cost ?? 0) * (m[c.costPeriod] ?? 0);
-      }, 0),
+    total:        contractStats.total        ?? totalContracts,
+    active:       contractStats.active       ?? 0,
+    expiring:     contractStats.expiring     ?? 0,
+    expired:      contractStats.expired      ?? 0,
+    totalMonthly: contractStats.totalMonthly ?? 0,
   };
+  const expiringCount = stats.expiring;
 
   const handlePay = async ({ contract, walletType, amount, note }) => {
     try {
@@ -151,7 +166,7 @@ export default function ContractsPage() {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-navy-900 tracking-tight">Contracts</h1>
-          <p className="text-[13px] text-slate-400 mt-0.5">{contracts.length} service contracts · track renewals and payments</p>
+          <p className="text-[13px] text-slate-400 mt-0.5">{stats.total} service contracts · track renewals and payments</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
@@ -214,16 +229,16 @@ export default function ContractsPage() {
       </div>
 
       {/* Cards */}
-      {filtered.length === 0 ? (
+      {contracts.length === 0 && !isContractFetching ? (
         <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
           <RiFileTextLine className="w-12 h-12 text-slate-200 mx-auto mb-3" />
           <p className="font-semibold text-slate-400">No contracts found</p>
           <button onClick={() => setModal('add')} className="mt-3 text-accent-600 text-[13px] font-semibold hover:underline">+ Add first contract</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" style={{ opacity: isContractFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
           <AnimatePresence mode="popLayout">
-            {filtered.map((c, i) => (
+            {contracts.map((c, i) => (
               <motion.div key={c.id} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }} transition={{ delay:i*0.04 }}>
                 <ContractCard contract={c} companies={companies} allTasks={allTasks}
                   onEdit={() => setModal(c)} onDelete={() => setDelTarget(c)}
@@ -232,6 +247,11 @@ export default function ContractsPage() {
             ))}
           </AnimatePresence>
         </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <PaginationBar page={page} pages={totalPages} total={totalContracts} isFetching={isContractFetching} onPage={setPage} />
       )}
 
       <ContractModal open={modal !== null} contract={modal !== 'add' ? modal : null} companies={companies}
@@ -269,6 +289,51 @@ export default function ContractsPage() {
         onClose={() => setRenewTarget(null)} onRenew={handleRenew} />
     </motion.div>
   );
+}
+
+function PaginationBar({ page, pages, total, isFetching, onPage }) {
+  if (pages <= 1) return null;
+  const nums = getPagNums(page, pages);
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border border-slate-100 bg-slate-50/40 rounded-2xl">
+      <p className="text-[11px] text-slate-400 tabular-nums">{total} total · Page {page}/{pages}</p>
+      <div className="flex items-center gap-1">
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(1)}>«</PagBtn>
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(page - 1)}>‹</PagBtn>
+        {nums.map((n, idx) => n === '…' ? (
+          <span key={`e-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
+        ) : (
+          <button key={n} onClick={() => onPage(n)} disabled={isFetching}
+            className={`w-7 h-7 rounded-lg text-[12px] font-bold transition-all ${n === page ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 disabled:opacity-40'}`}>
+            {n}
+          </button>
+        ))}
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(page + 1)}>›</PagBtn>
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(pages)}>»</PagBtn>
+      </div>
+    </div>
+  );
+}
+function PagBtn({ disabled, onClick, children }) {
+  return (
+    <button disabled={disabled} onClick={onClick}
+      className="w-7 h-7 rounded-lg text-[13px] font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-40 transition-all">
+      {children}
+    </button>
+  );
+}
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const nums = new Set([1, pages, page]);
+  if (page > 1) nums.add(page - 1);
+  if (page < pages) nums.add(page + 1);
+  const sorted = [...nums].sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+    result.push(n);
+  });
+  return result;
 }
 
 function ContractCard({ contract: c, companies, allTasks, onEdit, onDelete, onPay, onRenew }) {

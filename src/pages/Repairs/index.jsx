@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
@@ -8,6 +8,7 @@ import {
   RiAddLine, RiEditLine, RiDeleteBinLine, RiAlertLine, RiToolsLine,
   RiArrowDownSLine, RiArrowUpSLine, RiLoader4Line, RiWalletLine,
   RiBuilding2Line, RiCheckLine, RiLayoutGridLine, RiListCheck2,
+  RiArrowLeftSLine, RiArrowRightSLine,
 } from 'react-icons/ri';
 import { Wrench } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, usePatchMutation } from '../../api/apiSlice';
@@ -15,10 +16,13 @@ import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { REPAIR_STATUS_CFG } from '../../data/mockRepairs';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import PageLoader from '../../components/ui/PageLoader';
 import { Field, Input, Select, Textarea, FormGrid, FormSection, FormActions } from '../../components/ui/FormField';
 import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
+
+const PAGE_SIZE = 10;
 
 const PRIORITIES = ['critical','high','medium','low'];
 const STATUSES   = ['reported','in-progress','awaiting-parts','completed'];
@@ -40,41 +44,117 @@ const STATUS_BADGE = {
 
 function fmtDate(s) { return s ? new Date(s+'T00:00:00').toLocaleDateString('en-AE',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
 
+// ─── Pagination helpers ───────────────────────────────────────────────────────
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  if (page <= 4) return [1, 2, 3, 4, 5, '…', pages];
+  if (page >= pages - 3) return [1, '…', pages-4, pages-3, pages-2, pages-1, pages];
+  return [1, '…', page-1, page, page+1, '…', pages];
+}
+
+function PagBtn({ onClick, disabled, active, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'min-w-8 h-8 px-2 rounded-lg text-[12px] font-semibold transition-all border',
+        active
+          ? 'bg-navy-900 text-white border-navy-900'
+          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PaginationBar({ page, pages, onPage }) {
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-1.5 py-4">
+      <PagBtn onClick={() => onPage(page - 1)} disabled={page <= 1}>
+        <RiArrowLeftSLine className="w-4 h-4" />
+      </PagBtn>
+      {getPagNums(page, pages).map((n, i) =>
+        n === '…'
+          ? <span key={`e${i}`} className="text-slate-400 text-[12px] px-1">…</span>
+          : <PagBtn key={n} onClick={() => onPage(n)} active={n === page}>{n}</PagBtn>
+      )}
+      <PagBtn onClick={() => onPage(page + 1)} disabled={page >= pages}>
+        <RiArrowRightSLine className="w-4 h-4" />
+      </PagBtn>
+    </div>
+  );
+}
+
 export default function RepairsPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
-
-  const { data: allTasks   = [] }             = useGetQuery({ path: '/tasks',    params: { propertyId, category: 'Repair' } }, { skip: !propertyId });
-  const { data: companies  = [] }             = useGetQuery({ path: '/companies' });
-  const { data: areas      = [] }             = useGetQuery({ path: '/areas',    params: { propertyId } }, { skip: !propertyId });
-  const { data: assets     = [] }             = useGetQuery({ path: '/assets',   params: { propertyId } }, { skip: !propertyId });
-  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
-  const homeWallet    = { balance: walletData?.home?.balance    ?? 0 };
-  const vehicleWallet = { balance: walletData?.vehicle?.balance ?? 0 };
-
-  const repairs = allTasks.filter((t) => t.category === 'Repair');
-
-  const [addRepairMut]    = usePostMutation();
-  const [updateRepairMut] = usePutMutation();
-  const [deleteRepairMut] = useDeleteMutation();
-  const [patchRepairMut]  = usePatchMutation();
-  const [deductWalletMut] = usePostMutation();
 
   const [view,      setView]      = useState('grid');
   const [tab,       setTab]       = useState('all');
   const [pri,       setPri]       = useState('all');
+  const [page,      setPage]      = useState(1);
   const [modal,     setModal]     = useState(null);
   const [delTarget, setDelTarget] = useState(null);
   const [expanded,  setExpanded]  = useState(null);
 
-  const criticalOpen = repairs.filter((r) => r.priority === 'critical' && r.status !== 'completed').length;
-  const filtered = repairs.filter((r) => (tab === 'all' || r.status === tab) && (pri === 'all' || r.priority === pri));
+  useEffect(() => { setPage(1); }, [tab, pri]);
+
+  // Stats query (no pagination — returns aggregated counts)
+  const { data: repairStats = {} } = useGetQuery(
+    { path: '/tasks/stats', params: { propertyId, category: 'Repair' } },
+    { skip: !propertyId },
+  );
+
+  // Paginated list query — backend filters by category + status + priority
+  const repairParams = {
+    propertyId,
+    category: 'Repair',
+    page,
+    limit: PAGE_SIZE,
+    ...(tab !== 'all' && { status: tab }),
+    ...(pri !== 'all' && { priority: pri }),
+  };
+  const { data: rawData, isLoading, isFetching } = useGetQuery(
+    { path: '/tasks', params: repairParams },
+    { skip: !propertyId },
+  );
+
+  const repairs    = rawData?.items ?? (Array.isArray(rawData) ? rawData : []);
+  const totalPages = rawData?.pages ?? 1;
+  const totalCount = rawData?.total ?? repairs.length;
 
   const stats = {
-    total:      repairs.length,
-    reported:   repairs.filter((r) => r.status === 'reported').length,
-    inProgress: repairs.filter((r) => r.status === 'in-progress').length,
-    awaiting:   repairs.filter((r) => r.status === 'awaiting-parts').length,
-    completed:  repairs.filter((r) => r.status === 'completed').length,
+    total:      repairStats?.total      ?? 0,
+    reported:   repairStats?.byStatus?.reported    ?? 0,
+    inProgress: repairStats?.byStatus?.inProgress  ?? 0,
+    awaiting:   repairStats?.byStatus?.awaitingParts ?? 0,
+    completed:  repairStats?.byStatus?.completed   ?? 0,
+  };
+  const criticalOpen = repairStats?.criticalOpen ?? 0;
+
+  const { data: companies  = [] } = useGetQuery({ path: '/companies' });
+  const { data: areas      = [] } = useGetQuery({ path: '/areas',  params: { propertyId } }, { skip: !propertyId });
+  const { data: assets     = [] } = useGetQuery({ path: '/assets', params: { propertyId } }, { skip: !propertyId });
+  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
+  const homeWallet    = { balance: walletData?.home?.balance    ?? 0 };
+  const vehicleWallet = { balance: walletData?.vehicle?.balance ?? 0 };
+
+  const [addRepairMut,    { isLoading: isAdding   }] = usePostMutation();
+  const [updateRepairMut, { isLoading: isUpdating }] = usePutMutation();
+  const [deleteRepairMut] = useDeleteMutation();
+  const [patchRepairMut]  = usePatchMutation();
+  const [deductWalletMut] = usePostMutation();
+
+  const isSubmitting = isAdding || isUpdating;
+
+  const statusTabCounts = {
+    all:              stats.total,
+    reported:         stats.reported,
+    'in-progress':    stats.inProgress,
+    'awaiting-parts': stats.awaiting,
+    completed:        stats.completed,
   };
 
   const handleStatusChange = async (repair, status) => {
@@ -92,6 +172,8 @@ export default function RepairsPage() {
       }
     } catch { toast.error('Failed to update status'); }
   };
+
+  if (isLoading) return <PageLoader />;
 
   return (
     <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.3 }} className="space-y-6">
@@ -146,7 +228,7 @@ export default function RepairsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {[['all','All'], ['reported','Reported'], ['in-progress','In Progress'], ['awaiting-parts','Awaiting Parts'], ['completed','Completed']].map(([v, l]) => {
-            const count = v === 'all' ? stats.total : repairs.filter((r) => r.status === v).length;
+            const count = statusTabCounts[v] ?? 0;
             return (
               <button key={v} onClick={() => setTab(v)}
                 className={cn('flex items-center gap-2 px-3.5 py-2 rounded-xl text-[12px] font-semibold whitespace-nowrap border transition-all',
@@ -181,42 +263,47 @@ export default function RepairsPage() {
       </div>
 
       {/* Content */}
-      {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-          <RiToolsLine className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-          <p className="font-semibold text-slate-400">No repairs in this filter</p>
-          <button onClick={() => setModal('add')} className="mt-3 text-accent-600 text-[13px] font-semibold hover:underline">+ Report first issue</button>
-        </div>
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          <AnimatePresence mode="popLayout">
-            {filtered.map((r, i) => (
-              <motion.div key={r.id} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }} transition={{ delay:i*0.04 }}>
-                <RepairCard repair={r} companies={companies}
-                  onEdit={() => setModal(r)} onDelete={() => setDelTarget(r)}
-                  onStatusChange={(s) => handleStatusChange(r, s)} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <AnimatePresence mode="popLayout">
-            {filtered.map((r, i) => (
-              <motion.div key={r.id} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, x:20 }} transition={{ delay:i*0.04 }}>
-                <RepairRow repair={r} expanded={expanded === r.id}
-                  onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
-                  onEdit={() => setModal(r)} onDelete={() => setDelTarget(r)}
-                  onStatusChange={(s) => handleStatusChange(r, s)} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+      <div className={cn('transition-opacity duration-200', isFetching ? 'opacity-50' : 'opacity-100')}>
+        {repairs.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
+            <RiToolsLine className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+            <p className="font-semibold text-slate-400">No repairs in this filter</p>
+            <button onClick={() => setModal('add')} className="mt-3 text-accent-600 text-[13px] font-semibold hover:underline">+ Report first issue</button>
+          </div>
+        ) : view === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <AnimatePresence mode="popLayout">
+              {repairs.map((r, i) => (
+                <motion.div key={r.id} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }} transition={{ delay:i*0.04 }}>
+                  <RepairCard repair={r} companies={companies}
+                    onEdit={() => setModal(r)} onDelete={() => setDelTarget(r)}
+                    onStatusChange={(s) => handleStatusChange(r, s)} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <AnimatePresence mode="popLayout">
+              {repairs.map((r, i) => (
+                <motion.div key={r.id} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, x:20 }} transition={{ delay:i*0.04 }}>
+                  <RepairRow repair={r} expanded={expanded === r.id}
+                    onToggle={() => setExpanded(expanded === r.id ? null : r.id)}
+                    onEdit={() => setModal(r)} onDelete={() => setDelTarget(r)}
+                    onStatusChange={(s) => handleStatusChange(r, s)} />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+
+        <PaginationBar page={page} pages={totalPages} onPage={setPage} />
+      </div>
 
       <RepairModal open={modal !== null} repair={modal !== 'add' ? modal : null}
         companies={companies} areas={areas} assets={assets}
         homeWallet={homeWallet} vehicleWallet={vehicleWallet}
+        isSubmitting={isSubmitting}
         onClose={() => setModal(null)}
         onSave={async (data) => {
           try {
@@ -251,23 +338,16 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
       <div className="relative px-5 pt-4 pb-4 overflow-hidden"
         style={{ background:'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
 
-        {/* priority accent bar */}
         <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:accent, zIndex:2 }} />
-
-        {/* rings */}
         <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none', zIndex:1 }} />
         <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none', zIndex:1 }} />
-
-        {/* ghost watermark */}
         <Wrench style={{ position:'absolute', right:8, bottom:-4, width:70, height:70, color:'rgba(255,255,255,0.06)', userSelect:'none', pointerEvents:'none', zIndex:1 }} />
 
-        {/* priority badge top-right */}
         <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full text-[11px] font-bold"
           style={{ background:pBadge.bg, color:pBadge.color, border:pBadge.border, zIndex:10 }}>
           {pBadge.label}
         </div>
 
-        {/* icon + title */}
         <div className="relative flex items-center gap-3.5 mt-1" style={{ zIndex:5 }}>
           <div className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center"
             style={{ background:`${accent}28`, border:'2.5px solid rgba(255,255,255,0.13)', boxShadow:`0 4px 20px ${accent}40` }}>
@@ -281,7 +361,6 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
           </div>
         </div>
 
-        {/* progress bar */}
         <div className="relative flex items-center gap-1 mt-3" style={{ zIndex:5 }}>
           {steps.map((s, i) => (
             <div key={s} className="flex-1 h-1 rounded-full transition-all"
@@ -289,7 +368,6 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
           ))}
         </div>
 
-        {/* edit/delete hover */}
         <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
           <button onClick={onEdit}
             className="w-7 h-7 rounded-xl flex items-center justify-center border transition-all"
@@ -310,13 +388,9 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
 
       {/* BODY */}
       <div className="flex-1 flex flex-col px-5 pt-4 pb-4 gap-3">
-
-        {/* description preview */}
         {r.description && (
           <p className="text-[12px] text-slate-500 line-clamp-2 leading-relaxed">{r.description}</p>
         )}
-
-        {/* company link */}
         {(company || r.companyName) && (
           <div className="flex items-center gap-2 text-[12px] text-slate-600">
             <RiBuilding2Line className="w-3.5 h-3.5 text-slate-300 shrink-0" />
@@ -326,8 +400,6 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
             }
           </div>
         )}
-
-        {/* status badge + date */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
             style={{ background:sBadge.bg, color:sBadge.color, border:sBadge.border }}>
@@ -335,10 +407,7 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
           </span>
           <span className="text-[11px] text-slate-400">{fmtDate(r.reportedDate)}</span>
         </div>
-
         <div className="flex-1" />
-
-        {/* footer: cost + quick status */}
         <div className="border-t border-slate-100 pt-3">
           <div className="flex items-center justify-between gap-2 mb-2">
             {cost > 0 ? (
@@ -443,7 +512,7 @@ function RepairRow({ repair: r, expanded, onToggle, onEdit, onDelete, onStatusCh
   );
 }
 
-function RepairModal({ open, onClose, repair, companies, areas, assets, onSave, homeWallet, vehicleWallet }) {
+function RepairModal({ open, onClose, repair, companies, areas, assets, onSave, homeWallet, vehicleWallet, isSubmitting }) {
   const { register, handleSubmit, reset, watch, setValue } = useForm();
   const [walletType, setWalletType] = useState('home');
   useEffect(() => {
@@ -564,7 +633,7 @@ function RepairModal({ open, onClose, repair, companies, areas, assets, onSave, 
           )}
         </FormSection>
         <Field label="Notes"><Textarea {...register('notes')} rows={2} placeholder="Parts required, access notes, follow-up actions…" /></Field>
-        <FormActions onCancel={onClose} submitLabel={repair ? 'Update Repair' : 'Report Issue'} />
+        <FormActions onCancel={onClose} loading={isSubmitting} submitLabel={repair ? 'Update Repair' : 'Report Issue'} />
       </form>
     </Modal>
   );

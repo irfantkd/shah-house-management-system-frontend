@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import {
   RiBellLine, RiCheckDoubleLine, RiDeleteBinLine, RiFilterLine,
   RiAlertLine, RiInformationLine, RiCalendarLine, RiToolsLine,
-  RiShieldLine, RiMoneyDollarCircleLine, RiCheckLine, RiCakeLine, RiTeamLine,
+  RiShieldLine, RiCheckLine, RiCakeLine, RiTeamLine,
   RiVipCrownLine,
 } from 'react-icons/ri';
 import { useGetQuery, usePatchMutation, useDeleteMutation } from '../../api/apiSlice';
@@ -31,8 +31,7 @@ const TYPE_ICONS = {
   repair:      RiAlertLine,
   warranty:    RiShieldLine,
   contract:    RiCalendarLine,
-  payment:     RiMoneyDollarCircleLine,
-  info:        RiInformationLine,
+  general:     RiInformationLine,
 };
 
 function fmtAgo(iso) {
@@ -60,7 +59,7 @@ const nextBirthdayDate = (dob) => {
   return next.toISOString();
 };
 
-const TYPES = ['all', 'maintenance', 'repair', 'warranty', 'contract', 'payment', 'info'];
+const TYPES = ['all', 'maintenance', 'repair', 'warranty', 'contract', 'general'];
 
 export default function NotificationsPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
@@ -102,7 +101,7 @@ export default function NotificationsPage() {
 
   const handleMarkAllRead = async () => {
     try {
-      await markAllReadMut({ path: '/notifications/mark-all-read', body: { propertyId } }).unwrap();
+      await markAllReadMut({ path: `/notifications/read-all?propertyId=${propertyId}`, body: {} }).unwrap();
       toast.success('All marked as read');
     } catch {
       toast.error('Failed to mark all read');
@@ -111,7 +110,7 @@ export default function NotificationsPage() {
 
   const handleMarkRead = async (id) => {
     try {
-      await markReadMut({ path: `/notifications/${id}`, body: { read: true } }).unwrap();
+      await markReadMut({ path: `/notifications/${id}/read`, body: {} }).unwrap();
     } catch {
       toast.error('Failed to mark read');
     }
@@ -279,25 +278,30 @@ export default function NotificationsPage() {
 
 function NotifCard({ notif: n, onMarkRead, onDismiss }) {
   const TypeIcon = TYPE_ICONS[n.type] ?? RiInformationLine;
-  const cfg = NOTIF_TYPE_CFG?.[n.type] ?? { bg: 'bg-slate-100', text: 'text-slate-600', label: n.type };
+  const cfg      = NOTIF_TYPE_CFG?.[n.type] ?? { color: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400', label: n.type };
   const priColor = { high: 'bg-danger-50 border-danger-200', medium: 'bg-warning-50 border-warning-200', low: 'bg-white border-slate-100' }[n.priority ?? 'low'] ?? 'bg-white border-slate-100';
 
   return (
     <div className={cn('rounded-2xl border px-5 py-4 transition-all', priColor, !n.read && 'border-l-4 border-l-accent-400')}>
       <div className="flex items-start gap-3">
-        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5', cfg.bg)}>
-          <TypeIcon className={cn('w-4 h-4', cfg.text)} />
+        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5', cfg.color)}>
+          <TypeIcon className="w-4 h-4" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className={cn('text-[14px] leading-snug', n.read ? 'font-medium text-slate-600' : 'font-bold text-slate-900')}>{n.title}</p>
             <span className="text-[11px] text-slate-400 whitespace-nowrap shrink-0 mt-0.5">{fmtAgo(n.createdAt)}</span>
           </div>
-          <p className="text-[13px] text-slate-500 mt-1 leading-relaxed">{n.message}</p>
-          <div className="flex items-center gap-2 mt-2.5">
-            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-md capitalize', cfg.bg, cfg.text)}>{cfg.label}</span>
+          <p className="text-[13px] text-slate-500 mt-1 leading-relaxed">{n.description}</p>
+          <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-md capitalize', cfg.color)}>{cfg.label}</span>
+            {n.link && (
+              <Link to={n.link} className="flex items-center gap-1 text-[11px] font-semibold text-accent-600 hover:text-accent-700 transition-colors">
+                {n.linkLabel || 'View'} →
+              </Link>
+            )}
             {!n.read && (
-              <button onClick={onMarkRead} className="flex items-center gap-1 text-[11px] font-semibold text-accent-600 hover:text-accent-700 transition-colors">
+              <button onClick={onMarkRead} className="flex items-center gap-1 text-[11px] font-semibold text-navy-600 hover:text-navy-700 transition-colors">
                 <RiCheckLine className="w-3.5 h-3.5" />Mark read
               </button>
             )}

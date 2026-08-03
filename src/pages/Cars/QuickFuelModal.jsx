@@ -54,8 +54,8 @@ export default function QuickFuelModal({ open, onClose }) {
     setIsSubmitting(true);
     try {
       const carData = await addFuelMut({ path: `/cars/${effectiveId}/fuel-logs`, body: { date: form.date, totalPrice, liters, mileage } }).unwrap();
-      const sourceId = carData.data?.fuelLogs?.[0]?.id ?? carData.data?.fuelLogs?.[0]?._id ?? '';
-      await deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: 'vehicle', amount: totalPrice, description: `Fuel${liters ? ` — ${liters}L` : ''}`, date: form.date, category: 'Fuel', carId: effectiveId, sourceId } }).unwrap();
+      const sourceId = carData.data?.id ?? '';
+      await deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType: 'vehicle', amount: totalPrice, description: `Fuel${liters ? ` — ${liters}L` : ''}`, date: form.date, category: 'Fuel', carId: effectiveId, sourceId, sourceModel: 'FuelLog' } }).unwrap();
       await refetchWallet();
       toast.success(`Fuel logged for ${selectedCar?.make} ${selectedCar?.model}`);
       handleClose();

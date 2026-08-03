@@ -19,6 +19,7 @@ import {
   RiBuilding2Line,
   RiPlayLine,
   RiArrowRightSLine,
+  RiArrowLeftSLine,
   RiCheckboxCircleLine,
   RiPauseCircleLine,
   RiCloseCircleLine,
@@ -153,6 +154,50 @@ const NEXT_STATUSES = {
 };
 
 
+const PAGE_SIZE = 10;
+
+// ─── Pagination helpers ───────────────────────────────────────────────────────
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  if (page <= 4) return [1, 2, 3, 4, 5, "…", pages];
+  if (page >= pages - 3) return [1, "…", pages-4, pages-3, pages-2, pages-1, pages];
+  return [1, "…", page-1, page, page+1, "…", pages];
+}
+function PagBtn({ onClick, disabled, active, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "min-w-8 h-8 px-2 rounded-lg text-[12px] font-semibold transition-all border",
+        active
+          ? "bg-navy-900 text-white border-navy-900"
+          : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+function PaginationBar({ page, pages, onPage }) {
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-1.5 py-4">
+      <PagBtn onClick={() => onPage(page - 1)} disabled={page <= 1}>
+        <RiArrowLeftSLine className="w-4 h-4" />
+      </PagBtn>
+      {getPagNums(page, pages).map((n, i) =>
+        n === "…"
+          ? <span key={`e${i}`} className="text-slate-400 text-[12px] px-1">…</span>
+          : <PagBtn key={n} onClick={() => onPage(n)} active={n === page}>{n}</PagBtn>
+      )}
+      <PagBtn onClick={() => onPage(page + 1)} disabled={page >= pages}>
+        <RiArrowRightSLine className="w-4 h-4" />
+      </PagBtn>
+    </div>
+  );
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const RECURRENCES = [
   "one-time",
@@ -254,6 +299,7 @@ export default function MaintenancePage() {
 
   const [catTab, setCatTab] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const [view, setView] = useState("grid");
   const [modal, setModal] = useState(null);
   const [detailTask, setDetailTask] = useState(null);
@@ -278,18 +324,24 @@ export default function MaintenancePage() {
     { skip: !propertyId },
   );
 
-  // Fully filtered tasks for grid / list (backend filters category + status)
-  const { data: filtered = [] } = useGetQuery(
+  useEffect(() => { setPage(1); }, [catTab, statusFilter]);
+
+  // Fully filtered tasks for grid / list — paginated
+  const { data: filteredRaw, isFetching: isFilteredFetching } = useGetQuery(
     {
       path: "/tasks",
       params: {
         propertyId,
+        page,
+        limit: PAGE_SIZE,
         ...(catTab !== "all" && { category: catTab }),
         ...(statusFilter !== "all" && { status: statusFilter }),
       },
     },
     { skip: !propertyId },
   );
+  const filtered    = filteredRaw?.items ?? (Array.isArray(filteredRaw) ? filteredRaw : []);
+  const totalPages  = filteredRaw?.pages ?? 1;
 
   // Stats computed from category-filtered items (all statuses)
   const stats = useMemo(
@@ -799,6 +851,9 @@ export default function MaintenancePage() {
         </div>
       )}
 
+      {/* ── GRID / LIST CONTENT WRAPPER ── */}
+      <div className={cn("transition-opacity duration-200", isFilteredFetching ? "opacity-50" : "opacity-100")}>
+
       {/* ── EMPTY STATE ── */}
       {view !== "calendar" && filtered.length === 0 && (
         <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
@@ -879,6 +934,10 @@ export default function MaintenancePage() {
           ))}
         </div>
       )}
+
+      <PaginationBar page={page} pages={totalPages} onPage={setPage} />
+
+      </div>{/* end opacity wrapper */}
 
       {/* ── MODALS ── */}
       <TaskFormModal

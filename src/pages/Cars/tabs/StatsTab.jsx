@@ -1,4 +1,4 @@
-import { BarChart2, Fuel, Wrench, Gauge, TrendingUp, Calendar } from 'lucide-react';
+import { BarChart2, Fuel, Gauge, TrendingUp, Calendar } from 'lucide-react';
 import { useGetQuery } from '../../../api/apiSlice';
 import { CAR_EXPENSE_TYPES } from '../../../data/mockCars';
 
@@ -23,12 +23,11 @@ export default function StatsTab({ carId }) {
     <div className="space-y-6">
 
       {/* ── All-time stat cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          { label: 'Total Expenses',  value: allTime.expenses,    icon: Gauge,     color: '#2563eb', bg: '#eff6ff', sub: `${allTime.expenseCount} records` },
-          { label: 'Total Fuel',      value: allTime.fuel,        icon: Fuel,      color: '#d97706', bg: '#fffbeb', sub: `${fmtDec(allTime.liters, 0)}L · ${allTime.fillCount} fills` },
-          { label: 'Maintenance',     value: allTime.maintenance, icon: Wrench,    color: '#7c3aed', bg: '#f5f3ff', sub: `${allTime.maintenanceCount} records` },
-          { label: 'Total Spent',     value: allTime.combined,    icon: BarChart2, color: '#0b1d3a', bg: '#f1f5f9', sub: 'All categories' },
+          { label: 'Total Expenses', value: allTime.expenses, icon: Gauge,     color: '#2563eb', bg: '#eff6ff', sub: `${allTime.expenseCount} records` },
+          { label: 'Total Fuel',     value: allTime.fuel,     icon: Fuel,      color: '#d97706', bg: '#fffbeb', sub: `${fmtDec(allTime.liters, 0)}L · ${allTime.fillCount} fills` },
+          { label: 'Total Spent',    value: allTime.combined, icon: BarChart2, color: '#0b1d3a', bg: '#f1f5f9', sub: 'All categories' },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl p-4 border border-slate-100" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
@@ -46,17 +45,16 @@ export default function StatsTab({ carId }) {
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-400" />
           <p className="text-[13px] font-bold text-slate-700">This Month</p>
-          {thisMonth.combined > 0 && (
+          {(thisMonth.expenses + thisMonth.fuel) > 0 && (
             <span className="ml-auto text-[11px] font-bold text-slate-500">
-              AED {fmt(thisMonth.combined)} total
+              AED {fmt(thisMonth.expenses + thisMonth.fuel)} total
             </span>
           )}
         </div>
-        <div className="grid grid-cols-3 divide-x divide-slate-100">
+        <div className="grid grid-cols-2 divide-x divide-slate-100">
           {[
-            { label: 'Expenses',    value: thisMonth.expenses,    color: '#2563eb' },
-            { label: 'Fuel',        value: thisMonth.fuel,        color: '#d97706' },
-            { label: 'Maintenance', value: thisMonth.maintenance, color: '#7c3aed' },
+            { label: 'Expenses', value: thisMonth.expenses, color: '#2563eb' },
+            { label: 'Fuel',     value: thisMonth.fuel,     color: '#d97706' },
           ].map((s) => (
             <div key={s.label} className="px-5 py-4">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">{s.label}</p>
@@ -86,13 +84,12 @@ export default function StatsTab({ carId }) {
                 <th className="text-left px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Month</th>
                 <th className="text-right px-4 py-2.5 text-[10px] font-bold text-blue-400 uppercase tracking-wide">Expenses</th>
                 <th className="text-right px-4 py-2.5 text-[10px] font-bold text-amber-500 uppercase tracking-wide">Fuel</th>
-                <th className="text-right px-4 py-2.5 text-[10px] font-bold text-purple-500 uppercase tracking-wide">Maintenance</th>
                 <th className="text-right px-5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total</th>
               </tr>
             </thead>
             <tbody>
               {[...monthlyTrend].reverse().map((m, i) => {
-                const total = m.expenses + m.fuel + m.maintenance;
+                const total = m.expenses + m.fuel;
                 return (
                   <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3 text-[12px] font-semibold text-slate-700">{m.label}</td>
@@ -101,9 +98,6 @@ export default function StatsTab({ carId }) {
                     </td>
                     <td className="px-4 py-3 text-right text-[12px] font-medium text-amber-600">
                       {m.fuel > 0 ? `AED ${fmt(m.fuel)}` : <span className="text-slate-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-right text-[12px] font-medium text-purple-600">
-                      {m.maintenance > 0 ? `AED ${fmt(m.maintenance)}` : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-5 py-3 text-right text-[12px] font-bold text-slate-900">
                       {total > 0 ? `AED ${fmt(total)}` : <span className="text-slate-300">—</span>}
@@ -170,17 +164,16 @@ export default function StatsTab({ carId }) {
 }
 
 function MiniBarChart({ months }) {
-  const maxVal = Math.max(...months.map((m) => m.expenses + m.fuel + m.maintenance), 1);
+  const maxVal = Math.max(...months.map((m) => m.expenses + m.fuel), 1);
   return (
     <div className="px-5 pt-4 pb-2 flex items-end gap-1.5 h-20">
       {months.map((m, i) => {
-        const total = m.expenses + m.fuel + m.maintenance;
+        const total = m.expenses + m.fuel;
         const h = total > 0 ? Math.max((total / maxVal) * 52, 4) : 0;
         return (
           <div key={i} className="flex-1 flex flex-col items-center justify-end gap-0.5" title={`${m.label}: AED ${Number(total).toLocaleString()}`}>
             {total > 0 ? (
               <div className="w-full rounded-t-sm overflow-hidden" style={{ height: h }}>
-                <div className="w-full" style={{ height: `${(m.maintenance / total) * 100}%`, background: '#7c3aed', minHeight: m.maintenance > 0 ? 2 : 0 }} />
                 <div className="w-full" style={{ height: `${(m.fuel / total) * 100}%`, background: '#d97706', minHeight: m.fuel > 0 ? 2 : 0 }} />
                 <div className="w-full" style={{ height: `${(m.expenses / total) * 100}%`, background: '#2563eb', minHeight: m.expenses > 0 ? 2 : 0 }} />
               </div>

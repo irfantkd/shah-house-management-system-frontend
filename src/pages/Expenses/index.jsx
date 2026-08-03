@@ -179,6 +179,7 @@ export default function ExpensesPage() {
               date: data.date,
               category: data.category,
               sourceId,
+              sourceModel: 'Expense',
             },
           }).unwrap();
           await refetchWallet();

@@ -2,8 +2,8 @@ import { useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, Car, Edit, AlertCircle, Fuel, Gauge, FileText,
-  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, Wrench, BarChart2, Loader2,
+  ArrowLeft, Car, Edit, AlertCircle, Fuel, Gauge,
+  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, BarChart2, Loader2,
 } from 'lucide-react';
 import PageLoader from '../../components/ui/PageLoader';
 import { useGetQuery, usePutMutation } from '../../api/apiSlice';
@@ -11,21 +11,17 @@ import Badge   from '../../components/ui/Badge';
 import Button  from '../../components/ui/Button';
 import { cn }  from '../../utils/cn';
 import toast   from 'react-hot-toast';
-import OverviewTab     from './tabs/OverviewTab';
-import ExpensesTab     from './tabs/ExpensesTab';
-import FuelTab         from './tabs/FuelTab';
-import DocumentsTab    from './tabs/DocumentsTab';
-import MaintenanceTab  from './tabs/MaintenanceTab';
-import StatsTab        from './tabs/StatsTab';
+import OverviewTab from './tabs/OverviewTab';
+import ExpensesTab from './tabs/ExpensesTab';
+import FuelTab     from './tabs/FuelTab';
+import StatsTab    from './tabs/StatsTab';
 import { CAR_CATEGORIES } from '../../data/mockCars';
 
 const TABS = [
-  { id: 'overview',     label: 'Overview',     icon: Car       },
-  { id: 'expenses',     label: 'Expenses',     icon: Gauge     },
-  { id: 'fuel',         label: 'Fuel Log',     icon: Fuel      },
-  { id: 'maintenance',  label: 'Maintenance',  icon: Wrench    },
-  { id: 'stats',        label: 'Stats',        icon: BarChart2 },
-  { id: 'documents',    label: 'Documents',    icon: FileText  },
+  { id: 'overview',  label: 'Overview',  icon: Car       },
+  { id: 'expenses',  label: 'Expenses',  icon: Gauge     },
+  { id: 'fuel',      label: 'Fuel Log',  icon: Fuel      },
+  { id: 'stats',     label: 'Stats',     icon: BarChart2 },
 ];
 
 const INP_E = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white';
@@ -316,12 +312,10 @@ export default function CarDetail() {
 
       {/* ── Tab Content ── */}
       <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-        {tab === 'overview'    && <OverviewTab    car={car} />}
-        {tab === 'expenses'    && <ExpensesTab    carId={car.id} />}
-        {tab === 'fuel'        && <FuelTab        carId={car.id} />}
-        {tab === 'maintenance' && <MaintenanceTab carId={car.id} />}
-        {tab === 'stats'       && <StatsTab       carId={car.id} />}
-        {tab === 'documents'   && <DocumentsTab   car={car} />}
+        {tab === 'overview'  && <OverviewTab car={car} />}
+        {tab === 'expenses'  && <ExpensesTab carId={car.id} />}
+        {tab === 'fuel'      && <FuelTab     carId={car.id} />}
+        {tab === 'stats'     && <StatsTab    carId={car.id} />}
       </motion.div>
 
       {/* ── Edit Vehicle Modal (comprehensive) ── */}

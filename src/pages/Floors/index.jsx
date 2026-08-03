@@ -51,12 +51,33 @@ const fade = (d = 0) => ({
 export default function FloorsPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
 
+  const [page,        setPage]        = useState(1);
+  const [search,      setSearch]      = useState('');
+  const [levelFilter, setLevelFilter] = useState('all');
+  const [modal,       setModal]       = useState(null);
+  const [delTarget,   setDelTarget]   = useState(null);
+
+  useEffect(() => { setPage(1); }, [search, levelFilter]);
+
   const { data: property = {} } = useGetQuery(
     { path: `/properties/${propertyId}` },
     { skip: !propertyId },
   );
-  const { data: floorsRaw = [], isLoading, isError, refetch } = useGetQuery(
-    { path: '/floors', params: { propertyId } },
+  const { data: floorsRaw, isLoading, isFetching, isError, refetch } = useGetQuery(
+    {
+      path: '/floors',
+      params: {
+        propertyId,
+        page,
+        limit: 10,
+        ...(search && { search }),
+        ...(levelFilter !== 'all' && { levelType: levelFilter }),
+      },
+    },
+    { skip: !propertyId },
+  );
+  const { data: floorStats = {} } = useGetQuery(
+    { path: '/floors/stats', params: { propertyId } },
     { skip: !propertyId },
   );
 
@@ -64,29 +85,14 @@ export default function FloorsPage() {
   const [updateMut, { isLoading: isUpdating }] = usePutMutation();
   const [deleteMut, { isLoading: isDeleting }] = useDeleteMutation();
 
-  const [modal,       setModal]       = useState(null); // null | 'add' | floor-object
-  const [delTarget,   setDelTarget]   = useState(null);
-  const [search,      setSearch]      = useState('');
-  const [levelFilter, setLevelFilter] = useState('all');
+  const floors     = floorsRaw?.items ?? (Array.isArray(floorsRaw) ? floorsRaw : []);
+  const totalPages = floorsRaw?.pages ?? 1;
+  const totalCount = floorsRaw?.total ?? floors.length;
 
-  const floors = [...floorsRaw].sort((a, b) => a.level - b.level);
-
-  const totalAreas  = floors.reduce((s, f) => s + (f.areaCount ?? 0), 0);
-  const maxLevel    = floors.length ? Math.max(...floors.map((f) => f.level)) : 0;
-  const minLevel    = floors.length ? Math.min(...floors.map((f) => f.level)) : 0;
-  const hasBasement = minLevel < 0;
-
-  // Client-side filter — floor counts are always tiny for a villa so this is instant
-  const filtered = floors.filter((f) => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || f.name?.toLowerCase().includes(q) || f.description?.toLowerCase().includes(q);
-    const matchLevel  =
-      levelFilter === 'all'      ? true :
-      levelFilter === 'ground'   ? f.level === 0 :
-      levelFilter === 'upper'    ? f.level > 0 :
-      levelFilter === 'basement' ? f.level < 0 : true;
-    return matchSearch && matchLevel;
-  });
+  const totalAreas  = floorStats.totalAreas  ?? 0;
+  const maxLevel    = floorStats.maxLevel     ?? 0;
+  const minLevel    = floorStats.minLevel     ?? 0;
+  const hasBasement = floorStats.hasBasement  ?? false;
 
   const handleSave = async (data) => {
     try {
@@ -160,7 +166,7 @@ export default function FloorsPage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Floors</h1>
           <p className="text-[13px] text-slate-400 mt-0.5">
-            {floors.length} floor{floors.length !== 1 ? 's' : ''} · {totalAreas} areas configured
+            {totalCount} floor{totalCount !== 1 ? 's' : ''} · {totalAreas} areas configured
           </p>
         </div>
         <Button variant="primary" icon={RiAddLine} onClick={() => setModal('add')}>Add Floor</Button>
@@ -169,7 +175,7 @@ export default function FloorsPage() {
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Floors',    value: floors.length,  color: '#0b1d3a', bg: '#f0f5ff', icon: RiStackLine     },
+          { label: 'Total Floors',    value: totalCount,     color: '#0b1d3a', bg: '#f0f5ff', icon: RiStackLine     },
           { label: 'Total Areas',     value: totalAreas,     color: '#1d4ed8', bg: '#eff6ff', icon: RiMapPin2Line    },
           { label: 'Highest Level',   value: maxLevel,       color: '#0f766e', bg: '#f0fdfa', icon: RiArrowUpLine    },
           { label: 'Basement Levels', value: hasBasement ? Math.abs(minLevel) : 0, color: '#7c3aed', bg: '#f5f3ff', icon: RiArrowDownLine },
@@ -278,7 +284,7 @@ export default function FloorsPage() {
       )}
 
       {/* ── No results after filter ── */}
-      {floors.length > 0 && filtered.length === 0 && (
+      {totalCount > 0 && floors.length === 0 && !isLoading && (
         <div className="text-center py-10">
           <p className="text-slate-500 font-semibold text-[14px]">No floors match your search</p>
           <button onClick={() => { setSearch(''); setLevelFilter('all'); }}
@@ -289,17 +295,17 @@ export default function FloorsPage() {
       )}
 
       {/* ── Swipe hint (mobile only) ── */}
-      {filtered.length > 0 && (
+      {floors.length > 0 && (
         <p className="sm:hidden text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center -mb-2">
           ← Swipe card to edit or delete →
         </p>
       )}
 
       {/* ── Floor cards ── */}
-      {filtered.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {floors.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
           <AnimatePresence mode="popLayout">
-            {filtered.map((floor, i) => {
+            {floors.map((floor, i) => {
               const canDelete = (floor.areaCount ?? 0) === 0;
               return (
                 <MotionSwipeableRow
@@ -333,7 +339,7 @@ export default function FloorsPage() {
             })}
 
             {/* Add card */}
-            <motion.button key="add-card" {...fade(filtered.length * 0.05)}
+            <motion.button key="add-card" {...fade(floors.length * 0.05)}
               onClick={() => setModal('add')}
               className="min-h-45 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all group">
               <div className="w-12 h-12 rounded-2xl bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center transition-all">
@@ -348,13 +354,18 @@ export default function FloorsPage() {
         </div>
       )}
 
+      {/* ── Pagination ── */}
+      {totalPages > 1 && (
+        <PaginationBar page={page} pages={totalPages} total={totalCount} isFetching={isFetching} onPage={setPage} />
+      )}
+
       {/* ── Modals ── */}
       <FloorModal
         open={modal !== null}
         floor={modal !== 'add' ? modal : null}
         onClose={() => setModal(null)}
         onSave={handleSave}
-        floors={floors}
+        suggestedLevel={floorStats.maxLevel !== undefined ? floorStats.maxLevel + 1 : 0}
         isSubmitting={isAdding || isUpdating}
       />
 
@@ -369,6 +380,52 @@ export default function FloorsPage() {
       />
     </motion.div>
   );
+}
+
+/* ── Pagination helpers ── */
+function PaginationBar({ page, pages, total, isFetching, onPage }) {
+  if (pages <= 1) return null;
+  const nums = getPagNums(page, pages);
+  return (
+    <div className="flex items-center justify-between px-5 py-3 border border-slate-100 bg-slate-50/40 rounded-2xl">
+      <p className="text-[11px] text-slate-400 tabular-nums">{total} total · Page {page}/{pages}</p>
+      <div className="flex items-center gap-1">
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(1)}>«</PagBtn>
+        <PagBtn disabled={page === 1 || isFetching} onClick={() => onPage(page - 1)}>‹</PagBtn>
+        {nums.map((n, idx) => n === '…' ? (
+          <span key={`e-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
+        ) : (
+          <button key={n} onClick={() => onPage(n)} disabled={isFetching}
+            className={`w-7 h-7 rounded-lg text-[12px] font-bold transition-all ${n === page ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 disabled:opacity-40'}`}>
+            {n}
+          </button>
+        ))}
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(page + 1)}>›</PagBtn>
+        <PagBtn disabled={page === pages || isFetching} onClick={() => onPage(pages)}>»</PagBtn>
+      </div>
+    </div>
+  );
+}
+function PagBtn({ disabled, onClick, children }) {
+  return (
+    <button disabled={disabled} onClick={onClick}
+      className="w-7 h-7 rounded-lg text-[13px] font-bold text-slate-500 hover:bg-slate-100 disabled:opacity-40 transition-all">
+      {children}
+    </button>
+  );
+}
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const nums = new Set([1, pages, page]);
+  if (page > 1) nums.add(page - 1);
+  if (page < pages) nums.add(page + 1);
+  const sorted = [...nums].sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+    result.push(n);
+  });
+  return result;
 }
 
 /* ── Floor Card — inner content only, MotionSwipeableRow provides the shell ── */
@@ -450,7 +507,7 @@ function FloorCard({ floor, canDelete, onEdit, onDelete }) {
 }
 
 /* ── Add / Edit Modal ── */
-function FloorModal({ open, floor, onClose, onSave, floors, isSubmitting }) {
+function FloorModal({ open, floor, onClose, onSave, suggestedLevel = 0, isSubmitting }) {
   const { register, handleSubmit, reset, watch, setValue } = useForm();
   const selectedColor = watch('color', floor?.color ?? '#0b1d3a');
 
@@ -459,8 +516,7 @@ function FloorModal({ open, floor, onClose, onSave, floors, isSubmitting }) {
     if (floor) {
       reset({ name: floor.name, level: floor.level ?? 0, description: floor.description ?? '', color: floor.color ?? '#0b1d3a' });
     } else {
-      const nextLevel = floors.length > 0 ? Math.max(...floors.map((f) => f.level)) + 1 : 0;
-      reset({ name: '', level: nextLevel, description: '', color: '#0b1d3a' });
+      reset({ name: '', level: suggestedLevel, description: '', color: '#0b1d3a' });
     }
   }, [open, floor]);
 

@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
-  AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2, Pencil, Trash2,
+  AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2, Pencil, Trash2, Users,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePatchMutation, useDeleteMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
@@ -121,9 +121,10 @@ export default function WalletDetail() {
   const propertyId     = useSelector(selectCurrentPropertyId);
   const property       = useSelector(selectCurrentProperty);
 
-  const type = walletType === 'home' ? 'home' : walletType === 'salary' ? 'salary' : 'vehicle';
-  const cfg  = WALLET_CFG[type];
-  const Icon = cfg.icon;
+  const type       = ['home', 'salary'].includes(walletType) ? walletType : 'vehicle';
+  const isSalary   = type === 'salary';
+  const cfg        = WALLET_CFG[type];
+  const Icon       = cfg.icon;
 
   const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
   const { data: summaryResult, refetch: refetchTxns } = useGetQuery(
@@ -131,7 +132,7 @@ export default function WalletDetail() {
     { skip: !propertyId },
   );
   const rawTxns = summaryResult?.items ?? [];
-  const wallet = walletData?.[type] ?? { balance: 0, totalDeposited: 0 };
+  const wallet = walletData?.[type] ?? { balance: 0 };
 
   const [listPage, setListPage] = useState(1);
   const LIST_LIMIT = 10;
@@ -231,9 +232,6 @@ export default function WalletDetail() {
   const maxMonthVal = Math.max(...byMonth.flatMap((m) => [m.deposited, m.spent]), 1);
 
   const balance = wallet.balance ?? 0;
-  const total   = wallet.totalDeposited ?? 0;
-  const spent   = total - balance;
-  const pct     = total > 0 ? Math.max(0, Math.min(100, (balance / total) * 100)) : 0;
   const low     = balance < LOW_BALANCE_THRESHOLD;
   const empty   = balance <= 0;
 
@@ -304,7 +302,9 @@ export default function WalletDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button icon={Plus} onClick={() => setShowDeposit(true)}>Deposit Funds</Button>
+          {isSalary
+            ? <Button icon={Users} onClick={() => navigate('/employees')}>Manage Employees</Button>
+            : <Button icon={Plus} onClick={() => setShowDeposit(true)}>Deposit Funds</Button>}
         </div>
       </motion.div>
 
@@ -325,25 +325,25 @@ export default function WalletDetail() {
                 </span>
               )}
             </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden mb-2">
-              <div className="h-full rounded-full bg-white/60 transition-all duration-700" style={{ width: `${pct}%` }} />
-            </div>
-            <p className="text-white/30 text-[11px]">{Math.round(pct)}% of AED {fmt(total)} remaining</p>
-          </div>
-          <div className="grid grid-cols-3 border-t border-white/10">
-            {[
-              { l: 'Total Deposited', v: `AED ${fmt(total)}` },
-              { l: 'Total Spent',     v: `AED ${fmt(Math.max(0, spent))}` },
-              { l: 'Transactions',    v: allTxns.length },
-            ].map((s, i) => (
-              <div key={i} className={cn('px-3 sm:px-6 py-4 text-center', i < 2 && 'border-r border-white/10')}>
-                <p className="text-white/40 text-[9px] font-bold uppercase tracking-wider">{s.l}</p>
-                <p className="text-white font-bold text-[15px] sm:text-[18px] mt-1">{s.v}</p>
-              </div>
-            ))}
           </div>
         </div>
       </motion.div>
+
+      {/* ── Salary info banner ── */}
+      {isSalary && (
+        <motion.div {...fade(0.08)}>
+          <div className="flex items-start gap-3 p-4 rounded-2xl bg-violet-50 border border-violet-200">
+            <Banknote className="w-5 h-5 text-violet-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[13px] font-bold text-violet-800">Auto-managed wallet</p>
+              <p className="text-[12px] text-violet-600 mt-0.5">
+                This balance is updated automatically when salaries are paid via the Employees module.
+                Manual deposits are not allowed.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Period selector — horizontally scrollable on mobile ── */}
       <motion.div {...fade(0.1)}>
@@ -383,9 +383,9 @@ export default function WalletDetail() {
       <motion.div {...fade(0.13)}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { l: 'Received',    v: periodDeposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft },
-            { l: 'Spent',       v: periodSpent,     c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight  },
-            { l: 'Net Balance', v: periodNet,        c: periodNet >= 0 ? '#2563eb' : '#dc2626', bg: periodNet >= 0 ? '#eff6ff' : '#fef2f2', b: periodNet >= 0 ? '#bfdbfe' : '#fecaca', icon: periodNet >= 0 ? TrendingUp : TrendingDown },
+            ...(isSalary ? [] : [{ l: 'Received', v: periodDeposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft }]),
+            { l: isSalary ? 'Total Paid' : 'Spent', v: periodSpent, c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight },
+            ...(isSalary ? [] : [{ l: 'Net Balance', v: periodNet, c: periodNet >= 0 ? '#2563eb' : '#dc2626', bg: periodNet >= 0 ? '#eff6ff' : '#fef2f2', b: periodNet >= 0 ? '#bfdbfe' : '#fecaca', icon: periodNet >= 0 ? TrendingUp : TrendingDown }]),
           ].map((s) => (
             <div key={s.l} className="bg-white rounded-2xl border p-5" style={{ borderColor: s.b, boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>

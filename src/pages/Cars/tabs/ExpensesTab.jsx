@@ -95,10 +95,10 @@ export default function ExpensesTab({ carId }) {
           path: `/cars/${carId}/expenses`,
           body: { ...form, amount: amt, mileage: form.mileage ? Number(form.mileage) : undefined, walletType: 'vehicle' },
         }).unwrap();
-        const sourceId = carData.data?.expenses?.[0]?.id ?? carData.data?.expenses?.[0]?._id ?? '';
+        const sourceId = carData.data?.id ?? '';
         await deductWalletMut({
           path: '/wallet/deduct',
-          body: { propertyId, walletType: 'vehicle', amount: amt, description: form.description, date: form.date, category: expType, carId, sourceId },
+          body: { propertyId, walletType: 'vehicle', amount: amt, description: form.description, date: form.date, category: expType, carId, sourceId, sourceModel: 'CarExpense' },
         }).unwrap();
         await refetchWallet();
         toast.success('Expense added & deducted from Vehicle Wallet');

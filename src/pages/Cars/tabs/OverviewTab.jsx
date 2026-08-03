@@ -1,4 +1,4 @@
-import { Car, User, Phone, FileText, Shield, Info, TrendingUp, Fuel, Wrench, AlertTriangle, Clock, DollarSign } from 'lucide-react';
+import { Car, User, Phone, FileText, Shield, Info, TrendingUp, Fuel, AlertTriangle, Clock, DollarSign } from 'lucide-react';
 import { useGetQuery } from '../../../api/apiSlice';
 
 const fmt     = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
@@ -62,12 +62,11 @@ export default function OverviewTab({ car }) {
               <TrendingUp className="w-3.5 h-3.5 text-white/40" />
               <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">All-Time Spend</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {[
-                { label: 'Total Expenses', value: `AED ${fmt(stats.allTime?.expenses ?? 0)}`,    icon: DollarSign, color: '#93c5fd' },
-                { label: 'Fuel Cost',      value: `AED ${fmt(stats.allTime?.fuel ?? 0)}`,         icon: Fuel,       color: '#fcd34d' },
-                { label: 'Maintenance',    value: `AED ${fmt(stats.allTime?.maintenance ?? 0)}`,  icon: Wrench,     color: '#86efac' },
-                { label: 'Combined Total', value: `AED ${fmt(stats.allTime?.combined ?? 0)}`,     icon: TrendingUp, color: '#c4b5fd' },
+                { label: 'Total Expenses', value: `AED ${fmt(stats.allTime?.expenses ?? 0)}`, color: '#93c5fd' },
+                { label: 'Fuel Cost',      value: `AED ${fmt(stats.allTime?.fuel ?? 0)}`,     color: '#fcd34d' },
+                { label: 'Combined Total', value: `AED ${fmt(stats.allTime?.combined ?? 0)}`, color: '#c4b5fd' },
               ].map((s) => (
                 <div key={s.label}>
                   <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>{s.label}</p>
@@ -83,7 +82,6 @@ export default function OverviewTab({ car }) {
             {[
               { label: 'Expenses', val: stats.thisMonth?.expenses ?? 0, color: '#93c5fd' },
               { label: 'Fuel',     val: stats.thisMonth?.fuel     ?? 0, color: '#fcd34d' },
-              { label: 'Maintenance', val: stats.thisMonth?.maintenance ?? 0, color: '#86efac' },
             ].map((s) => (
               <span key={s.label} className="flex items-center gap-1.5">
                 <span className="text-[10px] font-semibold" style={{ color: 'rgba(255,255,255,0.35)' }}>{s.label}</span>

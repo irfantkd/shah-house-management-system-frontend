@@ -99,13 +99,16 @@ export default function AreasPage() {
   const [floorModal,   setFloorModal]   = useState(false);
   const [pendingFloor, setPendingFloor] = useState(null);
 
+  const showGrouped = floorFilter === "all" && !search;
+
   const areaParams = {
     propertyId,
     ...(floorFilter !== "all" && { floorId: floorFilter }),
     ...(search && { search }),
+    ...(!showGrouped && { page, limit: PAGE_SIZE }),
   };
 
-  const { data: areas = [], isLoading, isError, refetch } = useGetQuery(
+  const { data: rawAreaData, isLoading, isFetching, isError, refetch } = useGetQuery(
     { path: '/areas', params: areaParams },
     { skip: !propertyId },
   );
@@ -118,9 +121,10 @@ export default function AreasPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const showGrouped = floorFilter === "all" && !search;
-  const totalPages  = Math.ceil(areas.length / PAGE_SIZE);
-  const pagedItems  = showGrouped ? areas : areas.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const areas      = showGrouped ? (rawAreaData ?? []) : (rawAreaData?.items ?? []);
+  const totalPages = showGrouped ? 1 : (rawAreaData?.pages ?? 1);
+  const areaTotal  = showGrouped ? areas.length : (rawAreaData?.total ?? 0);
+  const pagedItems = areas;
 
   const grouped = [
     ...floors
@@ -220,7 +224,7 @@ export default function AreasPage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Areas & Rooms</h1>
           <p className="text-[13px] text-slate-400 mt-0.5">
-            {areaStats.total ?? areas.length} spaces · {areaStats.totalAssets ?? 0} assets tracked
+            {areaStats.total ?? areaTotal} spaces · {areaStats.totalAssets ?? 0} assets tracked
           </p>
         </div>
         <Button variant="primary" icon={RiAddLine} onClick={() => setModal("add")}>Add Area</Button>
@@ -259,7 +263,7 @@ export default function AreasPage() {
             <RiStackLine className="w-3.5 h-3.5" />All Floors
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
               style={floorFilter === "all" ? { background: "rgba(255,255,255,0.2)", color: "#fff" } : { background: "#f1f5f9", color: "#64748b" }}>
-              {areas.length}
+              {areaStats.total ?? areaTotal}
             </span>
           </button>
           {floors.map((floor) => {
@@ -389,7 +393,7 @@ export default function AreasPage() {
 
       {/* ── Flat view (filtered/searched) ── */}
       {areas.length > 0 && !showGrouped && view === "grid" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
           <AnimatePresence mode="popLayout">
             {pagedItems.map((area, i) => (
               <MotionSwipeableRow

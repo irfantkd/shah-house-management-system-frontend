@@ -1,15 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  UserPlus, Cake, Phone, Mail, ArrowRight,
-  Pencil, Trash2, BadgeCheck, Home, X,
+  UserPlus, Cake, Phone, Mail, ArrowRight, Pencil, Trash2, BadgeCheck,
+  Home, X, Search, ChevronLeft, ChevronRight, Loader2, AlertCircle,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
+import PageLoader from '../../components/ui/PageLoader';
+import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import toast from 'react-hot-toast';
+import { cn } from '../../utils/cn';
 
+const PAGE_SIZE = 10;
+const TODAY_STR = new Date().toISOString().split('T')[0];
+const PHONE_RE  = /^[+\d][\d\s\-().]{5,19}$/;
+const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
   '#2563eb','#7c3aed','#059669','#dc2626',
   '#d97706','#0891b2','#db2777','#16a34a',
@@ -29,10 +38,57 @@ const calcAge = (dob) => {
   return a;
 };
 
-const BLANK = { name: '', phone: '', email: '', dateOfBirth: '', notes: '' };
-const INP   = 'w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-[14px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all';
+// ── Validation ────────────────────────────────────────────────────────────────
+function validateOwnerForm(f) {
+  const e = {};
+  if (!f.name.trim())             e.name        = 'Full name is required';
+  else if (f.name.trim().length < 2) e.name     = 'Name must be at least 2 characters';
+  if (!f.dateOfBirth)             e.dateOfBirth = 'Date of birth is required';
+  else if (f.dateOfBirth >= TODAY_STR) e.dateOfBirth = 'Date of birth must be in the past';
+  if (f.phone && f.phone.trim() && !PHONE_RE.test(f.phone.trim())) e.phone = 'Enter a valid phone number';
+  if (f.email && f.email.trim() && !EMAIL_RE.test(f.email.trim())) e.email = 'Enter a valid email address';
+  return e;
+}
 
-// ── Card ──────────────────────────────────────────────────────────────────────
+const BLANK = { name: '', phone: '', email: '', dateOfBirth: '', notes: '' };
+
+const INP = 'w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-[14px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all';
+const INP_ERR = 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10';
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  if (page <= 4) return [1, 2, 3, 4, 5, '…', pages];
+  if (page >= pages - 3) return [1, '…', pages-4, pages-3, pages-2, pages-1, pages];
+  return [1, '…', page-1, page, page+1, '…', pages];
+}
+function PagBtn({ onClick, disabled, active, children }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className={cn('min-w-8 h-8 px-2 rounded-xl text-[12px] font-semibold transition-all border',
+        active
+          ? 'bg-navy-900 text-white border-navy-900'
+          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed')}>
+      {children}
+    </button>
+  );
+}
+function PaginationBar({ page, pages, onPage }) {
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-1.5 py-4">
+      <PagBtn onClick={() => onPage(page - 1)} disabled={page <= 1}><ChevronLeft className="w-4 h-4" /></PagBtn>
+      {getPagNums(page, pages).map((n, i) =>
+        n === '…'
+          ? <span key={`e${i}`} className="text-slate-400 text-[12px] px-1">…</span>
+          : <PagBtn key={n} onClick={() => onPage(n)} active={n === page}>{n}</PagBtn>
+      )}
+      <PagBtn onClick={() => onPage(page + 1)} disabled={page >= pages}><ChevronRight className="w-4 h-4" /></PagBtn>
+    </div>
+  );
+}
+
+// ── Desktop card ──────────────────────────────────────────────────────────────
 function OwnerCard({ own, bday, onEdit, onDelete }) {
   const color = avatarColor(own.name);
 
@@ -46,69 +102,41 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
       className="group rounded-3xl overflow-hidden bg-white flex flex-col"
       style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)' }}>
 
-      {/* ══════════════ HEADER ══════════════
-          Avatar sits INSIDE the header to avoid
-          any overflow-hidden clipping issues.
-          The avatar + name are side-by-side in a row.
-      ════════════════════════════════════ */}
-      <div
-        className="relative px-5 pt-4 pb-4 overflow-hidden"
+      <div className="relative px-5 pt-4 pb-4 overflow-hidden"
         style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
 
-        {/* Decorative circles */}
         <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
         <div style={{ position:'absolute', top:-18, right:-18, width:80,  height:80,  borderRadius:'50%', border:'1px solid rgba(255,255,255,0.09)', pointerEvents:'none' }} />
-
-        {/* Accent colour bar at very top */}
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:color, opacity:0.9 }} />
         <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          height: 3, background: color, opacity: 0.9,
-        }} />
-
-        {/* Ghost watermark — behind content */}
-        <div style={{
-          position: 'absolute', right: 12, bottom: -8,
-          fontSize: 80, fontWeight: 900, lineHeight: 1,
-          color: 'rgba(255,255,255,0.05)',
-          letterSpacing: '-3px',
-          userSelect: 'none', pointerEvents: 'none',
+          position:'absolute', right:12, bottom:-8,
+          fontSize:80, fontWeight:900, lineHeight:1,
+          color:'rgba(255,255,255,0.05)',
+          letterSpacing:'-3px', userSelect:'none', pointerEvents:'none',
         }}>
           {initials(own.name)}
         </div>
 
-        {/* Birthday badge */}
         {bday && (
           <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
-            style={{ background: '#f59e0b', boxShadow: '0 2px 8px rgba(245,158,11,0.5)', zIndex: 10 }}>
+            style={{ background:'#f59e0b', boxShadow:'0 2px 8px rgba(245,158,11,0.5)', zIndex:10 }}>
             <Cake className="w-3 h-3" />
-            {bday.daysUntilBirthday === 0 ? 'Today!' : `${bday.daysUntilBirthday} days`}
+            {bday.daysUntilBirthday === 0 ? 'Today!' : `${bday.daysUntilBirthday}d`}
           </div>
         )}
 
-        {/* Avatar + Name row — fully within header */}
-        <div className="relative flex items-center gap-4 mt-1" style={{ zIndex: 5 }}>
-          {/* Avatar — visible initials, clean border */}
-          <div
-            className="w-[54px] h-[54px] rounded-2xl shrink-0 flex items-center justify-center text-white text-[20px] font-black select-none"
-            style={{
-              background: color,
-              border: '2.5px solid rgba(255,255,255,0.22)',
-              boxShadow: `0 4px 20px ${color}70, 0 0 0 1px rgba(255,255,255,0.08)`,
-            }}>
+        <div className="relative flex items-center gap-4 mt-1" style={{ zIndex:5 }}>
+          <div className="w-13.5 h-13.5 rounded-2xl shrink-0 flex items-center justify-center text-white text-[20px] font-black select-none"
+            style={{ background:color, border:'2.5px solid rgba(255,255,255,0.22)', boxShadow:`0 4px 20px ${color}70, 0 0 0 1px rgba(255,255,255,0.08)` }}>
             {initials(own.name)}
           </div>
-
-          {/* Name + subtitle */}
           <div className="min-w-0 flex-1 pr-2">
             <p className="text-[18px] font-black text-white leading-tight truncate">{own.name}</p>
-            <p className="text-[11px] font-semibold mt-0.5" style={{ color: 'rgba(255,255,255,0.38)' }}>
-              Shah House · Owner
-            </p>
+            <p className="text-[11px] font-semibold mt-0.5" style={{ color:'rgba(255,255,255,0.38)' }}>Shah House · Owner</p>
           </div>
         </div>
 
-        {/* Edit / delete — visible on hover */}
-        <div className="absolute bottom-3.5 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex: 10 }}>
+        <div className="absolute bottom-3.5 right-4 flex gap-1.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150" style={{ zIndex:10 }}>
           <button onClick={onEdit}
             className="w-7 h-7 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/15 border border-white/10 transition-all">
             <Pencil className="w-3.5 h-3.5" />
@@ -120,15 +148,11 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
         </div>
       </div>
 
-      {/* ══════════════ BODY ══════════════ */}
       <div className="flex-1 flex flex-col px-5 pt-4 pb-5 gap-3">
-
-        {/* Contact info */}
         <div className="space-y-2.5">
           {own.dateOfBirth && (
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: `${color}18` }}>
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0" style={{ background:`${color}18` }}>
                 <Cake className="w-3.5 h-3.5" style={{ color }} />
               </div>
               <div className="flex-1 min-w-0">
@@ -141,8 +165,7 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
           )}
           {own.phone && (
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: `${color}18` }}>
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0" style={{ background:`${color}18` }}>
                 <Phone className="w-3.5 h-3.5" style={{ color }} />
               </div>
               <p className="text-[13px] font-semibold text-slate-700 truncate">{own.phone}</p>
@@ -150,8 +173,7 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
           )}
           {own.email && (
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: `${color}18` }}>
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0" style={{ background:`${color}18` }}>
                 <Mail className="w-3.5 h-3.5" style={{ color }} />
               </div>
               <p className="text-[13px] font-semibold text-slate-700 truncate">{own.email}</p>
@@ -159,16 +181,17 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
           )}
         </div>
 
-        {/* Spacer */}
+        {own.notes && (
+          <p className="text-[12px] text-slate-400 italic leading-relaxed line-clamp-2">{own.notes}</p>
+        )}
+
         <div className="flex-1" />
 
-        {/* View profile CTA */}
         <div className="border-t border-slate-100 pt-3 mt-1">
           <Link to={`/owners/${own.id}`} className="flex items-center justify-between group/cta">
             <span className="text-[13px] font-bold text-slate-800">View Full Profile</span>
-            <div
-              className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 group-hover/cta:scale-110 transition-transform"
-              style={{ background: color }}>
+            <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0 group-hover/cta:scale-110 transition-transform"
+              style={{ background:color }}>
               <ArrowRight className="w-3.5 h-3.5 text-white" />
             </div>
           </Link>
@@ -178,40 +201,125 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
   );
 }
 
+// ── Mobile swipeable row ──────────────────────────────────────────────────────
+function OwnerListRow({ own, bday, onEdit, onDelete }) {
+  const color   = avatarColor(own.name);
+  const ownerId = own.id ?? own._id;
+
+  return (
+    <MotionSwipeableRow
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -28 }}
+      transition={{ duration: 0.22 }}
+      onSwipeRight={onEdit}
+      onSwipeLeft={onDelete}
+      leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
+      leftLabel="Edit"
+      leftBg="#eff6ff"
+      leftColor="#2563eb"
+      rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
+      rightLabel="Delete"
+      rightBg="#fef2f2"
+      rightColor="#dc2626"
+    >
+      <Link
+        to={`/owners/${ownerId}`}
+        className="flex items-center gap-3.5 px-4 py-4 bg-white hover:bg-slate-50/60 active:bg-slate-50 transition-colors"
+      >
+        <div className="relative shrink-0">
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-[13px] font-black select-none"
+            style={{ background: color }}>
+            {initials(own.name)}
+          </div>
+          {bday && (
+            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+              style={{ background: '#f59e0b', boxShadow: '0 1px 6px rgba(245,158,11,0.5)' }}>
+              <Cake className="w-2.5 h-2.5 text-white" />
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-bold text-slate-900 truncate leading-tight">{own.name}</p>
+          <p className="text-[12px] text-slate-400 mt-0.5 truncate">
+            {own.phone || own.email || (own.dateOfBirth ? fmtDate(own.dateOfBirth) : 'No contact info')}
+          </p>
+        </div>
+
+        {bday && (
+          <span className="shrink-0 text-[10px] font-bold px-2 py-1 rounded-full"
+            style={{ background: '#fef3c7', color: '#92400e' }}>
+            {bday.daysUntilBirthday === 0 ? '🎂 Today' : `${bday.daysUntilBirthday}d`}
+          </span>
+        )}
+
+        <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
+      </Link>
+    </MotionSwipeableRow>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function OwnersPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
-  const { data: owners = [] } = useGetQuery({ path: '/owners', params: { propertyId } }, { skip: !propertyId });
-  const [addOwnerMut]    = usePostMutation();
-  const [updateOwnerMut] = usePutMutation();
-  const [deleteOwnerMut] = useDeleteMutation();
 
-  const birthdays = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    return owners
-      .filter((o) => o.dateOfBirth)
-      .map((o) => {
-        const dob = new Date(o.dateOfBirth); const yr = today.getFullYear();
-        let next = new Date(yr, dob.getMonth(), dob.getDate());
-        if (next < today) next = new Date(yr + 1, dob.getMonth(), dob.getDate());
-        return { ...o, daysUntilBirthday: Math.round((next - today) / 86_400_000), nextBirthday: next.toISOString().split('T')[0] };
-      })
-      .filter((o) => o.daysUntilBirthday <= 7)
-      .sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
-  }, [owners]);
+  const [page,            setPage]           = useState(1);
+  const [search,          setSearch]         = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [drawer,          setDrawer]         = useState(null);
+  const [delConfirm,      setDelConfirm]     = useState(null);
+  const [form,            setForm]           = useState(BLANK);
+  const [ownerErrors,     setOwnerErrors]    = useState({});
+  const [isSaving,        setIsSaving]       = useState(false);
 
-  const [drawer,     setDrawer]     = useState(null);
-  const [delConfirm, setDelConfirm] = useState(null);
-  const [form,       setForm]       = useState(BLANK);
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const setF     = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const openAdd  = ()     => { setForm(BLANK); setDrawer('add'); };
-  const openEdit = (own)  => { setForm({ ...BLANK, ...own }); setDrawer(own); };
+  // Stats query (total count + birthday notifications from ALL owners)
+  const { data: ownerStats = {} } = useGetQuery(
+    { path: '/owners/stats', params: { propertyId } },
+    { skip: !propertyId },
+  );
 
+  // Paginated list
+  const { data: rawData, isLoading, isFetching } = useGetQuery(
+    { path: '/owners', params: { propertyId, page, limit: PAGE_SIZE, ...(debouncedSearch && { search: debouncedSearch }) } },
+    { skip: !propertyId },
+  );
+  const owners     = rawData?.items ?? (Array.isArray(rawData) ? rawData : []);
+  const totalPages = rawData?.pages ?? 1;
+  const totalCount = ownerStats.total ?? 0;
+  const upcomingBirthdays = ownerStats.upcomingBirthdays ?? [];
+
+  const [addOwnerMut]                       = usePostMutation();
+  const [updateOwnerMut]                    = usePutMutation();
+  const [deleteOwnerMut, { isLoading: isDeleting }] = useDeleteMutation();
+
+  // ── Form helpers ────────────────────────────────────────────────────────────
+  const setF = (k, v) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    if (ownerErrors[k]) setOwnerErrors((e) => ({ ...e, [k]: undefined }));
+  };
+
+  const blurOwnerField = (k) => {
+    const errs = validateOwnerForm(form);
+    if (errs[k]) setOwnerErrors((e) => ({ ...e, [k]: errs[k] }));
+  };
+
+  const openAdd  = ()    => { setForm(BLANK); setOwnerErrors({}); setDrawer('add'); };
+  const openEdit = (own) => { setForm({ ...BLANK, ...own }); setOwnerErrors({}); setDrawer(own); };
+
+  // ── Save handler ────────────────────────────────────────────────────────────
   const handleSave = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim()) return toast.error('Name is required');
-    if (!form.dateOfBirth) return toast.error('Date of birth is required');
+    e?.preventDefault();
+    const errs = validateOwnerForm(form);
+    if (Object.keys(errs).length) { setOwnerErrors(errs); return; }
+    setIsSaving(true);
     try {
       if (drawer === 'add') {
         await addOwnerMut({ path: '/owners', body: { ...form, propertyId } }).unwrap();
@@ -221,68 +329,74 @@ export default function OwnersPage() {
         toast.success('Owner updated');
       }
       setDrawer(null);
-    } catch (err) { toast.error(err.data?.error || 'Failed to save'); }
+      setOwnerErrors({});
+    } catch (err) {
+      if (err.data?.errors) {
+        setOwnerErrors(err.data.errors);
+      } else {
+        toast.error(err.data?.error || 'Failed to save');
+      }
+    } finally { setIsSaving(false); }
   };
 
+  // ── Delete handler ──────────────────────────────────────────────────────────
   const handleDelete = async () => {
     try {
       await deleteOwnerMut({ path: `/owners/${delConfirm.id}` }).unwrap();
       toast.success(`${delConfirm.name} removed`);
+      setDelConfirm(null);
     } catch { toast.error('Failed to delete'); }
-    setDelConfirm(null);
   };
+
+  if (isLoading) return <PageLoader />;
+
+  const bdayFor = (own) => upcomingBirthdays.find((b) => b.id === (own.id ?? own._id));
 
   return (
     <>
       <div className="space-y-8">
 
-        {/* Page header */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between gap-4">
+        {/* ── Page header ── */}
+        <motion.div initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }}
+          className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow: '0 4px 14px rgba(11,29,58,0.35)' }}>
+              style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow:'0 4px 14px rgba(11,29,58,0.35)' }}>
               <Home className="w-5 h-5 text-white" />
             </div>
             <div>
               <h1 className="text-[22px] font-black text-slate-900 leading-tight">Owners</h1>
-              <p className="text-[12px] text-slate-400">Shah House · {owners.length} {owners.length === 1 ? 'owner' : 'owners'}</p>
+              <p className="text-[12px] text-slate-400">Shah House · {totalCount} {totalCount === 1 ? 'owner' : 'owners'}</p>
             </div>
           </div>
           <button onClick={openAdd}
             className="flex items-center gap-2 px-5 h-10 rounded-2xl text-[13px] font-bold text-white hover:opacity-90 active:scale-[0.97] transition-all"
-            style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow: '0 4px 14px rgba(11,29,58,0.3)' }}>
+            style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow:'0 4px 14px rgba(11,29,58,0.3)' }}>
             <UserPlus className="w-4 h-4" /> Add Owner
           </button>
         </motion.div>
 
-        {/* Birthday alert */}
+        {/* ── Birthday banner ── */}
         <AnimatePresence>
-          {birthdays.length > 0 && (
-            <motion.div key="bday"
-              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+          {upcomingBirthdays.length > 0 && (
+            <motion.div key="bday" initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}>
               <div className="flex items-start gap-4 px-5 py-4 rounded-3xl"
-                style={{
-                  background: 'linear-gradient(135deg,#fffbeb,#fef9ec)',
-                  border: '1px solid #fde68a',
-                  boxShadow: '0 2px 16px rgba(245,158,11,0.12)',
-                }}>
+                style={{ background:'linear-gradient(135deg,#fffbeb,#fef9ec)', border:'1px solid #fde68a', boxShadow:'0 2px 16px rgba(245,158,11,0.12)' }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                  style={{ background: '#f59e0b', boxShadow: '0 4px 12px rgba(245,158,11,0.4)' }}>
+                  style={{ background:'#f59e0b', boxShadow:'0 4px 12px rgba(245,158,11,0.4)' }}>
                   <Cake className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1 space-y-1.5">
-                  <p className="text-[11px] font-black text-amber-900 uppercase tracking-wider">Birthday Reminder</p>
-                  {birthdays.map((o) => (
-                    <div key={o.id} className="flex items-center gap-2.5">
+                  <p className="text-[11px] font-black text-amber-900 uppercase tracking-wider">🎂 Birthday Reminder</p>
+                  {upcomingBirthdays.map((o) => (
+                    <div key={o.id} className="flex items-center gap-2.5 flex-wrap">
                       <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[9px] font-black shrink-0"
                         style={{ background: avatarColor(o.name) }}>
                         {initials(o.name)}
                       </div>
                       <span className="text-[14px] font-bold text-amber-950">{o.name}</span>
                       <span className="text-[12px] text-amber-600">
-                        {o.daysUntilBirthday === 0 ? '— Today!' : o.daysUntilBirthday === 1 ? '— Tomorrow' : `— in ${o.daysUntilBirthday} days`}
+                        {o.daysUntilBirthday === 0 ? '— Today! 🎉' : o.daysUntilBirthday === 1 ? '— Tomorrow' : `— in ${o.daysUntilBirthday} days`}
                       </span>
                     </div>
                   ))}
@@ -292,68 +406,112 @@ export default function OwnersPage() {
           )}
         </AnimatePresence>
 
-        {/* Cards */}
-        {owners.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            <AnimatePresence>
-              {owners.map((own) => (
-                <OwnerCard
-                  key={own.id}
-                  own={own}
-                  bday={birthdays.find((b) => b.id === own.id)}
-                  onEdit={() => openEdit(own)}
-                  onDelete={() => setDelConfirm(own)}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="rounded-3xl border-2 border-dashed border-slate-200 py-24 flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
-              <Home className="w-8 h-8 text-slate-300" strokeWidth={1.5} />
-            </div>
-            <div className="text-center">
-              <p className="text-[15px] font-bold text-slate-400">No owners yet</p>
-              <p className="text-[13px] text-slate-300 mt-1">Add the owners of Shah House</p>
-            </div>
-            <button onClick={openAdd}
-              className="flex items-center gap-2 px-5 h-10 rounded-2xl text-[13px] font-bold text-white"
-              style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
-              <UserPlus className="w-4 h-4" /> Add First Owner
+        {/* ── Search ── */}
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name…"
+            className="w-full h-10 pl-10 pr-4 rounded-2xl border border-slate-200 bg-white text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all" />
+          {search && (
+            <button onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <X className="w-3.5 h-3.5" />
             </button>
-          </motion.div>
-        )}
+          )}
+        </div>
+
+        {/* ── List / Grid ── */}
+        <div className={cn('transition-opacity duration-200', isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100')}>
+          {owners.length > 0 ? (
+            <>
+              {/* Mobile: swipeable list (hidden on sm+) */}
+              <div className="sm:hidden">
+                <p className="text-[11px] text-slate-400 font-semibold mb-2 flex items-center gap-2">
+                  <span>← Swipe to edit or delete →</span>
+                </p>
+                <div className="rounded-2xl border border-slate-100 overflow-hidden bg-white divide-y divide-slate-50"
+                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
+                  <AnimatePresence>
+                    {owners.map((own) => (
+                      <OwnerListRow
+                        key={own.id ?? own._id}
+                        own={own}
+                        bday={bdayFor(own)}
+                        onEdit={() => openEdit(own)}
+                        onDelete={() => setDelConfirm(own)}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* Desktop: card grid (hidden below sm) */}
+              <div className="hidden sm:grid grid-cols-2 lg:grid-cols-3 gap-5">
+                <AnimatePresence>
+                  {owners.map((own) => (
+                    <OwnerCard
+                      key={own.id ?? own._id}
+                      own={own}
+                      bday={bdayFor(own)}
+                      onEdit={() => openEdit(own)}
+                      onDelete={() => setDelConfirm(own)}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </>
+          ) : (
+            <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }}
+              className="rounded-3xl border-2 border-dashed border-slate-200 py-24 flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+                {search
+                  ? <Search className="w-8 h-8 text-slate-300" strokeWidth={1.5} />
+                  : <Home className="w-8 h-8 text-slate-300" strokeWidth={1.5} />}
+              </div>
+              <div className="text-center">
+                <p className="text-[15px] font-bold text-slate-400">{search ? 'No owners match your search' : 'No owners yet'}</p>
+                <p className="text-[13px] text-slate-300 mt-1">{search ? 'Try a different name' : 'Add the owners of Shah House'}</p>
+              </div>
+              {!search && (
+                <button onClick={openAdd}
+                  className="flex items-center gap-2 px-5 h-10 rounded-2xl text-[13px] font-bold text-white"
+                  style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+                  <UserPlus className="w-4 h-4" /> Add First Owner
+                </button>
+              )}
+            </motion.div>
+          )}
+
+          <PaginationBar page={page} pages={totalPages} onPage={setPage} />
+        </div>
       </div>
 
       {/* ── Side Drawer ── */}
       <AnimatePresence>
         {drawer && (
           <>
-            <motion.div key="bg"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setDrawer(null)}
+            <motion.div key="bg" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+              onClick={() => !isSaving && setDrawer(null)}
               className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
             <motion.div key="panel"
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              initial={{ x:'100%' }} animate={{ x:0 }} exit={{ x:'100%' }}
+              transition={{ type:'spring', damping:28, stiffness:280 }}
               className="fixed right-0 top-0 h-full w-full max-w-sm bg-white z-50 flex flex-col shadow-2xl">
 
+              {/* Drawer header */}
               <div className="px-6 py-5 shrink-0 flex items-center justify-between"
-                style={{ background: 'linear-gradient(150deg, #0a172e, #0c1f3f)' }}>
+                style={{ background:'linear-gradient(150deg, #0a172e, #0c1f3f)' }}>
                 <div>
-                  <p className="text-[16px] font-black text-white">
-                    {drawer === 'add' ? 'Add Owner' : 'Edit Owner'}
-                  </p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>Shah House</p>
+                  <p className="text-[16px] font-black text-white">{drawer === 'add' ? 'Add Owner' : 'Edit Owner'}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color:'rgba(255,255,255,0.35)' }}>Shah House</p>
                 </div>
-                <button onClick={() => setDrawer(null)}
-                  className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-all">
+                <button onClick={() => setDrawer(null)} disabled={isSaving}
+                  className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-all disabled:opacity-40">
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Live preview */}
+              {/* Avatar preview */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-4 shrink-0 bg-slate-50">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-[16px] font-black"
                   style={{ background: form.name ? avatarColor(form.name) : '#cbd5e1' }}>
@@ -362,49 +520,121 @@ export default function OwnersPage() {
                 <div>
                   <p className="text-[15px] font-bold text-slate-800">{form.name || 'New Owner'}</p>
                   <p className="text-[12px] text-slate-400">
-                    {form.dateOfBirth ? `${calcAge(form.dateOfBirth)} years old` : 'Shah House Owner'}
+                    {form.dateOfBirth && !ownerErrors.dateOfBirth
+                      ? `${calcAge(form.dateOfBirth)} years old`
+                      : 'Shah House Owner'}
                   </p>
                 </div>
               </div>
 
+              {/* Form */}
               <form onSubmit={handleSave} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-                {[
-                  { label: 'Full Name *',     key: 'name',        type: 'text',  placeholder: 'e.g. Mirfan Shah',  required: true },
-                  { label: 'Date of Birth *', key: 'dateOfBirth', type: 'date',  placeholder: '',                  required: true },
-                  { label: 'Phone Number',    key: 'phone',       type: 'text',  placeholder: '+971 50 000 0000' },
-                  { label: 'Email Address',   key: 'email',       type: 'email', placeholder: 'email@example.com' },
-                ].map(({ label, key, type, placeholder, required }) => (
-                  <div key={key}>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{label}</label>
-                    <input
-                      value={form[key] ?? ''}
-                      onChange={(e) => setF(key, e.target.value)}
-                      type={type}
-                      required={required}
-                      placeholder={placeholder}
-                      className={INP} />
-                    {key === 'dateOfBirth' && form.dateOfBirth && (
-                      <p className="text-[12px] text-slate-400 mt-1.5 ml-1">{calcAge(form.dateOfBirth)} years old</p>
-                    )}
-                  </div>
-                ))}
+
+                {/* Name */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                    Full Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setF('name', e.target.value)}
+                    onBlur={() => blurOwnerField('name')}
+                    type="text"
+                    placeholder="e.g. Mirfan Shah"
+                    className={cn(INP, ownerErrors.name ? INP_ERR : '')}
+                  />
+                  {ownerErrors.name && (
+                    <p className="flex items-center gap-1 text-[11px] text-red-500 mt-1.5 ml-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />{ownerErrors.name}
+                    </p>
+                  )}
+                </div>
+
+                {/* Date of Birth */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                    Date of Birth <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    value={form.dateOfBirth}
+                    onChange={(e) => setF('dateOfBirth', e.target.value)}
+                    onBlur={() => blurOwnerField('dateOfBirth')}
+                    type="date"
+                    max={TODAY_STR}
+                    className={cn(INP, ownerErrors.dateOfBirth ? INP_ERR : '')}
+                  />
+                  {ownerErrors.dateOfBirth
+                    ? (
+                      <p className="flex items-center gap-1 text-[11px] text-red-500 mt-1.5 ml-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />{ownerErrors.dateOfBirth}
+                      </p>
+                    ) : form.dateOfBirth && (
+                      <p className="text-[11px] text-slate-400 mt-1.5 ml-1">{calcAge(form.dateOfBirth)} years old</p>
+                    )
+                  }
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Phone Number</label>
+                  <input
+                    value={form.phone}
+                    onChange={(e) => setF('phone', e.target.value)}
+                    onBlur={() => blurOwnerField('phone')}
+                    type="text"
+                    placeholder="+971 50 000 0000"
+                    className={cn(INP, ownerErrors.phone ? INP_ERR : '')}
+                  />
+                  {ownerErrors.phone && (
+                    <p className="flex items-center gap-1 text-[11px] text-red-500 mt-1.5 ml-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />{ownerErrors.phone}
+                    </p>
+                  )}
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
+                  <input
+                    value={form.email}
+                    onChange={(e) => setF('email', e.target.value)}
+                    onBlur={() => blurOwnerField('email')}
+                    type="text"
+                    placeholder="email@example.com"
+                    className={cn(INP, ownerErrors.email ? INP_ERR : '')}
+                  />
+                  {ownerErrors.email && (
+                    <p className="flex items-center gap-1 text-[11px] text-red-500 mt-1.5 ml-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />{ownerErrors.email}
+                    </p>
+                  )}
+                </div>
+
+                {/* Notes */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Notes</label>
-                  <textarea value={form.notes ?? ''} onChange={(e) => setF('notes', e.target.value)}
-                    rows={3} placeholder="Any additional notes…" className={`${INP} h-auto py-3 resize-none`} />
+                  <textarea
+                    value={form.notes ?? ''}
+                    onChange={(e) => setF('notes', e.target.value)}
+                    rows={3}
+                    placeholder="Any additional notes…"
+                    className={`${INP} h-auto py-3 resize-none`}
+                  />
                 </div>
               </form>
 
+              {/* Footer buttons */}
               <div className="px-6 py-4 border-t border-slate-100 flex gap-3 shrink-0">
-                <button type="button" onClick={() => setDrawer(null)}
-                  className="flex-1 h-11 rounded-2xl border-2 border-slate-200 text-[14px] font-bold text-slate-600 hover:bg-slate-50 transition-all">
+                <button type="button" onClick={() => setDrawer(null)} disabled={isSaving}
+                  className="flex-1 h-11 rounded-2xl border-2 border-slate-200 text-[14px] font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50">
                   Cancel
                 </button>
-                <button onClick={handleSave}
-                  className="flex-1 h-11 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 transition-all"
-                  style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow: '0 4px 14px rgba(11,29,58,0.3)' }}>
-                  <BadgeCheck className="w-4 h-4" />
-                  {drawer === 'add' ? 'Add Owner' : 'Save Changes'}
+                <button onClick={handleSave} disabled={isSaving}
+                  className="flex-1 h-11 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-60"
+                  style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow:'0 4px 14px rgba(11,29,58,0.3)' }}>
+                  {isSaving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
+                    : <><BadgeCheck className="w-4 h-4" /> {drawer === 'add' ? 'Add Owner' : 'Save Changes'}</>}
                 </button>
               </div>
             </motion.div>
@@ -416,33 +646,32 @@ export default function OwnersPage() {
       <AnimatePresence>
         {delConfirm && (
           <>
-            <motion.div key="del-bg"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setDelConfirm(null)}
+            <motion.div key="del-bg" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+              onClick={() => !isDeleting && setDelConfirm(null)}
               className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
             <motion.div key="del-box"
-              initial={{ opacity: 0, scale: 0.88, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+              initial={{ opacity:0, scale:0.88, y:20 }} animate={{ opacity:1, scale:1, y:0 }} exit={{ opacity:0, scale:0.9 }}
+              transition={{ type:'spring', damping:26, stiffness:320 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl p-7 w-full max-w-xs pointer-events-auto text-center"
-                style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
                 <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
                   <Trash2 className="w-7 h-7 text-red-500" />
                 </div>
                 <h3 className="text-[17px] font-black text-slate-900 mb-2">Remove Owner?</h3>
                 <p className="text-[13px] text-slate-500 leading-relaxed mb-6">
-                  <strong className="text-slate-700">{delConfirm.name}</strong> will be permanently removed.
+                  <strong className="text-slate-700">{delConfirm.name}</strong> will be permanently removed from Shah House.
                 </p>
                 <div className="flex gap-3">
-                  <button onClick={() => setDelConfirm(null)}
-                    className="flex-1 h-11 rounded-2xl border-2 border-slate-200 text-[14px] font-bold text-slate-600 hover:bg-slate-50 transition-all">
+                  <button onClick={() => setDelConfirm(null)} disabled={isDeleting}
+                    className="flex-1 h-11 rounded-2xl border-2 border-slate-200 text-[14px] font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50">
                     Cancel
                   </button>
-                  <button onClick={handleDelete}
-                    className="flex-1 h-11 rounded-2xl bg-red-500 hover:bg-red-600 text-white text-[14px] font-bold transition-colors">
-                    Remove
+                  <button onClick={handleDelete} disabled={isDeleting}
+                    className="flex-1 h-11 rounded-2xl bg-red-500 hover:bg-red-600 text-white text-[14px] font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-60">
+                    {isDeleting
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Removing…</>
+                      : <><Trash2 className="w-4 h-4" /> Remove</>}
                   </button>
                 </div>
               </div>
