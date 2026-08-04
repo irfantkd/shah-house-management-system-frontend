@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
+import DatePicker from '../../components/ui/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -638,9 +639,11 @@ function AssetRow({ asset: a, last, onEdit, onDelete, onAssign, canDelete = true
   );
 }
 
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+
 /* ═══ Add / Edit Asset Modal ═══ */
 function AssetModal({ open, onClose, asset, onSave, areas, isSubmitting }) {
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset, control } = useForm();
   const isEdit = !!asset;
 
   useEffect(() => {
@@ -736,7 +739,10 @@ function AssetModal({ open, onClose, asset, onSave, areas, isSubmitting }) {
         </FormSection>
         <FormSection title="Purchase & Value">
           <FormGrid>
-            <Field label="Purchase Date"><Input {...register('purchaseDate')} type="date" /></Field>
+            <Field label="Purchase Date">
+              <Controller name="purchaseDate" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
             <Field label="Purchase Price (AED)"><Input {...register('purchasePrice')} type="number" min="0" step="0.01" placeholder="0.00" /></Field>
             <Field label="Current Value (AED)"><Input {...register('currentValue')} type="number" min="0" step="0.01" placeholder="0.00" /></Field>
           </FormGrid>
@@ -748,8 +754,14 @@ function AssetModal({ open, onClose, asset, onSave, areas, isSubmitting }) {
             <Field label="Warranty Type">
               <Select {...register('wType')} options={WARRANTY_TYPES.map((t) => ({ value: t, label: t }))} />
             </Field>
-            <Field label="Warranty Start"><Input {...register('wStart')} type="date" /></Field>
-            <Field label="Warranty Expiry"><Input {...register('wExpiry')} type="date" /></Field>
+            <Field label="Warranty Start">
+              <Controller name="wStart" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
+            <Field label="Warranty Expiry">
+              <Controller name="wExpiry" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
           </FormGrid>
         </FormSection>
         <Field label="Notes"><Textarea {...register('notes')} rows={2} placeholder="Additional notes…" /></Field>

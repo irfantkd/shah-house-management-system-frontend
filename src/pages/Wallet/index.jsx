@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
-  Wallet, Car, Home, Banknote, Plus, ArrowDownLeft,
-  AlertTriangle, ChevronRight, Loader2,
+  Wallet, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
+  AlertTriangle, ChevronRight, Loader2, FileDown, BarChart3,
 } from 'lucide-react';
-import { useGetQuery, usePostMutation } from '../../api/apiSlice';
+import { useGetQuery, usePostMutation, API_BASE_URL } from '../../api/apiSlice';
+import DatePicker from '../../components/ui/DatePicker';
 import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
 import Modal  from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
@@ -23,18 +24,48 @@ const WALLETS = {
   salary:  { label: 'Salary Wallet',   desc: 'Employee salary payments · auto-tracked',  icon: Banknote, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)', detailLink: '/wallet/salary'   },
 };
 
+const REPORT_PERIODS = [
+  { k: 'week',      l: 'This Week'    },
+  { k: 'month',     l: 'This Month'   },
+  { k: 'lastMonth', l: 'Last Month'   },
+  { k: 'last3',     l: 'Last 3 Mo.'  },
+  { k: 'all',       l: 'All Time'     },
+  { k: 'custom',    l: 'Custom Range' },
+];
+
+const REPORT_WALLETS = [
+  { k: 'all',     l: 'All Wallets'   },
+  { k: 'vehicle', l: 'Vehicle'       },
+  { k: 'home',    l: 'Home'          },
+  { k: 'salary',  l: 'Salary'        },
+];
+
+const TXN_PAGE_SIZE = 8;
+
 function fmt(n) { return Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 }); }
+function fmtDate(d) { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
 const INP = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 
 export default function WalletPage() {
-  const propertyId = useSelector(selectCurrentPropertyId);
-  const property   = useSelector(selectCurrentProperty);
+  const propertyId  = useSelector(selectCurrentPropertyId);
+  const property    = useSelector(selectCurrentProperty);
+  const authToken   = useSelector((s) => s.auth?.token);
 
   const { data: walletData, refetch: refetchWallets } = useGetQuery(
     { path: '/wallet', params: { propertyId } },
     { skip: !propertyId },
   );
+
+  // Recent transactions — all wallets, limit 200 for client-side paging
+  const { data: recentResult } = useGetQuery(
+    { path: '/wallet/transactions', params: { propertyId, limit: 200 } },
+    { skip: !propertyId },
+  );
+  const allTxns = useMemo(() => {
+    const items = recentResult?.items ?? [];
+    return [...items].sort((a, b) => new Date(b.date) - new Date(a.date) || String(b.id).localeCompare(String(a.id)));
+  }, [recentResult]);
 
   const EMPTY_W = { balance: 0 };
   const vWallet = { ...EMPTY_W, ...walletData?.vehicle };
@@ -42,6 +73,7 @@ export default function WalletPage() {
   const sWallet = { ...EMPTY_W, ...walletData?.salary  };
   const walletsMap = { vehicle: vWallet, home: hWallet, salary: sWallet };
 
+  // ── Deposit ─────────────────────────────────────────────────────────────────
   const [depositMut, { isLoading: isDepositing }] = usePostMutation();
   const [showDeposit, setShowDeposit] = useState(false);
   const [form, setForm] = useState(BLANK);
@@ -64,6 +96,45 @@ export default function WalletPage() {
       setForm(BLANK);
     } catch (err) { toast.error(err.data?.error || 'Failed to deposit'); }
   };
+
+  // ── Reports ─────────────────────────────────────────────────────────────────
+  const [showReports,   setShowReports]   = useState(false);
+  const [reportWallet,  setReportWallet]  = useState('all');
+  const [reportPeriod,  setReportPeriod]  = useState('month');
+  const [reportStart,   setReportStart]   = useState('');
+  const [reportEnd,     setReportEnd]     = useState('');
+  const [reportLoading, setReportLoading] = useState(false);
+
+  const handleReport = async () => {
+    if (!propertyId) return;
+    setReportLoading(true);
+    try {
+      const params = new URLSearchParams({ propertyId, walletType: reportWallet, period: reportPeriod });
+      if (reportPeriod === 'custom' && reportStart && reportEnd) {
+        params.append('startDate', reportStart);
+        params.append('endDate', reportEnd);
+      }
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const res = await fetch(`${API_BASE_URL}/reports/wallet?${params}`, { credentials: 'include', headers });
+      if (!res.ok) throw new Error('Report generation failed');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `Shah-Wallet-${reportWallet}-${reportPeriod}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShowReports(false);
+    } catch { toast.error('Failed to generate report'); }
+    finally { setReportLoading(false); }
+  };
+
+  // ── Transaction pagination ───────────────────────────────────────────────────
+  const [txnPage, setTxnPage] = useState(1);
+  const txnPages = Math.max(1, Math.ceil(allTxns.length / TXN_PAGE_SIZE));
+  const pageTxns = allTxns.slice((txnPage - 1) * TXN_PAGE_SIZE, txnPage * TXN_PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -90,7 +161,10 @@ export default function WalletPage() {
           </div>
           <p className="text-slate-500 text-[13px]">Manage expense budgets — deposit and track spending by category</p>
         </div>
-        <Button icon={Plus} onClick={() => openDeposit('vehicle')}>Deposit Funds</Button>
+        <div className="flex items-center gap-2">
+          <Button icon={FileDown} variant="outline" onClick={() => setShowReports(true)}>Reports</Button>
+          <Button icon={Plus} onClick={() => openDeposit('vehicle')}>Deposit Funds</Button>
+        </div>
       </motion.div>
 
       {/* ── Wallet Cards ── */}
@@ -107,7 +181,6 @@ export default function WalletPage() {
             <motion.div key={key} {...fade(0.06 + i * 0.06)}>
               <div className="rounded-2xl overflow-hidden" style={{ background: w.gradient, boxShadow: `0 8px 32px ${w.color}30` }}>
 
-                {/* Clickable balance area → detail / employees page */}
                 <Link to={w.detailLink} className="block p-6 pb-5 hover:bg-white/5 transition-colors group">
                   <div className="flex items-start justify-between mb-4">
                     <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/10">
@@ -131,7 +204,6 @@ export default function WalletPage() {
                   <p className="text-white/40 text-[12px] mt-1.5">{w.desc}</p>
                 </Link>
 
-                {/* Action strip */}
                 <div className="border-t border-white/10">
                   {isSalary ? (
                     <div className="flex">
@@ -167,7 +239,7 @@ export default function WalletPage() {
         })}
       </div>
 
-      {/* ── Low balance alerts (vehicle + home only) ── */}
+      {/* ── Low balance alerts ── */}
       {(vWallet.balance < LOW_BALANCE_THRESHOLD || hWallet.balance < LOW_BALANCE_THRESHOLD) && (
         <motion.div {...fade(0.14)}>
           <div className="space-y-2">
@@ -227,7 +299,7 @@ export default function WalletPage() {
         </motion.div>
       )}
 
-      {/* ── Salary wallet info strip ── */}
+      {/* ── Salary info strip ── */}
       <motion.div {...fade(0.18)}>
         <div className="flex items-center gap-4 px-5 py-4 rounded-2xl"
           style={{ background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
@@ -246,12 +318,175 @@ export default function WalletPage() {
         </div>
       </motion.div>
 
-      {/* ── Deposit Modal (vehicle + home only) ── */}
+      {/* ── Recent Transactions ── */}
+      {allTxns.length > 0 && (
+        <motion.div {...fade(0.22)}>
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
+              <div>
+                <p className="text-[14px] font-bold text-slate-800">Recent Transactions</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{allTxns.length} total across all wallets</p>
+              </div>
+              <button onClick={() => setShowReports(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                <FileDown className="w-3.5 h-3.5" /> Export
+              </button>
+            </div>
+
+            {/* Transaction rows */}
+            <div className="divide-y divide-slate-50">
+              {pageTxns.map((txn) => {
+                const isCredit = txn.type === 'credit';
+                const wCfg     = WALLETS[txn.walletType] ?? WALLETS.vehicle;
+                const WIcon    = wCfg.icon;
+                return (
+                  <div key={txn._id ?? txn.id} className="flex items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
+                    <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+                      isCredit ? 'bg-emerald-50' : 'bg-red-50')}>
+                      {isCredit
+                        ? <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+                        : <ArrowUpRight  className="w-4 h-4 text-red-500"     />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-800 truncate">
+                        {isCredit ? (txn.note || 'Deposit received') : (txn.description || 'Expense deducted')}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{ background: wCfg.bg, color: wCfg.color }}>
+                          <WIcon className="w-2.5 h-2.5" />
+                          {wCfg.label.replace(' Wallet', '')}
+                        </span>
+                        {txn.category && (
+                          <>
+                            <span className="text-[10px] text-slate-300">·</span>
+                            <span className="text-[10px] text-slate-400 capitalize">{txn.category}</span>
+                          </>
+                        )}
+                        <span className="text-[10px] text-slate-300">·</span>
+                        <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={cn('text-[14px] font-bold tabular-nums', isCredit ? 'text-emerald-600' : 'text-red-500')}>
+                        {isCredit ? '+' : '−'}AED {fmt(txn.amount)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {txnPages > 1 && (
+              <div className="flex items-center justify-between px-5 py-3 bg-slate-50/60 border-t border-slate-100">
+                <p className="text-[11px] text-slate-400 tabular-nums">
+                  {allTxns.length} transactions · Page {txnPage} of {txnPages}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button disabled={txnPage === 1} onClick={() => setTxnPage(1)}
+                    className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">«</button>
+                  <button disabled={txnPage === 1} onClick={() => setTxnPage((p) => p - 1)}
+                    className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">‹</button>
+                  {Array.from({ length: Math.min(txnPages, 5) }, (_, i) => {
+                    const n = txnPage <= 3 ? i + 1 : txnPage >= txnPages - 2 ? txnPages - 4 + i : txnPage - 2 + i;
+                    if (n < 1 || n > txnPages) return null;
+                    return (
+                      <button key={n} onClick={() => setTxnPage(n)}
+                        className={cn('w-7 h-7 rounded-lg text-[12px] font-bold transition-all',
+                          n === txnPage ? 'text-white' : 'text-slate-500 hover:bg-slate-200')}
+                        style={n === txnPage ? { background: '#0b1d3a' } : {}}>
+                        {n}
+                      </button>
+                    );
+                  })}
+                  <button disabled={txnPage === txnPages} onClick={() => setTxnPage((p) => p + 1)}
+                    className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">›</button>
+                  <button disabled={txnPage === txnPages} onClick={() => setTxnPage(txnPages)}
+                    className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">»</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Reports Modal ── */}
+      <Modal open={showReports} onClose={() => { if (!reportLoading) setShowReports(false); }}
+        title="Generate Wallet Report" subtitle="Select wallet and period — downloads as PDF" size="sm">
+        <div className="space-y-4">
+
+          {/* Wallet selector */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Wallet</label>
+            <div className="grid grid-cols-2 gap-2">
+              {REPORT_WALLETS.map(({ k, l }) => {
+                const wCfg = k === 'all' ? null : WALLETS[k];
+                const active = reportWallet === k;
+                return (
+                  <button key={k} type="button" onClick={() => setReportWallet(k)}
+                    className={cn('py-2.5 px-3 rounded-xl border-2 text-[12px] font-bold transition-all',
+                      active ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
+                    style={active ? { background: wCfg?.gradient ?? 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', borderColor: 'transparent' } : {}}>
+                    {l}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Period selector */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Period</label>
+            <div className="grid grid-cols-3 gap-2">
+              {REPORT_PERIODS.map(({ k, l }) => (
+                <button key={k} type="button" onClick={() => setReportPeriod(k)}
+                  className={cn('py-2 px-2 rounded-xl border-2 text-[11px] font-bold transition-all',
+                    reportPeriod === k ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
+                  style={reportPeriod === k ? { background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', borderColor: 'transparent' } : {}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom date range */}
+          {reportPeriod === 'custom' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Start Date</label>
+                <DatePicker value={reportStart} onChange={setReportStart} className={INP} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">End Date</label>
+                <DatePicker value={reportEnd} onChange={setReportEnd} className={INP} />
+              </div>
+            </div>
+          )}
+
+          {/* Generate button */}
+          <div className="pt-1 border-t border-slate-100">
+            <button onClick={handleReport}
+              disabled={reportLoading || (reportPeriod === 'custom' && (!reportStart || !reportEnd))}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+              {reportLoading
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Generating PDF…</>
+                : <><BarChart3 className="w-4 h-4" />Generate & Download PDF</>}
+            </button>
+            <p className="text-[10px] text-slate-400 text-center mt-2">
+              Professional PDF · balance cards, full transaction table &amp; totals
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Deposit Modal ── */}
       <Modal open={showDeposit} onClose={() => { if (!isDepositing) setShowDeposit(false); }}
         title="Deposit Funds" subtitle="Receive money and allocate to a wallet" size="sm">
         <form onSubmit={handleDeposit} className="space-y-4">
 
-          {/* Wallet picker — vehicle + home only */}
           <div>
             <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Wallet</label>
             <div className="grid grid-cols-2 gap-2">
@@ -285,7 +520,7 @@ export default function WalletPage() {
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date</label>
-            <input value={form.date} onChange={(e) => setF('date', e.target.value)} type="date" className={INP} />
+            <DatePicker value={form.date} onChange={(v) => setF('date', v)} className={INP} />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Note / Source</label>

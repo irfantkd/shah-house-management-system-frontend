@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { MotionSwipeableRow } from "../../components/ui/SwipeableRow";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
+import DatePicker from "../../components/ui/DatePicker";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import {
@@ -27,6 +28,7 @@ import {
   RiRefreshLine,
   RiAddCircleLine,
   RiFileTextLine,
+  RiErrorWarningLine,
 } from "react-icons/ri";
 import {
   Settings2,
@@ -202,6 +204,8 @@ function PaginationBar({ page, pages, onPage }) {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+
 const RECURRENCES = [
   "one-time",
   "weekly",
@@ -1688,7 +1692,7 @@ function TaskRow({
 // CompleteModal
 // ─────────────────────────────────────────────────────────────────────────────
 function CompleteModal({ open, task, onClose, onConfirm }) {
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm();
+  const { register, handleSubmit, reset, control, formState: { isSubmitting } } = useForm();
 
   useEffect(() => {
     if (!open || !task) return;
@@ -1758,10 +1762,8 @@ function CompleteModal({ open, task, onClose, onConfirm }) {
         </div>
 
         <Field label="Completion Date" required>
-          <Input
-            {...register("completedDate", { required: true })}
-            type="date"
-          />
+          <Controller name="completedDate" control={control} rules={{ required: true }}
+            render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
         </Field>
 
         <Field
@@ -2031,7 +2033,7 @@ function TaskFormModal({
   propertyId,
   onSave,
 }) {
-  const { register, handleSubmit, reset, watch, setValue, formState: { isSubmitting } } = useForm();
+  const { register, handleSubmit, reset, watch, setValue, control, formState: { isSubmitting, errors } } = useForm();
   const [addFloorMut] = usePostMutation();
   const [addAreaMut] = usePostMutation();
   const [addAssetMut] = usePostMutation();
@@ -2284,9 +2286,10 @@ function TaskFormModal({
             What
           </p>
 
-          <Field label="Task / Service Description" required>
+          <Field label="Task / Service Description" required error={errors.title?.message}>
             <Input
-              {...register("title", { required: "Required" })}
+              error={errors.title?.message}
+              {...register("title", { required: "Task description is required" })}
               placeholder="e.g. AC full service, Fix kitchen tap, Annual pool inspection…"
             />
           </Field>
@@ -2308,8 +2311,8 @@ function TaskFormModal({
                 </button>
               )}
             </div>
-            <input type="hidden" {...register("category", { required: true })} />
-            <div className="flex flex-wrap gap-2">
+            <input type="hidden" {...register("category", { required: "Please select a category" })} />
+            <div className={cn("flex flex-wrap gap-2 p-2 rounded-xl transition-all", errors.category && "ring-2 ring-danger-200 bg-danger-50/30")}>
               {categories.map((c) => {
                 const cfg = getCatCfg(c, categories);
                 const CIcon = cfg.Icon;
@@ -2318,7 +2321,7 @@ function TaskFormModal({
                   <button
                     key={c}
                     type="button"
-                    onClick={() => setValue("category", c)}
+                    onClick={() => setValue("category", c, { shouldValidate: true })}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-semibold border transition-all"
                     style={
                       active
@@ -2332,6 +2335,12 @@ function TaskFormModal({
                 );
               })}
             </div>
+            {errors.category && (
+              <p className="flex items-center gap-1 text-[11px] text-danger-500 pl-0.5 mt-1">
+                <RiErrorWarningLine className="w-3.5 h-3.5 shrink-0" />
+                {errors.category.message}
+              </p>
+            )}
             {showAddCat && (
               <div className="flex items-center gap-2 mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <input
@@ -2641,11 +2650,9 @@ function TaskFormModal({
           </p>
           {mode === "schedule" ? (
             <FormGrid>
-              <Field label="Scheduled Date" required>
-                <Input
-                  {...register("scheduledDate", { required: "Required" })}
-                  type="date"
-                />
+              <Field label="Scheduled Date" required error={errors.scheduledDate?.message}>
+                <Controller name="scheduledDate" control={control} rules={{ required: "Please set a scheduled date" }}
+                  render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.scheduledDate} className={DP_CLS} />} />
               </Field>
               <Field label="Recurrence">
                 <Select
@@ -2659,11 +2666,9 @@ function TaskFormModal({
             </FormGrid>
           ) : (
             <FormGrid>
-              <Field label="Completion Date" required>
-                <Input
-                  {...register("completedDate", { required: "Required" })}
-                  type="date"
-                />
+              <Field label="Completion Date" required error={errors.completedDate?.message}>
+                <Controller name="completedDate" control={control} rules={{ required: "Completion date is required" }}
+                  render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.completedDate} className={DP_CLS} />} />
               </Field>
               <Field label="What was done">
                 <Textarea
@@ -2724,7 +2729,7 @@ function TaskExpenseModal({
   onClose,
   onSave,
 }) {
-  const { register, handleSubmit, reset, watch, formState: { isSubmitting } } = useForm();
+  const { register, handleSubmit, reset, watch, control, formState: { isSubmitting } } = useForm();
   const [walletType, setWalletType] = useState("home");
 
   useEffect(() => {
@@ -2862,7 +2867,8 @@ function TaskExpenseModal({
             </select>
           </Field>
           <Field label="Date">
-            <Input {...register("date")} type="date" />
+            <Controller name="date" control={control}
+              render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
           </Field>
         </FormGrid>
 

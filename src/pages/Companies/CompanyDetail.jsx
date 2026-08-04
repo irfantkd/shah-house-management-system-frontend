@@ -5,6 +5,7 @@ import {
   ArrowLeft, Phone, Mail, MessageCircle, MapPin, Star, FileText,
   ChevronRight, Download, Eye, Calendar, User, Plus, Wrench,
 } from 'lucide-react';
+import DatePicker from '../../components/ui/DatePicker';
 import { useSelector } from 'react-redux';
 import { CATEGORY_CFG } from '../../data/mockCompanies';
 import { useGetQuery, usePostMutation, useDeleteMutation } from '../../api/apiSlice';
@@ -480,7 +481,7 @@ function AddServiceModal({ open, onClose, onSave }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Date *</label>
-            <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)}
+            <DatePicker value={form.date} onChange={(v) => set('date', v)}
               className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] outline-none focus:ring-2 focus:ring-accent-400" />
           </div>
           <div>

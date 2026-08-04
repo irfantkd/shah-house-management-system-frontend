@@ -8,6 +8,7 @@ import Modal  from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
 import toast  from 'react-hot-toast';
+import DatePicker from '../../components/ui/DatePicker';
 
 const fmt = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
 
@@ -109,17 +110,14 @@ export default function QuickFuelModal({ open, onClose }) {
           <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-3">Fuel Details</label>
           <div className="space-y-3">
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
-                <input value={form.date} onChange={(e) => setField('date', e.target.value)}
-                  type="date" required className={INPUT} />
-              </div>
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Total Price (AED) *</label>
-                <input value={form.totalPrice} onChange={(e) => setField('totalPrice', e.target.value)}
-                  type="number" min="0" step="0.01" required placeholder="e.g. 220" className={INPUT} />
-              </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
+              <DatePicker value={form.date} onChange={(v) => setField('date', v)} required className={INPUT} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Total Price (AED) *</label>
+              <input value={form.totalPrice} onChange={(e) => setField('totalPrice', e.target.value)}
+                type="number" min="0" step="0.01" required placeholder="e.g. 220" className={INPUT} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

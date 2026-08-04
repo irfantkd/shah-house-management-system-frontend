@@ -9,6 +9,7 @@ import {
   Loader2, Search, ChevronLeft, ChevronRight, Printer, Building2,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, useDownloadChallanMutation } from '../../api/apiSlice';
+import DatePicker from '../../components/ui/DatePicker';
 import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import PageLoader from '../../components/ui/PageLoader';
@@ -928,13 +929,11 @@ export default function EmployeesPage() {
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
                       Date of Birth <span className="text-red-500">*</span>
                     </label>
-                    <input
+                    <DatePicker
                       value={empForm.dateOfBirth}
-                      onChange={(e) => setEF('dateOfBirth', e.target.value)}
-                      onBlur={() => blurEmpField('dateOfBirth')}
-                      type="date"
-                      max={TODAY_STR}
+                      onChange={(v) => { setEF('dateOfBirth', v); blurEmpField('dateOfBirth'); }}
                       className={cn(INP, empErrors.dateOfBirth ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
+                      hasError={!!empErrors.dateOfBirth}
                     />
                     {empErrors.dateOfBirth
                       ? <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{empErrors.dateOfBirth}</p>
@@ -945,12 +944,11 @@ export default function EmployeesPage() {
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
                       Join Date <span className="text-red-500">*</span>
                     </label>
-                    <input
+                    <DatePicker
                       value={empForm.joinDate}
-                      onChange={(e) => setEF('joinDate', e.target.value)}
-                      onBlur={() => blurEmpField('joinDate')}
-                      type="date"
+                      onChange={(v) => { setEF('joinDate', v); blurEmpField('joinDate'); }}
                       className={cn(INP, empErrors.joinDate ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
+                      hasError={!!empErrors.joinDate}
                     />
                     {empErrors.joinDate && <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{empErrors.joinDate}</p>}
                   </div>

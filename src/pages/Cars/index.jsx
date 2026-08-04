@@ -20,6 +20,7 @@ import QuickFuelModal from './QuickFuelModal';
 import ReportsTab from './tabs/ReportsTab';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
+import DatePicker from '../../components/ui/DatePicker';
 
 const fade = (d = 0) => ({
   initial: { opacity: 0, y: 16 },
@@ -81,6 +82,11 @@ export default function CarsPage() {
   const [editForm,  setEditForm]  = useState(BLANK);
   const [deleteCar, setDeleteCar] = useState(null);
 
+  const [addErrors,  setAddErrors]  = useState({});
+  const [editErrors, setEditErrors] = useState({});
+  const [addApiErr,  setAddApiErr]  = useState('');
+  const [editApiErr, setEditApiErr] = useState('');
+
   const [localImages, setLocalImages] = useState({});
   const fileRefs = useRef({});
 
@@ -101,27 +107,73 @@ export default function CarsPage() {
     return match && filt && sFltr;
   });
 
-  const set  = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const setE = (k, v) => setEditForm((f) => ({ ...f, [k]: v }));
+  const set  = (k, v) => { setForm((f) => ({ ...f, [k]: v }));  setAddErrors((e) => { const n = { ...e }; delete n[k]; return n; }); };
+  const setE = (k, v) => { setEditForm((f) => ({ ...f, [k]: v })); setEditErrors((e) => { const n = { ...e }; delete n[k]; return n; }); };
+
+  function validateCarForm(f, requireExpiry = true) {
+    const errs = {};
+    if (!f.makeModel?.trim())       errs.makeModel    = 'Make & Model is required (e.g. Toyota Land Cruiser 2023)';
+    if (!f.plateNumber?.trim())     errs.plateNumber  = 'Plate number is required';
+    if (requireExpiry && !f.registrationExpiry) errs.registrationExpiry = 'Registration expiry date is required';
+
+    if (f.vin?.trim() && f.vin.trim().length !== 17)
+      errs.vin = 'VIN must be exactly 17 characters';
+
+    if (f.driverPhone?.trim()) {
+      const ph = f.driverPhone.trim().replace(/[\s\-()]/g, '');
+      if (!/^(\+971|00971|0)[0-9]{8,9}$/.test(ph) && !/^[0-9]{9,10}$/.test(ph))
+        errs.driverPhone = 'Enter a valid phone number (e.g. +971 50 123 4567)';
+    }
+
+    if (f.odometer !== '' && f.odometer !== undefined) {
+      if (isNaN(Number(f.odometer)) || Number(f.odometer) < 0)
+        errs.odometer = 'Enter a valid positive number';
+    }
+    if (f.purchasePrice !== '' && f.purchasePrice !== undefined) {
+      if (isNaN(Number(f.purchasePrice)) || Number(f.purchasePrice) < 0)
+        errs.purchasePrice = 'Enter a valid positive amount';
+    }
+    if (f.registrationFee !== '' && f.registrationFee !== undefined) {
+      if (isNaN(Number(f.registrationFee)) || Number(f.registrationFee) < 0)
+        errs.registrationFee = 'Enter a valid positive amount';
+    }
+    if (f.registrationExpiry && f.insuranceExpiry) {
+      if (f.insuranceExpiry < f.registrationExpiry)
+        errs.insuranceExpiry = 'Insurance expiry should not be before registration expiry';
+    }
+    return errs;
+  }
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!form.makeModel.trim() || !form.plateNumber || !form.registrationExpiry) return toast.error('Fill required fields');
+    setAddApiErr('');
+    const errs = validateCarForm(form, true);
+    if (Object.keys(errs).length) { setAddErrors(errs); return; }
+
     const { make, model, year } = parseMakeModelYear(form.makeModel);
     const { makeModel, ...rest } = form;
     try {
       await addCarMut({
         path: '/cars',
-        body: { ...rest, make, model, year, propertyId, purchasePrice: Number(form.purchasePrice) || 0, odometer: Number(form.odometer) || 0, registrationFee: Number(form.registrationFee) || 0 },
+        body: { ...rest, make, model, year, propertyId,
+          purchasePrice: Number(form.purchasePrice) || 0,
+          odometer: Number(form.odometer) || 0,
+          registrationFee: Number(form.registrationFee) || 0 },
       }).unwrap();
       toast.success('Vehicle added to fleet');
       setShowAdd(false);
       setForm(BLANK);
-    } catch (err) { toast.error(err.data?.error || 'Failed to add vehicle'); }
+      setAddErrors({});
+    } catch (err) {
+      const msg = err.data?.error || err.data?.message || 'Failed to add vehicle. Please try again.';
+      setAddApiErr(msg);
+    }
   };
 
   const openEdit = (car) => {
     setEditCar(car);
+    setEditErrors({});
+    setEditApiErr('');
     setEditForm({
       makeModel: [car.make, car.model, car.year].filter(Boolean).join(' '),
       category: car.category ?? 'SUV', nickname: car.nickname ?? '',
@@ -142,18 +194,27 @@ export default function CarsPage() {
 
   const handleEditSave = async (e) => {
     e.preventDefault();
-    if (!editForm.makeModel?.trim()) return toast.error('Make & model is required');
-    if (!editForm.plateNumber?.trim()) return toast.error('Plate number is required');
+    setEditApiErr('');
+    const errs = validateCarForm(editForm, false);
+    if (Object.keys(errs).length) { setEditErrors(errs); return; }
+
     const { make, model, year } = parseMakeModelYear(editForm.makeModel);
     const { makeModel, ...rest } = editForm;
     try {
       await updateCarMut({
         path: `/cars/${editCar.id}`,
-        body: { ...rest, make, model, year, odometer: Number(editForm.odometer) || 0, purchasePrice: Number(editForm.purchasePrice) || 0, registrationFee: Number(editForm.registrationFee) || 0 },
+        body: { ...rest, make, model, year,
+          odometer: Number(editForm.odometer) || 0,
+          purchasePrice: Number(editForm.purchasePrice) || 0,
+          registrationFee: Number(editForm.registrationFee) || 0 },
       }).unwrap();
       toast.success(`${make} ${model} updated`);
       setEditCar(null);
-    } catch (err) { toast.error(err.data?.error || 'Failed to update vehicle'); }
+      setEditErrors({});
+    } catch (err) {
+      const msg = err.data?.error || err.data?.message || 'Failed to update vehicle. Please try again.';
+      setEditApiErr(msg);
+    }
   };
 
   const handleToggleStatus = async (car) => {
@@ -370,94 +431,169 @@ export default function CarsPage() {
       </>}
 
       {/* ── Add Vehicle Modal ── */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Vehicle" subtitle="Enter vehicle details, registration & driver info" size="lg">
-        <form onSubmit={handleAdd} className="space-y-5">
+      <Modal open={showAdd} onClose={() => { setShowAdd(false); setAddErrors({}); setAddApiErr(''); setForm(BLANK); }}
+        title="Add Vehicle" subtitle="Enter vehicle details, registration & driver info" size="lg">
+        <form onSubmit={handleAdd} className="space-y-5" noValidate>
+
+          {/* API error banner */}
+          {addApiErr && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-red-50 border border-red-200">
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-[12px] text-red-700 font-medium">{addApiErr}</p>
+              <button type="button" onClick={() => setAddApiErr('')} className="ml-auto text-red-400 hover:text-red-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Validation error summary */}
+          {Object.keys(addErrors).length > 0 && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[12px] text-amber-700 font-medium">
+                Please fix {Object.keys(addErrors).length} error{Object.keys(addErrors).length > 1 ? 's' : ''} below before submitting.
+              </p>
+            </div>
+          )}
+
           <Section label="Vehicle Details">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nickname" value={form.nickname} onChange={(v) => set('nickname', v)} placeholder="e.g. White Ranger" />
               <Field label="Category" value={form.category} onChange={(v) => set('category', v)} type="select" options={CAR_CATEGORIES} />
-              <Field label="Make & Model *" value={form.makeModel} onChange={(v) => set('makeModel', v)} placeholder="e.g. Land Rover Range Rover 2024" required span2 />
+              <Field label="Make & Model" value={form.makeModel} onChange={(v) => set('makeModel', v)}
+                placeholder="e.g. Land Rover Range Rover 2024" required span2
+                error={addErrors.makeModel} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.makeModel; return n; })} />
               <Field label="Color Name" value={form.colorName} onChange={(v) => set('colorName', v)} placeholder="e.g. Pearl White" />
-              <Field label="Plate Number *" value={form.plateNumber} onChange={(v) => set('plateNumber', v)} placeholder="Dubai A 12345" required />
-              <Field label="VIN" value={form.vin} onChange={(v) => set('vin', v)} placeholder="17-character VIN" />
-              <Field label="Odometer (km)" value={form.odometer} onChange={(v) => set('odometer', v)} type="number" placeholder="0" />
-              <Field label="Purchase Price (AED)" value={form.purchasePrice} onChange={(v) => set('purchasePrice', v)} type="number" placeholder="0" />
+              <Field label="Plate Number" value={form.plateNumber} onChange={(v) => set('plateNumber', v)}
+                placeholder="Dubai A 12345" required
+                error={addErrors.plateNumber} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.plateNumber; return n; })} />
+              <Field label="VIN" value={form.vin} onChange={(v) => set('vin', v)} placeholder="17-character VIN"
+                error={addErrors.vin} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.vin; return n; })} />
+              <Field label="Odometer (km)" value={form.odometer} onChange={(v) => set('odometer', v)} type="number" placeholder="0"
+                error={addErrors.odometer} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.odometer; return n; })} />
+              <Field label="Purchase Price (AED)" value={form.purchasePrice} onChange={(v) => set('purchasePrice', v)} type="number" placeholder="0"
+                error={addErrors.purchasePrice} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.purchasePrice; return n; })} />
             </div>
           </Section>
+
           <Section label="Driver">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Driver Name" value={form.driverName} onChange={(v) => set('driverName', v)} placeholder="Full name" />
-              <Field label="Driver Phone" value={form.driverPhone} onChange={(v) => set('driverPhone', v)} placeholder="+971 50 000 0000" />
+              <Field label="Driver Phone" value={form.driverPhone} onChange={(v) => set('driverPhone', v)} placeholder="+971 50 000 0000"
+                error={addErrors.driverPhone} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.driverPhone; return n; })} />
             </div>
           </Section>
+
           <Section label="Registration">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Registration Number" value={form.registrationNumber} onChange={(v) => set('registrationNumber', v)} placeholder="RN-2025-XXXXX" />
-              <Field label="Expiry Date *" value={form.registrationExpiry} onChange={(v) => set('registrationExpiry', v)} type="date" required />
-              <Field label="Registration Fee (AED)" value={form.registrationFee} onChange={(v) => set('registrationFee', v)} type="number" placeholder="1200" />
+              <Field label="Expiry Date" value={form.registrationExpiry} onChange={(v) => set('registrationExpiry', v)} type="date" required
+                error={addErrors.registrationExpiry} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.registrationExpiry; return n; })} />
+              <Field label="Registration Fee (AED)" value={form.registrationFee} onChange={(v) => set('registrationFee', v)} type="number" placeholder="1200"
+                error={addErrors.registrationFee} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.registrationFee; return n; })} />
             </div>
           </Section>
+
           <Section label="Insurance">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Insurance Company" value={form.insuranceCompany} onChange={(v) => set('insuranceCompany', v)} placeholder="e.g. AXA Insurance UAE" />
               <Field label="Policy Number" value={form.insurancePolicy} onChange={(v) => set('insurancePolicy', v)} placeholder="Policy no." />
-              <Field label="Insurance Expiry" value={form.insuranceExpiry} onChange={(v) => set('insuranceExpiry', v)} type="date" />
+              <Field label="Insurance Expiry" value={form.insuranceExpiry} onChange={(v) => set('insuranceExpiry', v)} type="date"
+                error={addErrors.insuranceExpiry} onClearError={() => setAddErrors((e) => { const n={...e}; delete n.insuranceExpiry; return n; })} />
             </div>
           </Section>
+
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Notes</label>
             <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2}
               placeholder="Any additional notes…"
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
           </div>
+
           <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
-            <Button variant="outline" type="button" onClick={() => setShowAdd(false)}>Cancel</Button>
+            <Button variant="outline" type="button" onClick={() => { setShowAdd(false); setAddErrors({}); setAddApiErr(''); setForm(BLANK); }}>Cancel</Button>
             <Button type="submit" disabled={isAdding}>
               {isAdding
                 ? <span className="flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Adding…</span>
-                : <span className="flex items-center gap-2"><Plus className="w-3.5 h-3.5" /> Add Vehicle</span>
-              }
+                : <span className="flex items-center gap-2"><Plus className="w-3.5 h-3.5" /> Add Vehicle</span>}
             </Button>
           </div>
         </form>
       </Modal>
 
       {/* ── Edit Vehicle Modal ── */}
-      <Modal open={!!editCar} onClose={() => setEditCar(null)} title="Edit Vehicle"
-        subtitle={editCar ? `${editCar.make} ${editCar.model} · ${editCar.plateNumber}` : ''} size="lg">
-        <form onSubmit={handleEditSave} className="space-y-5">
+      <Modal open={!!editCar} onClose={() => { setEditCar(null); setEditErrors({}); setEditApiErr(''); }}
+        title="Edit Vehicle" subtitle={editCar ? `${editCar.make} ${editCar.model} · ${editCar.plateNumber}` : ''} size="lg">
+        <form onSubmit={handleEditSave} className="space-y-5" noValidate>
+
+          {/* API error banner */}
+          {editApiErr && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-red-50 border border-red-200">
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-[12px] text-red-700 font-medium">{editApiErr}</p>
+              <button type="button" onClick={() => setEditApiErr('')} className="ml-auto text-red-400 hover:text-red-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Validation error summary */}
+          {Object.keys(editErrors).length > 0 && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[12px] text-amber-700 font-medium">
+                Please fix {Object.keys(editErrors).length} error{Object.keys(editErrors).length > 1 ? 's' : ''} below before saving.
+              </p>
+            </div>
+          )}
+
           <Section label="Vehicle Details">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nickname" value={editForm.nickname} onChange={(v) => setE('nickname', v)} placeholder="e.g. White Ranger" />
               <Field label="Category" value={editForm.category} onChange={(v) => setE('category', v)} type="select" options={CAR_CATEGORIES} />
-              <Field label="Make & Model *" value={editForm.makeModel} onChange={(v) => setE('makeModel', v)} placeholder="e.g. Land Rover Range Rover 2024" required span2 />
+              <Field label="Make & Model" value={editForm.makeModel} onChange={(v) => setE('makeModel', v)}
+                placeholder="e.g. Land Rover Range Rover 2024" required span2
+                error={editErrors.makeModel} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.makeModel; return n; })} />
               <Field label="Color Name" value={editForm.colorName} onChange={(v) => setE('colorName', v)} placeholder="e.g. Pearl White" />
-              <Field label="Plate Number *" value={editForm.plateNumber} onChange={(v) => setE('plateNumber', v)} placeholder="Dubai A 12345" required />
-              <Field label="VIN" value={editForm.vin} onChange={(v) => setE('vin', v)} placeholder="17-character VIN" />
-              <Field label="Odometer (km)" value={editForm.odometer} onChange={(v) => setE('odometer', v)} type="number" placeholder="0" />
-              <Field label="Purchase Price (AED)" value={editForm.purchasePrice} onChange={(v) => setE('purchasePrice', v)} type="number" placeholder="0" />
+              <Field label="Plate Number" value={editForm.plateNumber} onChange={(v) => setE('plateNumber', v)}
+                placeholder="Dubai A 12345" required
+                error={editErrors.plateNumber} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.plateNumber; return n; })} />
+              <Field label="VIN" value={editForm.vin} onChange={(v) => setE('vin', v)} placeholder="17-character VIN"
+                error={editErrors.vin} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.vin; return n; })} />
+              <Field label="Odometer (km)" value={editForm.odometer} onChange={(v) => setE('odometer', v)} type="number" placeholder="0"
+                error={editErrors.odometer} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.odometer; return n; })} />
+              <Field label="Purchase Price (AED)" value={editForm.purchasePrice} onChange={(v) => setE('purchasePrice', v)} type="number" placeholder="0"
+                error={editErrors.purchasePrice} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.purchasePrice; return n; })} />
             </div>
           </Section>
+
           <Section label="Driver">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Driver Name" value={editForm.driverName} onChange={(v) => setE('driverName', v)} placeholder="Full name" />
-              <Field label="Driver Phone" value={editForm.driverPhone} onChange={(v) => setE('driverPhone', v)} placeholder="+971 50 000 0000" />
+              <Field label="Driver Phone" value={editForm.driverPhone} onChange={(v) => setE('driverPhone', v)} placeholder="+971 50 000 0000"
+                error={editErrors.driverPhone} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.driverPhone; return n; })} />
             </div>
           </Section>
+
           <Section label="Registration">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Registration Number" value={editForm.registrationNumber} onChange={(v) => setE('registrationNumber', v)} placeholder="RN-2025-XXXXX" />
-              <Field label="Expiry Date" value={editForm.registrationExpiry} onChange={(v) => setE('registrationExpiry', v)} type="date" />
-              <Field label="Registration Fee (AED)" value={editForm.registrationFee} onChange={(v) => setE('registrationFee', v)} type="number" placeholder="1200" />
+              <Field label="Expiry Date" value={editForm.registrationExpiry} onChange={(v) => setE('registrationExpiry', v)} type="date"
+                error={editErrors.registrationExpiry} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.registrationExpiry; return n; })} />
+              <Field label="Registration Fee (AED)" value={editForm.registrationFee} onChange={(v) => setE('registrationFee', v)} type="number" placeholder="1200"
+                error={editErrors.registrationFee} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.registrationFee; return n; })} />
             </div>
           </Section>
+
           <Section label="Insurance">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Insurance Company" value={editForm.insuranceCompany} onChange={(v) => setE('insuranceCompany', v)} placeholder="e.g. AXA Insurance UAE" />
               <Field label="Policy Number" value={editForm.insurancePolicy} onChange={(v) => setE('insurancePolicy', v)} placeholder="Policy no." />
-              <Field label="Insurance Expiry" value={editForm.insuranceExpiry} onChange={(v) => setE('insuranceExpiry', v)} type="date" />
+              <Field label="Insurance Expiry" value={editForm.insuranceExpiry} onChange={(v) => setE('insuranceExpiry', v)} type="date"
+                error={editErrors.insuranceExpiry} onClearError={() => setEditErrors((e) => { const n={...e}; delete n.insuranceExpiry; return n; })} />
             </div>
           </Section>
+
           <Section label="Status">
             <div className="flex gap-2">
               {['active', 'inactive'].map((s) => (
@@ -471,16 +607,20 @@ export default function CarsPage() {
               ))}
             </div>
           </Section>
+
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Notes</label>
             <textarea value={editForm.notes} onChange={(e) => setE('notes', e.target.value)} rows={2}
               placeholder="Any additional notes…"
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
           </div>
+
           <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
-            <Button variant="outline" type="button" onClick={() => setEditCar(null)}>Cancel</Button>
+            <Button variant="outline" type="button" onClick={() => { setEditCar(null); setEditErrors({}); setEditApiErr(''); }}>Cancel</Button>
             <Button type="submit" disabled={isUpdating}>
-              {isUpdating ? 'Saving…' : 'Save Changes'}
+              {isUpdating
+                ? <span className="flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</span>
+                : 'Save Changes'}
             </Button>
           </div>
         </form>
@@ -698,17 +838,31 @@ function Section({ label, children }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', placeholder, required, options, span2 }) {
-  const cls = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+function Field({ label, value, onChange, type = 'text', placeholder, required, options, span2, error, onClearError }) {
+  const base = 'w-full h-10 px-3 rounded-xl border text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 transition-colors';
+  const cls  = error
+    ? `${base} border-red-400 focus:ring-red-400/30 focus:border-red-400`
+    : `${base} border-slate-200 focus:ring-accent-500/30 focus:border-accent-500`;
+
+  const handleChange = (v) => { onChange(v); if (error && onClearError) onClearError(); };
+
   return (
     <div className={span2 ? 'col-span-2' : ''}>
-      <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">{label}</label>
+      <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">
+        {label}
+        {required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
       {type === 'select'
-        ? <select value={value} onChange={(e) => onChange(e.target.value)} className={cls}>
+        ? <select value={value} onChange={(e) => handleChange(e.target.value)}
+            className={cls}>
             {options.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
-        : <input value={value} onChange={(e) => onChange(e.target.value)} type={type} placeholder={placeholder} required={required} className={cls} />
+        : type === 'date'
+          ? <DatePicker value={value} onChange={handleChange} required={required} className={cls} hasError={!!error} />
+          : <input value={value} onChange={(e) => handleChange(e.target.value)}
+              type={type} placeholder={placeholder} required={required} className={cls} />
       }
+      {error && <p className="text-red-500 text-[11px] mt-1 flex items-center gap-1"><span>⚠</span>{error}</p>}
     </div>
   );
 }

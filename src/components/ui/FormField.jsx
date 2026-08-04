@@ -25,23 +25,31 @@ export function Field({ label, error, required, hint, children, className }) {
   );
 }
 
-export const Input = forwardRef(function Input({ className, ...props }, ref) {
+export const Input = forwardRef(function Input({ className, error, ...props }, ref) {
   return (
     <input
       ref={ref}
-      className={cn(base, 'h-10 px-3.5', className)}
-      style={{ boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)' }}
+      className={cn(
+        base, 'h-10 px-3.5',
+        error && 'border-danger-400 focus:ring-danger-200 focus:border-danger-500',
+        className,
+      )}
+      style={{ boxShadow: error ? '0 0 0 3px rgba(220,38,38,0.08)' : '0 1px 3px rgb(0 0 0 / 0.06)' }}
       {...props}
     />
   );
 });
 
-export const Select = forwardRef(function Select({ options = [], placeholder, className, ...props }, ref) {
+export const Select = forwardRef(function Select({ options = [], placeholder, className, error, ...props }, ref) {
   return (
     <select
       ref={ref}
-      className={cn(base, 'h-10 px-3.5 cursor-pointer', className)}
-      style={{ boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)' }}
+      className={cn(
+        base, 'h-10 px-3.5 cursor-pointer',
+        error && 'border-danger-400 focus:ring-danger-200 focus:border-danger-500',
+        className,
+      )}
+      style={{ boxShadow: error ? '0 0 0 3px rgba(220,38,38,0.08)' : '0 1px 3px rgb(0 0 0 / 0.06)' }}
       {...props}
     >
       {placeholder && <option value="">{placeholder}</option>}
@@ -52,13 +60,17 @@ export const Select = forwardRef(function Select({ options = [], placeholder, cl
   );
 });
 
-export const Textarea = forwardRef(function Textarea({ rows = 3, className, ...props }, ref) {
+export const Textarea = forwardRef(function Textarea({ rows = 3, className, error, ...props }, ref) {
   return (
     <textarea
       ref={ref}
       rows={rows}
-      className={cn(base, 'px-3.5 py-2.5 resize-none', className)}
-      style={{ boxShadow: '0 1px 3px rgb(0 0 0 / 0.06)' }}
+      className={cn(
+        base, 'px-3.5 py-2.5 resize-none',
+        error && 'border-danger-400 focus:ring-danger-200 focus:border-danger-500',
+        className,
+      )}
+      style={{ boxShadow: error ? '0 0 0 3px rgba(220,38,38,0.08)' : '0 1px 3px rgb(0 0 0 / 0.06)' }}
       {...props}
     />
   );

@@ -7,6 +7,7 @@ import {
   TrendingDown, TrendingUp, Fuel, Wrench, CheckCircle2,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, useDeleteMutation, usePutMutation } from '../../api/apiSlice';
+import DatePicker from '../../components/ui/DatePicker';
 import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
 import { EXPENSE_CATEGORIES } from '../../data/mockExpenses';
 import Modal      from '../../components/ui/Modal';
@@ -488,7 +489,7 @@ function HouseExpensesTab({ expenses, walletData, propertyId, refetchWallet, ope
             </div>
             <div>
               <label className={LABEL}>Date *</label>
-              <input type="date" value={addForm.date} onChange={(e) => setA('date', e.target.value)} required className={INPUT} />
+              <DatePicker value={addForm.date} onChange={(v) => setA('date', v)} className={INPUT} />
             </div>
           </div>
           <div>
@@ -539,7 +540,7 @@ function HouseExpensesTab({ expenses, walletData, propertyId, refetchWallet, ope
             </div>
             <div>
               <label className={LABEL}>Date *</label>
-              <input type="date" value={editForm.date} onChange={(e) => setE('date', e.target.value)} required className={INPUT} />
+              <DatePicker value={editForm.date} onChange={(v) => setE('date', v)} className={INPUT} />
             </div>
           </div>
           <div>
@@ -1039,7 +1040,7 @@ export default function TransactionsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={LABEL}>Date</label>
-              <input value={depForm.date} onChange={(e) => setD('date', e.target.value)} type="date" className={INPUT} />
+              <DatePicker value={depForm.date} onChange={(v) => setD('date', v)} className={INPUT} />
             </div>
             <div>
               <label className={LABEL}>Note / Source</label>

@@ -5,8 +5,10 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
   AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2, Pencil, Trash2, Users,
+  FileDown, BarChart3,
 } from 'lucide-react';
-import { useGetQuery, usePostMutation, usePatchMutation, useDeleteMutation } from '../../api/apiSlice';
+import { useGetQuery, usePostMutation, usePatchMutation, useDeleteMutation, API_BASE_URL } from '../../api/apiSlice';
+import DatePicker from '../../components/ui/DatePicker';
 import { selectCurrentPropertyId, selectCurrentProperty } from '../../store/slices/propertiesSlice';
 import Modal   from '../../components/ui/Modal';
 import Button  from '../../components/ui/Button';
@@ -120,6 +122,7 @@ export default function WalletDetail() {
   const navigate       = useNavigate();
   const propertyId     = useSelector(selectCurrentPropertyId);
   const property       = useSelector(selectCurrentProperty);
+  const authToken      = useSelector((s) => s.auth?.token);
 
   const type       = ['home', 'salary'].includes(walletType) ? walletType : 'vehicle';
   const isSalary   = type === 'salary';
@@ -181,6 +184,48 @@ export default function WalletDetail() {
   const listPages = listResult?.pages  ?? 1;
 
   useEffect(() => { setListPage(1); }, [period, customStart, customEnd]);
+
+  // ── Report modal ─────────────────────────────────────────────────────────────
+  const [showReports,       setShowReports]       = useState(false);
+  const [reportWallet,      setReportWallet]      = useState(type);
+  const [reportPeriod,      setReportPeriod]      = useState('month');
+  const [reportStart,       setReportStart]       = useState('');
+  const [reportEnd,         setReportEnd]         = useState('');
+  const [reportLoading,     setReportLoading]     = useState(false);
+
+  const openReports = () => {
+    setReportWallet(type);
+    setReportPeriod(period === 'all' ? 'all' : period === 'custom' ? 'custom' : period === 'lastm' ? 'lastMonth' : period);
+    setReportStart(customStart);
+    setReportEnd(customEnd);
+    setShowReports(true);
+  };
+
+  const handleBackendReport = async () => {
+    if (!propertyId) return;
+    setReportLoading(true);
+    try {
+      const params = new URLSearchParams({ propertyId, walletType: reportWallet, period: reportPeriod });
+      if (reportPeriod === 'custom' && reportStart && reportEnd) {
+        params.append('startDate', reportStart);
+        params.append('endDate', reportEnd);
+      }
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const res = await fetch(`${API_BASE_URL}/reports/wallet?${params}`, { credentials: 'include', headers });
+      if (!res.ok) throw new Error('Report generation failed');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `Shah-Wallet-${reportWallet}-${reportPeriod}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShowReports(false);
+    } catch { toast.error('Failed to generate report'); }
+    finally { setReportLoading(false); }
+  };
 
   // ── Deposit form ─────────────────────────────────────────────────────────────
   const [showDeposit, setShowDeposit] = useState(false);
@@ -302,6 +347,7 @@ export default function WalletDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button icon={FileDown} variant="outline" onClick={openReports}>Reports</Button>
           {isSalary
             ? <Button icon={Users} onClick={() => navigate('/employees')}>Manage Employees</Button>
             : <Button icon={Plus} onClick={() => setShowDeposit(true)}>Deposit Funds</Button>}
@@ -366,12 +412,11 @@ export default function WalletDetail() {
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-semibold text-slate-500 mb-1">Start Date</label>
-              <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className={INP} />
+              <DatePicker value={customStart} onChange={setCustomStart} className={INP} />
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-slate-500 mb-1">End Date</label>
-              <input type="date" value={customEnd} max={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setCustomEnd(e.target.value)} className={INP} />
+              <DatePicker value={customEnd} onChange={setCustomEnd} className={INP} />
             </div>
           </div>
         )}
@@ -563,7 +608,7 @@ export default function WalletDetail() {
             </div>
             <div>
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date</label>
-              <input value={editForm.date} onChange={(e) => setEF('date', e.target.value)} type="date" className={INP} />
+              <DatePicker value={editForm.date} onChange={(v) => setEF('date', v)} className={INP} />
             </div>
             <div>
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Note / Source</label>
@@ -628,6 +673,84 @@ export default function WalletDetail() {
         )}
       </Modal>
 
+      {/* ── Reports Modal ── */}
+      <Modal open={showReports} onClose={() => { if (!reportLoading) setShowReports(false); }}
+        title="Generate Wallet Report" subtitle="Select wallet and period — downloads as PDF" size="sm">
+        <div className="space-y-4">
+
+          {/* Wallet selector */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Wallet</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { k: 'all',     l: 'All Wallets',    color: '#0b1d3a', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+                { k: 'vehicle', l: 'Vehicle Wallet',  color: '#0b1d3a', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+                { k: 'home',    l: 'Home Wallet',     color: '#16a34a', g: 'linear-gradient(135deg,#14532d,#16a34a)' },
+                { k: 'salary',  l: 'Salary Wallet',   color: '#7c3aed', g: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+              ].map(({ k, l, color, g }) => (
+                <button key={k} type="button" onClick={() => setReportWallet(k)}
+                  className={cn('py-2.5 px-3 rounded-xl border-2 text-[12px] font-bold transition-all',
+                    reportWallet === k ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
+                  style={reportWallet === k ? { background: g, borderColor: 'transparent' } : {}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Period selector */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Period</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { k: 'week',      l: 'This Week'   },
+                { k: 'month',     l: 'This Month'  },
+                { k: 'lastMonth', l: 'Last Month'  },
+                { k: 'last3',     l: 'Last 3 Months' },
+                { k: 'all',       l: 'All Time'    },
+                { k: 'custom',    l: 'Custom Range' },
+              ].map(({ k, l }) => (
+                <button key={k} type="button" onClick={() => setReportPeriod(k)}
+                  className={cn('py-2 px-2 rounded-xl border-2 text-[11px] font-bold transition-all',
+                    reportPeriod === k ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
+                  style={reportPeriod === k ? { background: cfg.gradient, borderColor: 'transparent' } : {}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom date range */}
+          {reportPeriod === 'custom' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Start Date</label>
+                <DatePicker value={reportStart} onChange={setReportStart} className={INP} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">End Date</label>
+                <DatePicker value={reportEnd} onChange={setReportEnd} className={INP} />
+              </div>
+            </div>
+          )}
+
+          {/* Generate button */}
+          <div className="pt-1 border-t border-slate-100">
+            <button onClick={handleBackendReport}
+              disabled={reportLoading || (reportPeriod === 'custom' && (!reportStart || !reportEnd))}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: cfg.gradient }}>
+              {reportLoading
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Generating PDF…</>
+                : <><BarChart3 className="w-4 h-4" />Generate & Download PDF</>}
+            </button>
+            <p className="text-[10px] text-slate-400 text-center mt-2">
+              Professional PDF with balance cards, transaction table & totals
+            </p>
+          </div>
+        </div>
+      </Modal>
+
       {/* ── Deposit Modal ── */}
       <Modal open={showDeposit} onClose={() => { if (!isDepositing) setShowDeposit(false); }}
         title={`Deposit to ${cfg.label}`} subtitle="Receive funds and add to this wallet" size="sm">
@@ -639,7 +762,7 @@ export default function WalletDetail() {
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date</label>
-            <input value={depForm.date} onChange={(e) => setDF('date', e.target.value)} type="date" className={INP} />
+            <DatePicker value={depForm.date} onChange={(v) => setDF('date', v)} className={INP} />
           </div>
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Note / Source</label>

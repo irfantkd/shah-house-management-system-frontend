@@ -6,6 +6,7 @@ import {
   UserPlus, Cake, Phone, Mail, ArrowRight, Pencil, Trash2, BadgeCheck,
   Home, X, Search, ChevronLeft, ChevronRight, Loader2, AlertCircle,
 } from 'lucide-react';
+import DatePicker from '../../components/ui/DatePicker';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import PageLoader from '../../components/ui/PageLoader';
@@ -555,13 +556,11 @@ export default function OwnersPage() {
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
                     Date of Birth <span className="text-red-400">*</span>
                   </label>
-                  <input
+                  <DatePicker
                     value={form.dateOfBirth}
-                    onChange={(e) => setF('dateOfBirth', e.target.value)}
-                    onBlur={() => blurOwnerField('dateOfBirth')}
-                    type="date"
-                    max={TODAY_STR}
+                    onChange={(v) => { setF('dateOfBirth', v); blurOwnerField('dateOfBirth'); }}
                     className={cn(INP, ownerErrors.dateOfBirth ? INP_ERR : '')}
+                    hasError={!!ownerErrors.dateOfBirth}
                   />
                   {ownerErrors.dateOfBirth
                     ? (

@@ -9,6 +9,7 @@ import Modal from '../../components/ui/Modal';
 import Button from '../../components/ui/Button';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
+import DatePicker from '../../components/ui/DatePicker';
 
 const fmt = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
 const LOW_THRESHOLD = 5000;
@@ -163,7 +164,7 @@ export default function QuickExpenseModal({ open, onClose }) {
             </div>
             <div>
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
-              <input value={form.date} onChange={(e) => set('date', e.target.value)} type="date" required className={INPUT} />
+              <DatePicker value={form.date} onChange={(v) => set('date', v)} required className={INPUT} />
             </div>
             <div>
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Vendor / Garage</label>

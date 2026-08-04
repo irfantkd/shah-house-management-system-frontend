@@ -16,6 +16,7 @@ import ExpensesTab from './tabs/ExpensesTab';
 import FuelTab     from './tabs/FuelTab';
 import StatsTab    from './tabs/StatsTab';
 import { CAR_CATEGORIES } from '../../data/mockCars';
+import DatePicker from '../../components/ui/DatePicker';
 
 const TABS = [
   { id: 'overview',  label: 'Overview',  icon: Car       },
@@ -375,7 +376,7 @@ export default function CarDetail() {
                     </div>
                     <div>
                       <label className={LBL_E}>Purchase Date</label>
-                      <input type="date" value={editForm.purchaseDate} onChange={(e) => setF('purchaseDate', e.target.value)} className={INP_E} />
+                      <DatePicker value={editForm.purchaseDate} onChange={(v) => setF('purchaseDate', v)} className={INP_E} />
                     </div>
                     <div>
                       <label className={LBL_E}>Purchase Price (AED)</label>
@@ -409,7 +410,7 @@ export default function CarDetail() {
                     </div>
                     <div>
                       <label className={LBL_E}>Registration Expiry</label>
-                      <input type="date" value={editForm.registrationExpiry} onChange={(e) => setF('registrationExpiry', e.target.value)} className={INP_E} />
+                      <DatePicker value={editForm.registrationExpiry} onChange={(v) => setF('registrationExpiry', v)} className={INP_E} />
                     </div>
                     <div>
                       <label className={LBL_E}>Registration Fee (AED)</label>
@@ -432,7 +433,7 @@ export default function CarDetail() {
                     </div>
                     <div>
                       <label className={LBL_E}>Insurance Expiry</label>
-                      <input type="date" value={editForm.insuranceExpiry} onChange={(e) => setF('insuranceExpiry', e.target.value)} className={INP_E} />
+                      <DatePicker value={editForm.insuranceExpiry} onChange={(v) => setF('insuranceExpiry', v)} className={INP_E} />
                     </div>
                   </div>
                 </Section>

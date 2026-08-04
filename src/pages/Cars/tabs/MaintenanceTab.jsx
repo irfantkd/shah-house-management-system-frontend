@@ -6,6 +6,7 @@ import Modal      from '../../../components/ui/Modal';
 import EmptyState from '../../../components/ui/EmptyState';
 import { cn }     from '../../../utils/cn';
 import toast      from 'react-hot-toast';
+import DatePicker from '../../../components/ui/DatePicker';
 
 const SERVICE_TYPES = [
   'Oil Change', 'Tyre Rotation', 'Tyre Replacement', 'Brake Service',
@@ -290,16 +291,14 @@ export default function MaintenanceTab({ carId }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
-              <input value={form.date} onChange={(e) => setField('date', e.target.value)} type="date" required className={INPUT} />
-            </div>
-            <div>
-              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Workshop <span className="font-normal text-slate-400">(optional)</span></label>
-              <input value={form.vendor} onChange={(e) => setField('vendor', e.target.value)}
-                type="text" placeholder="e.g. Al Futtaim Auto" className={INPUT} />
-            </div>
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
+            <DatePicker value={form.date} onChange={(v) => setField('date', v)} required className={INPUT} />
+          </div>
+          <div>
+            <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Workshop <span className="font-normal text-slate-400">(optional)</span></label>
+            <input value={form.vendor} onChange={(e) => setField('vendor', e.target.value)}
+              type="text" placeholder="e.g. Al Futtaim Auto" className={INPUT} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -317,16 +316,14 @@ export default function MaintenanceTab({ carId }) {
 
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100 space-y-3">
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Next Service Reminder (optional)</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Next Due Date</label>
-                <input value={form.nextDueDate} onChange={(e) => setField('nextDueDate', e.target.value)} type="date" className={INPUT} />
-              </div>
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Next Due Mileage (km)</label>
-                <input value={form.nextDueMileage} onChange={(e) => setField('nextDueMileage', e.target.value)}
-                  type="number" min="0" placeholder="e.g. 50000" className={INPUT} />
-              </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Next Due Date</label>
+              <DatePicker value={form.nextDueDate} onChange={(v) => setField('nextDueDate', v)} className={INPUT} />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Next Due Mileage (km)</label>
+              <input value={form.nextDueMileage} onChange={(e) => setField('nextDueMileage', e.target.value)}
+                type="number" min="0" placeholder="e.g. 50000" className={INPUT} />
             </div>
           </div>
 

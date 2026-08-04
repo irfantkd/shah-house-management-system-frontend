@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
+import DatePicker from '../../components/ui/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -626,8 +627,10 @@ function RepairRow({ repair: r, expanded, onToggle, onEdit, onDelete, onStatusCh
   );
 }
 
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+
 function RepairModal({ open, onClose, repair, companies, areas, assets, onSave, homeWallet, vehicleWallet, isSubmitting }) {
-  const { register, handleSubmit, reset, watch, setValue } = useForm();
+  const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = useForm();
   const [walletType, setWalletType] = useState('home');
   useEffect(() => {
     if (!open) return;
@@ -674,8 +677,8 @@ function RepairModal({ open, onClose, repair, companies, areas, assets, onSave, 
   return (
     <Modal open={open} onClose={onClose} size="lg" title={repair ? 'Edit Repair' : 'Report New Issue'} subtitle="Log an issue for tracking and resolution">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <Field label="Issue Title" required>
-          <Input {...register('title', { required:'Required' })} placeholder="e.g. Living Room AC not cooling" />
+        <Field label="Issue Title" required error={errors.title?.message}>
+          <Input error={errors.title?.message} {...register('title', { required:'Issue title is required' })} placeholder="e.g. Living Room AC not cooling" />
         </Field>
         <Field label="Description" hint="Describe what is wrong and when it started">
           <Textarea {...register('description')} rows={2} placeholder="What is the issue? When did it start?" />
@@ -693,20 +696,26 @@ function RepairModal({ open, onClose, repair, companies, areas, assets, onSave, 
             <Select {...register('companyId')} placeholder="Select company"
               options={companies.map((c) => ({ value:c.id, label:c.name }))} />
           </Field>
-          <Field label="Reported Date" required>
-            <Input {...register('reportedDate', { required:'Required' })} type="date" />
+          <Field label="Reported Date" required error={errors.reportedDate?.message}>
+            <Controller name="reportedDate" control={control} rules={{ required: 'Reported date is required' }}
+              render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.reportedDate} className={DP_CLS} />} />
           </Field>
         </FormGrid>
         <FormSection title="Priority & Status">
           <FormGrid>
-            <Field label="Priority" required>
-              <Select {...register('priority', { required:'Required' })}
+            <Field label="Priority" required error={errors.priority?.message}>
+              <Select error={errors.priority?.message} {...register('priority', { required:'Please select a priority' })}
                 options={PRIORITIES.map((p) => ({ value:p, label:p.charAt(0).toUpperCase()+p.slice(1) }))} />
             </Field>
             <Field label="Current Status">
               <Select {...register('status')} options={STATUSES.map((s) => ({ value:s, label:STATUS_LABELS[s] }))} />
             </Field>
-            {status === 'completed' && <Field label="Completed Date"><Input {...register('completedDate')} type="date" /></Field>}
+            {status === 'completed' && (
+              <Field label="Completed Date">
+                <Controller name="completedDate" control={control}
+                  render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+              </Field>
+            )}
             <Field label="Estimated Cost (AED)"><Input {...register('estimatedCost')} type="number" min="0" step="0.01" placeholder="0.00" /></Field>
             {status === 'completed' && (
               <Field label="Actual Cost (AED)">

@@ -13,6 +13,7 @@ import ConfirmDialog from '../../../components/ui/ConfirmDialog';
 import { MotionSwipeableRow } from '../../../components/ui/SwipeableRow';
 import { cn } from '../../../utils/cn';
 import toast from 'react-hot-toast';
+import DatePicker from '../../../components/ui/DatePicker';
 
 const LOW_THRESHOLD = 5000;
 
@@ -258,7 +259,7 @@ export default function FuelTab({ carId }) {
 
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Date *</label>
-            <input value={form.date} onChange={(e) => setField('date', e.target.value)} type="date" required className={INPUT} />
+            <DatePicker value={form.date} onChange={(v) => setField('date', v)} required className={INPUT} />
           </div>
 
           <div>

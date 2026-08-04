@@ -6,6 +6,7 @@ import {
   CheckCircle2, AlertTriangle, XCircle, Bell, CheckCheck,
   Download, Eye, Trash2, Phone, Mail, MessageCircle, Clock, Wrench, Settings2,
 } from 'lucide-react';
+import DatePicker from '../../components/ui/DatePicker';
 import { useSelector } from 'react-redux';
 import {
   RiWalletLine, RiHistoryLine, RiMoneyDollarCircleLine, RiRefreshLine,
@@ -549,7 +550,7 @@ function RenewModal({ open, contract: c, onClose, onRenew }) {
 
         <div>
           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">New End Date</label>
-          <input type="date" value={newEndDate} onChange={(e) => setNewEndDate(e.target.value)}
+          <DatePicker value={newEndDate} onChange={setNewEndDate}
             className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] font-medium outline-none focus:ring-2 focus:ring-accent-400" />
         </div>
 

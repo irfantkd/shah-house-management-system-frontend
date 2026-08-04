@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
+import DatePicker from '../../components/ui/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -699,7 +700,7 @@ function RenewModal({ open, contract: c, onClose, onRenew }) {
         {/* New end date */}
         <div>
           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">New End Date</label>
-          <input type="date" value={newEndDate} onChange={(e) => setNewEndDate(e.target.value)}
+          <DatePicker value={newEndDate} onChange={setNewEndDate}
             className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] font-medium outline-none focus:ring-2 focus:ring-accent-400" />
         </div>
 
@@ -738,7 +739,7 @@ function RenewModal({ open, contract: c, onClose, onRenew }) {
 
 // ─── CONTRACT MODAL (ADD / EDIT) ──────────────────────────────────────────────
 function ContractModal({ open, onClose, contract: c, companies, onSave }) {
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = useForm();
   const [services, setServices] = useState([]);
   const [svcInput, setSvcInput] = useState('');
 
@@ -793,10 +794,12 @@ function ContractModal({ open, onClose, contract: c, companies, onSave }) {
         <FormSection title="Duration & Cost">
           <FormGrid>
             <Field label="Start Date" required error={errors.startDate?.message}>
-              <Input {...register('startDate', { required:'Required' })} type="date" />
+              <Controller name="startDate" control={control} rules={{ required: 'Required' }}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.startDate} className="w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />} />
             </Field>
             <Field label="End Date" required error={errors.endDate?.message}>
-              <Input {...register('endDate', { required:'Required' })} type="date" />
+              <Controller name="endDate" control={control} rules={{ required: 'Required' }}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.endDate} className="w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />} />
             </Field>
             <Field label="Contract Value (AED)" required error={errors.cost?.message}>
               <Input {...register('cost', { required:'Required' })} type="number" min="0" step="0.01" placeholder="0.00" />

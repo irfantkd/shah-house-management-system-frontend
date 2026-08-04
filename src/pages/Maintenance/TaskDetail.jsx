@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
+import DatePicker from '../../components/ui/DatePicker';
 import toast from 'react-hot-toast';
 import {
   RiArrowLeftLine, RiEditLine, RiDeleteBinLine, RiCheckLine,
@@ -462,9 +463,11 @@ function InfoCard({ icon: Icon, label, children }) {
   );
 }
 
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+
 // ── Complete Modal ────────────────────────────────────────────────────────────
 function CompleteModal({ open, task, onClose, onConfirm }) {
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset, control } = useForm();
 
   const onOpen = () => reset({ completedDate: new Date().toISOString().split('T')[0], completionNotes: '' });
   useState(() => { if (open) onOpen(); }, [open]);
@@ -475,7 +478,8 @@ function CompleteModal({ open, task, onClose, onConfirm }) {
       <form onSubmit={handleSubmit((d) => onConfirm({ completedDate: d.completedDate, completionNotes: d.completionNotes || '' }))}
         className="space-y-4">
         <Field label="Completion Date" required>
-          <Input {...register('completedDate', { required: true })} type="date" />
+          <Controller name="completedDate" control={control} rules={{ required: true }}
+            render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
         </Field>
         <Field label="Completion Notes" hint="What was done, parts used, observations">
           <Textarea {...register('completionNotes')} rows={3}
@@ -505,7 +509,7 @@ function CompleteModal({ open, task, onClose, onConfirm }) {
 
 // ── Expense Modal ─────────────────────────────────────────────────────────────
 function ExpenseModal({ open, task, homeWallet, vehicleWallet, onClose, onSave }) {
-  const { register, handleSubmit, reset, watch } = useForm();
+  const { register, handleSubmit, reset, watch, control } = useForm();
   const [walletType, setWalletType] = useState('home');
   const amount  = parseFloat(watch('amount') ?? 0) || 0;
   const balance = walletType === 'vehicle' ? (vehicleWallet?.balance ?? 0) : (homeWallet?.balance ?? 0);
@@ -558,7 +562,8 @@ function ExpenseModal({ open, task, homeWallet, vehicleWallet, onClose, onSave }
             </select>
           </Field>
           <Field label="Date" required>
-            <Input {...register('date', { required: true })} type="date" />
+            <Controller name="date" control={control} rules={{ required: true }}
+              render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
           </Field>
         </FormGrid>
 

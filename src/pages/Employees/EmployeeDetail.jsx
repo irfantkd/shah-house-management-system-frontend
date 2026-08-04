@@ -9,6 +9,7 @@ import {
   Save, Loader2,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, usePatchMutation } from '../../api/apiSlice';
+import DatePicker from '../../components/ui/DatePicker';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import toast from 'react-hot-toast';
@@ -626,11 +627,11 @@ export default function EmployeeDetail() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Date of Birth *</label>
-                    <input value={editForm.dateOfBirth ?? ''} onChange={(e) => setEF('dateOfBirth', e.target.value)} type="date" required className={INP} />
+                    <DatePicker value={editForm.dateOfBirth ?? ''} onChange={(v) => setEF('dateOfBirth', v)} required className={INP} />
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Join Date</label>
-                    <input value={editForm.joinDate ?? ''} onChange={(e) => setEF('joinDate', e.target.value)} type="date" className={INP} />
+                    <DatePicker value={editForm.joinDate ?? ''} onChange={(v) => setEF('joinDate', v)} className={INP} />
                   </div>
                 </div>
                 <div>

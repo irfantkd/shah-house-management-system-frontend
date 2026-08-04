@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
+import DatePicker from '../../components/ui/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -655,9 +656,11 @@ function InfoCard({ title, icon: Icon, children }) {
   );
 }
 
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+
 /* ══ Edit Asset Modal ══ */
 function EditAssetModal({ open, onClose, asset, areas, onSave, isSubmitting }) {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
+  const { register, handleSubmit, reset, control, formState: { errors } } = useForm();
 
   useEffect(() => {
     if (!open || !asset) return;
@@ -774,8 +777,14 @@ function EditAssetModal({ open, onClose, asset, areas, onSave, isSubmitting }) {
 
         <FormSection title="Purchase & Value">
           <FormGrid>
-            <Field label="Purchase Date"><Input {...register('purchaseDate')} type="date" /></Field>
-            <Field label="Install Date"><Input {...register('installDate')} type="date" /></Field>
+            <Field label="Purchase Date">
+              <Controller name="purchaseDate" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
+            <Field label="Install Date">
+              <Controller name="installDate" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
             <Field label="Installer"><Input {...register('installer')} placeholder="Installer name" /></Field>
             <Field label="Purchase Price (AED)"><Input {...register('purchasePrice')} type="number" min="0" step="0.01" placeholder="0.00" /></Field>
             <Field label="Current Value (AED)"><Input {...register('currentValue')} type="number" min="0" step="0.01" placeholder="0.00" /></Field>
@@ -791,8 +800,14 @@ function EditAssetModal({ open, onClose, asset, areas, onSave, isSubmitting }) {
               <Select {...register('wType')} options={WARRANTY_TYPES.map((t) => ({ value: t, label: t }))} />
             </Field>
             <Field label="Coverage"><Input {...register('wCoverage')} placeholder="e.g. Full parts and labor" /></Field>
-            <Field label="Start Date"><Input {...register('wStart')} type="date" /></Field>
-            <Field label="Expiry Date"><Input {...register('wExpiry')} type="date" /></Field>
+            <Field label="Start Date">
+              <Controller name="wStart" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
+            <Field label="Expiry Date">
+              <Controller name="wExpiry" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
           </FormGrid>
         </FormSection>
 
@@ -800,8 +815,14 @@ function EditAssetModal({ open, onClose, asset, areas, onSave, isSubmitting }) {
           <FormGrid>
             <Field label="Service Company"><Input {...register('mCompany')} placeholder="e.g. Carrier Service UAE" /></Field>
             <Field label="Frequency"><Input {...register('mFrequency')} placeholder="e.g. Every 3 months" /></Field>
-            <Field label="Last Service Date"><Input {...register('mLastService')} type="date" /></Field>
-            <Field label="Next Service Date"><Input {...register('mNextService')} type="date" /></Field>
+            <Field label="Last Service Date">
+              <Controller name="mLastService" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
+            <Field label="Next Service Date">
+              <Controller name="mNextService" control={control}
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
+            </Field>
           </FormGrid>
         </FormSection>
 

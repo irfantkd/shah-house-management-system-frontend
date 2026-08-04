@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DatePicker from '../../../components/ui/DatePicker';
 import { useSelector } from 'react-redux';
 import {
   Shield, Phone, Mail, Calendar, CreditCard, DollarSign,
@@ -113,11 +114,11 @@ export default function InsuranceTab() {
             </div>
             <div>
               <label className={LBL}>Start Date</label>
-              <input type="date" value={form.startDate ?? ''} onChange={(e) => set('startDate', e.target.value)} className={INP} />
+              <DatePicker value={form.startDate ?? ''} onChange={(v) => set('startDate', v)} className={INP} />
             </div>
             <div>
               <label className={LBL}>Expiry Date</label>
-              <input type="date" value={form.expiryDate ?? ''} onChange={(e) => set('expiryDate', e.target.value)} className={INP} />
+              <DatePicker value={form.expiryDate ?? ''} onChange={(v) => set('expiryDate', v)} className={INP} />
             </div>
             <div>
               <label className={LBL}>Renewal Reminder (days before)</label>

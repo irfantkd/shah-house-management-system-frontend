@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
+import DatePicker from '../../components/ui/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -594,6 +595,7 @@ export default function ExpensesPage() {
 // ExpenseModal — Add / Edit
 // ─────────────────────────────────────────────────────────────────────────────
 const LOW_THRESHOLD = 5000;
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 const CUSTOM_SENTINEL = '__custom__';
 
 function ExpenseModal({ open, item, homeBalance, vehicleBalance, onClose, onSave }) {
@@ -601,7 +603,7 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, onClose, onSave
 
   const {
     register, handleSubmit, reset, watch,
-    setValue, formState: { isSubmitting, errors },
+    setValue, control, formState: { isSubmitting, errors },
   } = useForm();
 
   const [segment,     setSegment]     = useState('property');
@@ -869,7 +871,8 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, onClose, onSave
             />
           </Field>
           <Field label="Date" required>
-            <Input {...register('date', { required: true })} type="date" />
+            <Controller name="date" control={control} rules={{ required: true }}
+              render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} className={DP_CLS} />} />
           </Field>
         </FormGrid>
 
