@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   RiUserLine, RiHomeLine, RiBellLine, RiShieldLine,
-  RiSaveLine, RiSmartphoneLine,
+  RiSaveLine, RiSmartphoneLine, RiGlobalLine,
 } from 'react-icons/ri';
 import { selectAuthUser, updateAuthProfile, changePassword } from '../../store/slices/authSlice';
+import { patchPropertySettings, patchNotifSettings } from '../../store/slices/settingsSlice';
 import { useGetQuery, usePutMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { getInitials } from '../../utils/getInitials';
@@ -22,9 +23,14 @@ const TABS = [
   { id: 'security', label: 'Security',       icon: RiShieldLine },
 ];
 
-const EMIRATES  = ['Dubai','Abu Dhabi','Sharjah','Ajman','Umm Al Quwain','Ras Al Khaimah','Fujairah'];
-const CURRENCIES = ['AED','USD','GBP','EUR'];
+const EMIRATES   = ['Dubai','Abu Dhabi','Sharjah','Ajman','Umm Al Quwain','Ras Al Khaimah','Fujairah'];
+const CURRENCIES = ['AED','USD','GBP','EUR','SAR','QAR'];
 const LANGUAGES  = ['English','Arabic','Urdu','Hindi'];
+
+const DEFAULT_NOTIFS = {
+  maintenance: true, repairs: true, warranties: true,
+  contracts: true, expenses: false, carAlerts: true, salaryAlerts: false,
+};
 
 export default function SettingsPage() {
   const [tab, setTab] = useState('profile');
@@ -143,48 +149,60 @@ function ProfileTab() {
 }
 
 function PropertyTab() {
-  const propertyId = useSelector(selectCurrentPropertyId);
-  const { data: settings = {} } = useGetQuery({ path: '/settings', params: { propertyId } }, { skip: !propertyId });
+  const dispatch    = useDispatch();
+  // Settings are per-user, not per-property — no params needed
+  const { data: settings = {} } = useGetQuery({ path: '/settings' });
   const [savePropertyMut] = usePutMutation();
   const { register, handleSubmit, reset } = useForm();
 
-  useEffect(() => { reset(settings.property ?? {}); }, [settings]);
+  useEffect(() => {
+    if (settings?.property) reset(settings.property);
+  }, [settings]);
 
   const onSubmit = async (d) => {
     try {
-      await savePropertyMut({ path: '/settings/property', body: { propertyId, ...d } }).unwrap();
-      toast.success('Property saved!');
+      await savePropertyMut({ path: '/settings/property', body: d }).unwrap();
+      dispatch(patchPropertySettings(d));
+      toast.success('Property settings saved!');
     } catch {
-      toast.error('Failed to save property');
+      toast.error('Failed to save property settings');
     }
   };
 
   return (
-    <SettingsCard title="Property Details" subtitle="Villa information and configuration">
+    <SettingsCard title="Property Details" subtitle="Villa information and global display preferences">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Field label="Property Name / Reference">
-          <Input {...register('propertyName')} placeholder="e.g. Villa Al Noor — Palm Jumeirah" />
+          <Input {...register('propertyName')} placeholder="e.g. Shah House — Palm Jumeirah" />
         </Field>
         <FormGrid>
           <Field label="Emirate">
             <Select {...register('emirate')} placeholder="Select emirate" options={EMIRATES.map((e) => ({ value: e, label: e }))} />
           </Field>
           <Field label="Community / District">
-            <Input {...register('community')} placeholder="e.g. Al Barsha, JBR" />
+            <Input {...register('community')} placeholder="e.g. Palm Jumeirah, JBR" />
           </Field>
         </FormGrid>
         <FormGrid>
           <Field label="Plot / Villa Number"><Input {...register('plotNumber')} placeholder="e.g. 42-B" /></Field>
           <Field label="Built Up Area (sqft)"><Input {...register('builtArea')} type="number" placeholder="6500" /></Field>
           <Field label="Plot Area (sqft)"><Input {...register('plotArea')} type="number" placeholder="9000" /></Field>
-          <Field label="Year Built"><Input {...register('yearBuilt')} type="number" placeholder="2019" /></Field>
+          <Field label="Year Built"><Input {...register('yearBuilt')} type="number" placeholder="2021" /></Field>
         </FormGrid>
         <FormGrid>
-          <Field label="Currency">
+          <Field label="Currency" hint="Used across all financial displays">
             <Select {...register('currency')} options={CURRENCIES.map((c) => ({ value: c, label: c }))} />
           </Field>
-          <Field label="DEWA Account No."><Input {...register('dewaAccount')} placeholder="DEWA account" /></Field>
+          <Field label="Language">
+            <div className="relative">
+              <RiGlobalLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <Select {...register('language')} options={LANGUAGES.map((l) => ({ value: l, label: l }))} style={{ paddingLeft: '2.5rem' }} />
+            </div>
+          </Field>
         </FormGrid>
+        <Field label="DEWA Account No.">
+          <Input {...register('dewaAccount')} placeholder="DEWA account number" />
+        </Field>
         <Field label="Additional Notes">
           <Textarea {...register('notes')} rows={2} placeholder="Special notes about the property…" />
         </Field>
@@ -197,14 +215,14 @@ function PropertyTab() {
 }
 
 function NotifsTab() {
-  const propertyId = useSelector(selectCurrentPropertyId);
-  const { data: notifSettings = {} } = useGetQuery({ path: '/settings/notifications', params: { propertyId } }, { skip: !propertyId });
+  const dispatch = useDispatch();
+  const { data: notifSettings = {} } = useGetQuery({ path: '/settings/notifications' });
   const [saveNotifMut] = usePutMutation();
-  const [local, setLocal] = useState({ maintenance: true, repairs: true, warranties: true, contracts: true, expenses: false });
+  const [local, setLocal] = useState(DEFAULT_NOTIFS);
 
   useEffect(() => {
     if (notifSettings && Object.keys(notifSettings).length > 0) {
-      setLocal((prev) => ({ ...prev, ...notifSettings }));
+      setLocal((prev) => ({ ...DEFAULT_NOTIFS, ...prev, ...notifSettings }));
     }
   }, [notifSettings]);
 
@@ -212,8 +230,9 @@ function NotifsTab() {
 
   const onSave = async () => {
     try {
-      await saveNotifMut({ path: '/settings/notifications', body: { propertyId, ...local } }).unwrap();
-      toast.success('Preferences saved!');
+      await saveNotifMut({ path: '/settings/notifications', body: local }).unwrap();
+      dispatch(patchNotifSettings(local));
+      toast.success('Notification preferences saved!');
     } catch {
       toast.error('Failed to save preferences');
     }
@@ -222,11 +241,13 @@ function NotifsTab() {
   return (
     <SettingsCard title="Notification Preferences" subtitle="Choose what alerts you want to receive">
       <div className="space-y-1">
-        <Toggle checked={local.maintenance} onChange={() => toggle('maintenance')} label="Maintenance Reminders"    description="Upcoming scheduled maintenance tasks" />
-        <Toggle checked={local.repairs}     onChange={() => toggle('repairs')}     label="Repair Alerts"           description="Status changes on open repairs" />
-        <Toggle checked={local.warranties}  onChange={() => toggle('warranties')}  label="Warranty Expiry"         description="Alerts 90 and 30 days before expiry" />
-        <Toggle checked={local.contracts}   onChange={() => toggle('contracts')}   label="Contract Renewals"       description="Service contracts due for renewal" />
-        <Toggle checked={local.expenses}    onChange={() => toggle('expenses')}    label="Monthly Expense Summary" description="Monthly spending digest via email" />
+        <Toggle checked={local.maintenance}  onChange={() => toggle('maintenance')}  label="Maintenance Reminders"    description="Upcoming scheduled maintenance tasks" />
+        <Toggle checked={local.repairs}      onChange={() => toggle('repairs')}      label="Repair Alerts"           description="Status changes on open repairs" />
+        <Toggle checked={local.warranties}   onChange={() => toggle('warranties')}   label="Warranty Expiry"         description="Alerts 90 and 30 days before expiry" />
+        <Toggle checked={local.contracts}    onChange={() => toggle('contracts')}    label="Contract Renewals"       description="Service contracts due for renewal" />
+        <Toggle checked={local.carAlerts}    onChange={() => toggle('carAlerts')}    label="Car Registration & Insurance" description="Vehicle registration and insurance expiry alerts" />
+        <Toggle checked={local.expenses}     onChange={() => toggle('expenses')}     label="Monthly Expense Summary" description="Monthly spending digest via email" />
+        <Toggle checked={local.salaryAlerts} onChange={() => toggle('salaryAlerts')} label="Salary Payment Reminders" description="Alerts before employee salary due dates" />
       </div>
       <div className="flex justify-end pt-4">
         <Button variant="primary" icon={RiSaveLine} onClick={onSave}>Save Preferences</Button>

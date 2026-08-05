@@ -8,7 +8,7 @@ import {
   RiArrowUpLine, RiArrowDownLine, RiBellLine, RiBox3Line,
   RiHome4Line, RiBankCardLine, RiTimeLine, RiCheckboxCircleLine, RiAddLine,
   RiUploadCloudLine, RiHammerLine, RiCarLine, RiGasStationLine,
-  RiUserLine,
+  RiUserLine, RiTeamLine, RiShieldLine, RiPhoneLine, RiMailLine,
 } from 'react-icons/ri';
 import {
   BedDouble, ShowerHead, UtensilsCrossed, Sofa, Utensils,
@@ -18,6 +18,8 @@ import {
 import { useGetQuery } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import { selectAuthUser }           from '../../store/slices/authSlice';
+import { selectCurrency }           from '../../store/slices/settingsSlice';
+import { fmtCurrency }              from '../../utils/fmtCurrency';
 import Badge from '../../components/ui/Badge';
 import { cn } from '../../utils/cn';
 
@@ -74,11 +76,24 @@ const TYPE_META = {
 };
 const typeMeta = (t) => TYPE_META[t] ?? TYPE_META.Other;
 
-const EMPTY_DASH = { expenses: {}, home: {}, stats: {}, wallet: {}, upcomingSchedule: [], recentActivities: [], expiringContracts: [], areas: [], cars: [], healthScore: 0, fleetFuelMonth: 0 };
+const EXPIRY_ICON  = { contract: RiFileList3Line, warranty: RiShieldLine, 'car-reg': RiCarLine, 'car-ins': RiAlertLine };
+const EXPIRY_COLOR = { contract: '#2563eb', warranty: '#7c3aed', 'car-reg': '#d97706', 'car-ins': '#dc2626' };
+const EXPIRY_BG    = { contract: '#eff6ff', warranty: '#f5f3ff', 'car-reg': '#fffbeb', 'car-ins': '#fef2f2' };
+
+const EMPTY_WALLET = { balance: 0, totalDeposited: 0 };
+const EMPTY_DASH = {
+  expenses: {}, home: {}, stats: {},
+  wallet: { home: EMPTY_WALLET, vehicle: EMPTY_WALLET, salary: EMPTY_WALLET },
+  upcomingSchedule: [], recentActivities: [], recentTransactions: [],
+  expiringContracts: [], expiringWarranties: [], allExpiryAlerts: [],
+  areas: [], cars: [], staff: [], owners: [],
+  healthScore: 0, fleetFuelMonth: 0,
+};
 
 export default function Dashboard() {
   const propertyId = useSelector(selectCurrentPropertyId);
   const user       = useSelector(selectAuthUser);
+  const currency   = useSelector(selectCurrency);
 
   const { data: dash = EMPTY_DASH, isLoading } = useGetQuery({ path: '/dashboard', params: { propertyId } }, { skip: !propertyId });
 
@@ -88,7 +103,13 @@ export default function Dashboard() {
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   // Expense segments from dashboard response
-  const { expenses, home, stats, wallet, upcomingSchedule, recentActivities, expiringContracts, areas, cars, healthScore, fleetFuelMonth } = dash;
+  const {
+    expenses, home, stats, wallet,
+    upcomingSchedule, recentActivities, recentTransactions,
+    expiringContracts, allExpiryAlerts,
+    areas, cars, staff, owners,
+    healthScore, fleetFuelMonth,
+  } = dash;
 
   const grandTotal = (expenses.property ?? 0) + (expenses.household ?? 0) + (expenses.vehicle ?? 0) + (expenses.fuel ?? 0);
 
@@ -110,10 +131,34 @@ export default function Dashboard() {
   const homeInsDays = home.insurance?.expiryDate ? getDaysUntil(home.insurance.expiryDate) : null;
 
   const stats4 = [
-    { label: 'Active Contracts',     value: stats.activeContracts,     icon: RiFileList3Line, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', trend: '+2 this month', up: true,  href: '/contracts'   },
-    { label: 'Upcoming Maintenance', value: stats.upcomingMaintenance, icon: RiCalendarCheckLine, color: '#d97706', bg: '#fffbeb', border: '#fde68a', trend: '3 due this week', up: null, href: '/maintenance' },
-    { label: 'Open Repairs',         value: stats.openRepairs,         icon: RiHammerLine,    color: '#dc2626', bg: '#fef2f2', border: '#fecaca', trend: '1 critical', up: false, href: '/maintenance' },
-    { label: 'Total Assets',         value: stats.totalAssets,         icon: RiBox3Line,      color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', trend: `${stats.totalAreas || 0} areas tracked`, up: true,  href: '/assets' },
+    {
+      label: 'Active Contracts',
+      value: stats.activeContracts ?? 0,
+      icon: RiFileList3Line, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe',
+      trend: `+${stats.contractsThisMonth ?? 0} added this month`,
+      up: true, href: '/contracts',
+    },
+    {
+      label: 'Upcoming Maintenance',
+      value: stats.upcomingMaintenance ?? 0,
+      icon: RiCalendarCheckLine, color: '#d97706', bg: '#fffbeb', border: '#fde68a',
+      trend: `${stats.maintenanceDueThisWeek ?? 0} due this week`,
+      up: null, href: '/maintenance',
+    },
+    {
+      label: 'Open Repairs',
+      value: stats.openRepairs ?? 0,
+      icon: RiHammerLine, color: '#dc2626', bg: '#fef2f2', border: '#fecaca',
+      trend: `${stats.overdueRepairs ?? 0} overdue`,
+      up: false, href: '/maintenance',
+    },
+    {
+      label: 'Active Staff',
+      value: stats.activeEmployees ?? 0,
+      icon: RiTeamLine, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe',
+      trend: `${fmtCurrency(stats.monthlySalaryBudget ?? 0, currency)} / month`,
+      up: true, href: '/employees',
+    },
   ];
 
   const maxAreaCount = useMemo(() => Math.max(...areas.map((a) => a.assetCount ?? 0), 1), [areas]);
@@ -271,6 +316,52 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
+      {/* ── Owners ── */}
+      {owners.length > 0 && (
+        <motion.div {...fadeUp(0.14)}>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                  <RiUserLine className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-[14px] font-bold text-slate-800">Property Owners</p>
+                  <p className="text-[11px] text-slate-400">{owners.length} owner{owners.length > 1 ? 's' : ''} registered</p>
+                </div>
+              </div>
+              <Link to="/owners" className="flex items-center gap-1 text-[12px] text-blue-600 font-bold hover:text-blue-700">
+                View all <RiArrowRightLine className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {owners.map((owner) => (
+                <div key={owner.id} className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-100 bg-slate-50/60">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                    <RiUserLine className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-slate-800 truncate leading-tight">{owner.name}</p>
+                    {owner.phone && (
+                      <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <RiPhoneLine className="w-3 h-3" /> {owner.phone}
+                      </p>
+                    )}
+                    {owner.email && (
+                      <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                        <RiMailLine className="w-3 h-3" /> {owner.email}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* ── Property Overview: areas horizontal scroll ── */}
       {areas.length > 0 && (
         <motion.div {...fadeUp(0.15)}>
@@ -337,12 +428,17 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {cars.map((car) => {
-                const regDays  = car.regDays;
-                const expired  = regDays !== null && regDays < 0;
-                const expiring = regDays !== null && regDays >= 0 && regDays <= 30;
+                const regDays = car.regDays;
+                const insDays = car.insDays;
+                const regExpired  = regDays !== null && regDays < 0;
+                const regExpiring = regDays !== null && regDays >= 0 && regDays <= 30;
+                const insExpired  = insDays !== null && insDays < 0;
+                const insExpiring = insDays !== null && insDays >= 0 && insDays <= 30;
+                const hasAlert    = regExpired || regExpiring || insExpired || insExpiring;
                 return (
                   <Link key={car.id} to={`/cars/${car.id}`}
-                    className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all group bg-slate-50/60">
+                    className="flex items-start gap-3 p-3.5 rounded-2xl border hover:shadow-sm transition-all group bg-slate-50/60"
+                    style={{ borderColor: hasAlert ? '#fde68a' : '#f1f5f9' }}>
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                       style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
                       <RiCarLine className="w-5 h-5 text-white" />
@@ -350,15 +446,63 @@ export default function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-bold text-slate-800 truncate leading-tight">{car.make} {car.model}</p>
                       <p className="text-[11px] text-slate-500 mt-0.5">{car.plateNumber} · {car.driverName?.split(' ')[0]}</p>
-                    </div>
-                    <div className="shrink-0">
-                      {expired  && <span className="text-[10px] font-bold text-white bg-red-500 px-2 py-0.5 rounded-full">Expired</span>}
-                      {expiring && <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">{regDays}d left</span>}
-                      {!expired && !expiring && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Active</span>}
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {/* Registration badge */}
+                        {regExpired  && <span className="text-[9px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-full">Reg Expired</span>}
+                        {regExpiring && <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">Reg {regDays}d</span>}
+                        {!regExpired && !regExpiring && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">Reg OK</span>}
+                        {/* Insurance badge */}
+                        {insExpired  && <span className="text-[9px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-full">Ins Expired</span>}
+                        {insExpiring && <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">Ins {insDays}d</span>}
+                        {!insExpired && !insExpiring && insDays !== null && <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-full">Ins OK</span>}
+                      </div>
                     </div>
                   </Link>
                 );
               })}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Staff Overview ── */}
+      {staff.length > 0 && (
+        <motion.div {...fadeUp(0.18)}>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}>
+                  <RiTeamLine className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-[14px] font-bold text-slate-800">Staff Overview</p>
+                  <p className="text-[11px] text-slate-400">
+                    {stats.activeEmployees ?? 0} active staff · {fmtCurrency(stats.monthlySalaryBudget ?? 0, currency)} / month
+                  </p>
+                </div>
+              </div>
+              <Link to="/employees" className="flex items-center gap-1 text-[12px] text-blue-600 font-bold hover:text-blue-700">
+                View all <RiArrowRightLine className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {staff.map((emp) => (
+                <Link key={emp.id} to={`/employees/${emp.id}`}
+                  className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-100 hover:border-violet-200 hover:shadow-sm transition-all group bg-slate-50/60">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)' }}>
+                    <RiUserLine className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-slate-800 truncate leading-tight">{emp.name}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{emp.role}</p>
+                    <p className="text-[11px] font-semibold" style={{ color: '#7c3aed' }}>
+                      {fmtCurrency(emp.monthlySalary ?? 0, currency)}
+                    </p>
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
         </motion.div>
@@ -375,17 +519,18 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-[14px] font-bold text-slate-800">Expense Wallets</p>
-                <p className="text-[11px] text-slate-400">Available budget from boss</p>
+                <p className="text-[11px] text-slate-400">Vehicle · Home · Salary balances</p>
               </div>
             </div>
             <Link to="/wallet" className="flex items-center gap-1 text-[12px] text-blue-600 font-bold hover:text-blue-700">
               Manage <RiArrowRightLine className="w-3.5 h-3.5" />
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {[
               { key: 'vehicle', label: 'Vehicle Wallet', w: wallet.vehicle, color: '#0b1d3a', bg: '#f0f5ff', icon: RiCarLine },
               { key: 'home',    label: 'Home Wallet',    w: wallet.home,    color: '#16a34a', bg: '#f0fdf4', icon: RiHome4Line },
+              { key: 'salary',  label: 'Salary Wallet',  w: wallet.salary,  color: '#7c3aed', bg: '#f5f3ff', icon: RiTeamLine },
             ].map(({ key, label, w, color, bg, icon: Icon }) => {
               const bal   = w?.balance ?? 0;
               const total = w?.totalDeposited ?? 0;
@@ -402,7 +547,7 @@ export default function Dashboard() {
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold text-slate-700">{label}</p>
                     <p className="text-[18px] font-bold leading-tight" style={{ color: empty ? '#dc2626' : low ? '#d97706' : color }}>
-                      AED {bal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                      {fmtCurrency(bal, currency)}
                     </p>
                     <div className="h-1 bg-white/60 rounded-full overflow-hidden mt-1.5">
                       <div className="h-full rounded-full transition-all duration-700"
@@ -533,10 +678,10 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-2.5 mb-4">
                 {[
-                  { label: 'Contracts', value: stats.activeContracts, icon: RiFileList3Line, color: '#2563eb', bg: '#eff6ff' },
-                  { label: 'Assets',    value: stats.totalAssets,     icon: RiBox3Line,      color: '#16a34a', bg: '#f0fdf4' },
-                  { label: 'Repairs',   value: stats.openRepairs,     icon: RiHammerLine,    color: '#dc2626', bg: '#fef2f2' },
-                  { label: 'Alerts',    value: unread,                icon: RiBellLine,      color: '#d97706', bg: '#fffbeb' },
+                  { label: 'Contracts', value: stats.activeContracts ?? 0,   icon: RiFileList3Line, color: '#2563eb', bg: '#eff6ff' },
+                  { label: 'Staff',     value: stats.activeEmployees ?? 0,   icon: RiTeamLine,      color: '#7c3aed', bg: '#f5f3ff' },
+                  { label: 'Warranties',value: stats.warrantyAlerts ?? 0,    icon: RiShieldLine,    color: '#0891b2', bg: '#ecfeff' },
+                  { label: 'Alerts',    value: unread,                       icon: RiBellLine,      color: '#d97706', bg: '#fffbeb' },
                 ].map((s) => (
                   <div key={s.label} className="flex items-center gap-2.5 p-3 rounded-xl" style={{ background: s.bg }}>
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-white">
@@ -586,7 +731,7 @@ export default function Dashboard() {
             >
               <div className="mb-4">
                 <p className="text-3xl font-bold tracking-tight leading-none" style={{ color: '#0b1d3a' }}>
-                  AED {grandTotal.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                  {fmtCurrency(grandTotal, currency)}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-1">All categories combined</p>
               </div>
@@ -612,7 +757,7 @@ export default function Dashboard() {
                         <div className="h-1 rounded-full" style={{ width: `${e.percent}%`, background: e.color }} />
                       </div>
                       <span className="text-[12px] font-bold text-slate-700 w-18 text-right tabular-nums">
-                        AED {e.amount.toLocaleString('en-AE', { maximumFractionDigits: 0 })}
+                        {fmtCurrency(e.amount, currency)}
                       </span>
                     </div>
                   </div>
@@ -624,35 +769,43 @@ export default function Dashboard() {
             </SectionCard>
           </motion.div>
 
-          {/* Expiring Soon */}
+          {/* Expiring Soon — unified (contracts + warranties + car reg/insurance) */}
           <motion.div {...fadeUp(0.28)}>
             <SectionCard
               title="Expiring Soon"
-              subtitle="Needs attention"
+              subtitle="Contracts · Warranties · Registrations"
               action={<Link to="/contracts" className="text-[12px] text-blue-600 font-bold hover:text-blue-700">View all →</Link>}
             >
               <div className="space-y-2">
-                {expiringContracts.map((item) => (
-                  <div key={item.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold text-slate-800 truncate">{item.name}</p>
-                      <p className="text-[11px] text-slate-400 truncate">{item.company}</p>
+                {allExpiryAlerts.map((item) => {
+                  const TypeIcon = EXPIRY_ICON[item.type] ?? RiAlertLine;
+                  const typeColor = EXPIRY_COLOR[item.type] ?? '#64748b';
+                  const typeBg   = EXPIRY_BG[item.type]    ?? '#f8fafc';
+                  return (
+                    <div key={item.id}
+                      className="flex items-center gap-2.5 p-2.5 rounded-xl hover:bg-slate-50 transition-colors group">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: typeBg }}>
+                        <TypeIcon className="w-3.5 h-3.5" style={{ color: typeColor }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-semibold text-slate-800 truncate leading-tight">{item.name}</p>
+                        {item.detail && <p className="text-[10px] text-slate-400 truncate">{item.detail}</p>}
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={cn(
+                          'px-2 py-0.5 rounded-full text-[10px] font-bold',
+                          item.status === 'danger'  ? 'bg-red-50 text-red-600'     :
+                          item.status === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600',
+                        )}>
+                          {item.expiresIn < 0 ? 'Expired' : `${item.expiresIn}d`}
+                        </span>
+                        <RiArrowRightSLine className="w-4 h-4 text-slate-200 group-hover:text-slate-400 transition-colors" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                      <span className={cn(
-                        'px-2 py-0.5 rounded-full text-[10px] font-bold',
-                        item.status === 'danger'  ? 'bg-red-50 text-red-600'     :
-                        item.status === 'warning' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600',
-                      )}>
-                        {item.expiresIn}d left
-                      </span>
-                      <RiArrowRightSLine className="w-4 h-4 text-slate-200 group-hover:text-slate-400 transition-colors" />
-                    </div>
-                  </div>
-                ))}
-                {expiringContracts.length === 0 && (
-                  <p className="text-[12px] text-slate-400 text-center py-2">No expiring contracts</p>
+                  );
+                })}
+                {allExpiryAlerts.length === 0 && (
+                  <p className="text-[12px] text-slate-400 text-center py-3">All clear — nothing expiring soon</p>
                 )}
               </div>
             </SectionCard>

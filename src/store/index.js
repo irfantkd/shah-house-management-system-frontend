@@ -10,10 +10,12 @@ const storage = {
 
 import authReducer       from './slices/authSlice';
 import propertiesReducer from './slices/propertiesSlice';
+import settingsReducer   from './slices/settingsSlice';
 
 const rootReducer = combineReducers({
   auth:                    authReducer,
   properties:              propertiesReducer,
+  settings:                settingsReducer,
   [apiSlice.reducerPath]:  apiSlice.reducer,
 });
 
@@ -24,11 +26,18 @@ const propertiesTransform = createTransform(
   { whitelist: ['properties'] },
 );
 
+// Persist only `data` from settings — status resets to 'idle' so AppLayout re-validates on boot
+const settingsTransform = createTransform(
+  (inbound)  => ({ data: inbound.data }),
+  (outbound) => ({ data: outbound.data ?? null, status: 'idle' }),
+  { whitelist: ['settings'] },
+);
+
 const persistConfig = {
   key: 'ahms-v5',
   storage,
-  whitelist: ['auth', 'properties'],
-  transforms: [propertiesTransform],
+  whitelist: ['auth', 'properties', 'settings'],
+  transforms: [propertiesTransform, settingsTransform],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

@@ -6,6 +6,7 @@ import Navbar  from '../components/layout/Navbar';
 import { selectIsAuthenticated } from '../store/slices/authSlice';
 import { setProperties } from '../store/slices/propertiesSlice';
 import { selectCurrentPropertyId } from '../store/slices/propertiesSlice';
+import { loadSettings, clearSettings } from '../store/slices/settingsSlice';
 import { useGetQuery, usePostMutation } from '../api/apiSlice';
 import { registerServiceWorker, subscribeToPush, requestNotificationPermission } from '../utils/notificationUtils';
 
@@ -35,6 +36,16 @@ export default function AppLayout() {
   useEffect(() => {
     if (propertiesList) dispatch(setProperties(propertiesList));
   }, [propertiesList, dispatch]);
+
+  // Load settings on auth so currency / language / notification prefs are available app-wide.
+  // Clear them on logout so stale data isn't shown on next login.
+  useEffect(() => {
+    if (isAuth) {
+      dispatch(loadSettings());
+    } else {
+      dispatch(clearSettings());
+    }
+  }, [isAuth, dispatch]);
 
   /* ── Service Worker + Push setup (runs once after auth + propertyId ready) */
   useEffect(() => {

@@ -14,7 +14,7 @@ import {
 import toast from 'react-hot-toast';
 import { cn } from '../../utils/cn';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
-import { generateLetterheadPdf } from '../../utils/generateLetterheadPdf';
+import { generateLetterheadPdf, generateLetterheadPdfBlob } from '../../utils/generateLetterheadPdf';
 import DatePicker from '../../components/ui/DatePicker';
 
 /* ─── Config ──────────────────────────────────────────────────── */
@@ -167,6 +167,15 @@ export default function LetterheadPage() {
     setHiddenDocData(null);
   };
 
+  /* Renders to the hidden DOM element and returns the PDF as a Blob (no download) */
+  const captureBlob = async (docData) => {
+    flushSync(() => setHiddenDocData(docData));
+    if (!hiddenPrintRef.current) throw new Error('Render element not ready');
+    const blob = await generateLetterheadPdfBlob(hiddenPrintRef.current);
+    setHiddenDocData(null);
+    return blob;
+  };
+
   const buildRecord = () => ({
     type, docNum, date, reference, deliveryRef, receivedBy,
     party: { ...party },
@@ -270,32 +279,69 @@ export default function LetterheadPage() {
     }
   };
 
-  /* ─── WhatsApp share ─── */
-  const handleWhatsApp = (record) => {
-    const c = TYPES[record.type];
-    const lines = [
-      `*SHAH HOUSE*`,
-      `_Official Document — ${c.label}_`,
-      ``,
-      `Doc No: *${record.docNum}*`,
-      `Date: ${fmtDate(record.date)}`,
-      ...(record.reference ? [`Reference: ${record.reference}`] : []),
-      ``,
-      `*${c.partyLabel.toUpperCase()}*`,
-      ...(record.party.company ? [record.party.company] : []),
-      ...(record.party.name ? [`Contact: ${record.party.name}`] : []),
-      ...(record.party.phone ? [`Tel: ${record.party.phone}`] : []),
-      ``,
-      `*Items (${record.items.length}):*`,
-      ...record.items.map((it, i) => {
-        const t = lineTotal(it);
-        return `${i + 1}. ${it.name || '—'} — ${it.qty} ${it.unit}${t > 0 ? ` — AED ${t.toFixed(2)}` : ''}`;
-      }),
-      ...(record.hasPrice ? [``, `*Grand Total: ${fmtAED(record.grandTotal)}*`] : []),
-      ``,
-      `_Shah House · Villa Property · Dubai, UAE_`,
-    ];
-    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank');
+  /* ─── WhatsApp share — sends the actual PDF, not text ─── */
+  const handleWhatsApp = async (record) => {
+    if (pdfLoading) return;
+
+    const recCfg = TYPES[record.type];
+    const docData = {
+      cfg: recCfg,
+      docNum: record.docNum,
+      date: record.date,
+      reference: record.reference,
+      deliveryRef: record.deliveryRef || '',
+      receivedBy: record.receivedBy || '',
+      party: record.party,
+      items: record.items,
+      notes: record.notes,
+      hasPrice: record.hasPrice,
+      grandTotal: record.grandTotal,
+    };
+
+    setPdfLoading(true);
+    const toastId = toast.loading('Preparing PDF…');
+
+    try {
+      const blob = await captureBlob(docData);
+      const filename = `${record.docNum}.pdf`;
+      const file = new File([blob], filename, { type: 'application/pdf' });
+
+      // Web Share API — available on mobile browsers and desktop Chrome/Edge on Win/Mac
+      const canShare = typeof navigator.share === 'function' &&
+                       typeof navigator.canShare === 'function' &&
+                       navigator.canShare({ files: [file] });
+
+      if (canShare) {
+        toast.dismiss(toastId);
+        await navigator.share({
+          files: [file],
+          title: `Shah House — ${record.docNum}`,
+          text: `${recCfg.label} · ${record.docNum}`,
+        });
+        toast.success('PDF shared!');
+      } else {
+        // Browser doesn't support file sharing — download the PDF and instruct user
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success('PDF downloaded — open WhatsApp and attach it to share', { id: toastId, duration: 5000 });
+      }
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        // User dismissed the share sheet — not an error
+        toast.dismiss(toastId);
+      } else {
+        toast.error('Could not prepare PDF', { id: toastId });
+        setHiddenDocData(null);
+      }
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   /* ─── Delete ─── */
