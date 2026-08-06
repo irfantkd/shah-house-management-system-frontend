@@ -192,8 +192,6 @@ export default function WalletDetail() {
   const [reportPeriod,      setReportPeriod]      = useState('month');
   const [reportStart,       setReportStart]       = useState('');
   const [reportEnd,         setReportEnd]         = useState('');
-  const [reportLoading,     setReportLoading]     = useState(false);
-
   const openReports = () => {
     setReportWallet(type);
     setReportPeriod(period === 'all' ? 'all' : period === 'custom' ? 'custom' : period === 'lastm' ? 'lastMonth' : period);
