@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
-  Wallet, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
-  AlertTriangle, ChevronRight, Loader2, FileDown, BarChart3,
+  Wallet, Car, Home, Banknote, Building2, Plus, ArrowDownLeft, ArrowUpRight,
+  AlertTriangle, ChevronRight, Loader2, FileDown, BarChart3, Share2, CheckCircle2,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, API_BASE_URL } from '../../api/apiSlice';
 import DatePicker from '../../components/ui/DatePicker';
@@ -19,9 +19,10 @@ const fade = (d = 0) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1
 const BLANK = { wallet: 'vehicle', amount: '', note: '', date: new Date().toISOString().split('T')[0] };
 
 const WALLETS = {
-  vehicle: { label: 'Vehicle Wallet',  desc: 'Fuel, maintenance, repairs & fleet costs', icon: Car,      color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', detailLink: '/wallet/vehicle' },
-  home:    { label: 'Home Wallet',     desc: 'Property services, grocery & household',   icon: Home,     color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)', detailLink: '/wallet/home'    },
-  salary:  { label: 'Salary Wallet',   desc: 'Employee salary payments · auto-tracked',  icon: Banknote, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)', detailLink: '/wallet/salary'   },
+  vehicle:  { label: 'Vehicle Wallet',  desc: 'Fuel, maintenance, repairs & fleet costs',          icon: Car,       color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', detailLink: '/wallet/vehicle'  },
+  home:     { label: 'Home Wallet',     desc: 'Property services, grocery & household',            icon: Home,      color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)', detailLink: '/wallet/home'     },
+  property: { label: 'Property Wallet', desc: 'Property maintenance, infrastructure & capital',   icon: Building2, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', gradient: 'linear-gradient(135deg,#164e63,#0891b2)', detailLink: '/wallet/property' },
+  salary:   { label: 'Salary Wallet',   desc: 'Employee salary payments · auto-tracked',          icon: Banknote,  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)', detailLink: '/wallet/salary'   },
 };
 
 const REPORT_PERIODS = [
@@ -34,10 +35,11 @@ const REPORT_PERIODS = [
 ];
 
 const REPORT_WALLETS = [
-  { k: 'all',     l: 'All Wallets'   },
-  { k: 'vehicle', l: 'Vehicle'       },
-  { k: 'home',    l: 'Home'          },
-  { k: 'salary',  l: 'Salary'        },
+  { k: 'all',      l: 'All Wallets' },
+  { k: 'vehicle',  l: 'Vehicle'     },
+  { k: 'home',     l: 'Home'        },
+  { k: 'property', l: 'Property'    },
+  { k: 'salary',   l: 'Salary'      },
 ];
 
 const TXN_PAGE_SIZE = 8;
@@ -57,21 +59,31 @@ export default function WalletPage() {
     { skip: !propertyId },
   );
 
-  // Recent transactions — all wallets, limit 200 for client-side paging
-  const { data: recentResult } = useGetQuery(
-    { path: '/wallet/transactions', params: { propertyId, limit: 200 } },
+  // ── Transaction list state (server-side pagination + wallet filter) ──────────
+  const [txnPage,       setTxnPage]       = useState(1);
+  const [txnWalletFlt,  setTxnWalletFlt]  = useState('all');
+
+  const txnParams = useMemo(() => ({
+    propertyId,
+    limit:  TXN_PAGE_SIZE,
+    page:   txnPage,
+    ...(txnWalletFlt !== 'all' && { walletType: txnWalletFlt }),
+  }), [propertyId, txnPage, txnWalletFlt]);
+
+  const { data: recentResult, isFetching: txnFetching } = useGetQuery(
+    { path: '/wallet/transactions', params: txnParams },
     { skip: !propertyId },
   );
-  const allTxns = useMemo(() => {
-    const items = recentResult?.items ?? [];
-    return [...items].sort((a, b) => new Date(b.date) - new Date(a.date) || String(b.id).localeCompare(String(a.id)));
-  }, [recentResult]);
+  const allTxns  = recentResult?.items  ?? [];
+  const txnTotal = recentResult?.total  ?? 0;
+  const txnPages = recentResult?.pages  ?? 1;
 
   const EMPTY_W = { balance: 0 };
-  const vWallet = { ...EMPTY_W, ...walletData?.vehicle };
-  const hWallet = { ...EMPTY_W, ...walletData?.home    };
-  const sWallet = { ...EMPTY_W, ...walletData?.salary  };
-  const walletsMap = { vehicle: vWallet, home: hWallet, salary: sWallet };
+  const vWallet = { ...EMPTY_W, ...walletData?.vehicle  };
+  const hWallet = { ...EMPTY_W, ...walletData?.home     };
+  const pWallet = { ...EMPTY_W, ...walletData?.property };
+  const sWallet = { ...EMPTY_W, ...walletData?.salary   };
+  const walletsMap = { vehicle: vWallet, home: hWallet, property: pWallet, salary: sWallet };
 
   // ── Deposit ─────────────────────────────────────────────────────────────────
   const [depositMut, { isLoading: isDepositing }] = usePostMutation();
@@ -98,43 +110,83 @@ export default function WalletPage() {
   };
 
   // ── Reports ─────────────────────────────────────────────────────────────────
-  const [showReports,   setShowReports]   = useState(false);
-  const [reportWallet,  setReportWallet]  = useState('all');
-  const [reportPeriod,  setReportPeriod]  = useState('month');
-  const [reportStart,   setReportStart]   = useState('');
-  const [reportEnd,     setReportEnd]     = useState('');
-  const [reportLoading, setReportLoading] = useState(false);
+  const [showReports,  setShowReports]  = useState(false);
+  const [reportWallet, setReportWallet] = useState('all');
+  const [reportPeriod, setReportPeriod] = useState('month');
+  const [reportStart,  setReportStart]  = useState('');
+  const [reportEnd,    setReportEnd]    = useState('');
+  const [reportStep,   setReportStep]   = useState('idle'); // idle | generating | ready | sharing | done
+  const [reportBlob,   setReportBlob]   = useState(null);
+  const [reportSizeKB, setReportSizeKB] = useState(0);
+
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share;
+  const fmtSize  = (kb) => kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+
+  const walletReportFilename = () =>
+    `Shah-${reportWallet === 'all' ? 'All-Wallets' : reportWallet}-${reportPeriod}-Statement.pdf`;
+
+  const fetchWalletBlob = async () => {
+    const params = new URLSearchParams({ propertyId, walletType: reportWallet, period: reportPeriod });
+    if (reportPeriod === 'custom' && reportStart && reportEnd) {
+      params.append('startDate', reportStart);
+      params.append('endDate', reportEnd);
+    }
+    const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+    const res = await fetch(`${API_BASE_URL}/reports/wallet?${params}`, { credentials: 'include', headers });
+    if (!res.ok) throw new Error('Report generation failed');
+    return res.blob();
+  };
 
   const handleReport = async () => {
     if (!propertyId) return;
-    setReportLoading(true);
+    setReportStep('generating');
     try {
-      const params = new URLSearchParams({ propertyId, walletType: reportWallet, period: reportPeriod });
-      if (reportPeriod === 'custom' && reportStart && reportEnd) {
-        params.append('startDate', reportStart);
-        params.append('endDate', reportEnd);
-      }
-      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
-      const res = await fetch(`${API_BASE_URL}/reports/wallet?${params}`, { credentials: 'include', headers });
-      if (!res.ok) throw new Error('Report generation failed');
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `Shah-Wallet-${reportWallet}-${reportPeriod}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setShowReports(false);
-    } catch { toast.error('Failed to generate report'); }
-    finally { setReportLoading(false); }
+      const blob = await fetchWalletBlob();
+      setReportBlob(blob);
+      setReportSizeKB(Math.round(blob.size / 1024));
+      setReportStep('ready');
+    } catch {
+      toast.error('Failed to generate report');
+      setReportStep('idle');
+    }
   };
 
-  // ── Transaction pagination ───────────────────────────────────────────────────
-  const [txnPage, setTxnPage] = useState(1);
-  const txnPages = Math.max(1, Math.ceil(allTxns.length / TXN_PAGE_SIZE));
-  const pageTxns = allTxns.slice((txnPage - 1) * TXN_PAGE_SIZE, txnPage * TXN_PAGE_SIZE);
+  const handleDownloadReport = () => {
+    if (!reportBlob) return;
+    const url = URL.createObjectURL(reportBlob);
+    const a   = document.createElement('a');
+    a.href = url; a.download = walletReportFilename();
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setReportStep('done');
+    setTimeout(() => { setShowReports(false); setReportStep('idle'); setReportBlob(null); }, 1200);
+  };
+
+  const handleShareReport = async () => {
+    if (!reportBlob) return;
+    setReportStep('sharing');
+    try {
+      const file = new File([reportBlob], walletReportFilename(), { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Shah House — Wallet Statement', text: 'Wallet PDF report from Shah House Management' });
+        setReportStep('done');
+        setTimeout(() => { setShowReports(false); setReportStep('idle'); setReportBlob(null); }, 1200);
+      } else {
+        handleDownloadReport();
+        toast('Sharing not supported — downloaded instead');
+      }
+    } catch (e) {
+      setReportStep(e?.name === 'AbortError' ? 'ready' : 'idle');
+      if (e?.name !== 'AbortError') toast.error('Failed to share');
+    }
+  };
+
+  const reportLoading = reportStep === 'generating' || reportStep === 'sharing';
+  const resetReport   = () => { setReportStep('idle'); setReportBlob(null); };
+
+  // Reset to page 1 when wallet filter changes
+  const handleTxnFilter = (w) => { setTxnWalletFlt(w); setTxnPage(1); };
 
   return (
     <div className="space-y-6">
@@ -240,7 +292,7 @@ export default function WalletPage() {
       </div>
 
       {/* ── Low balance alerts ── */}
-      {(vWallet.balance < LOW_BALANCE_THRESHOLD || hWallet.balance < LOW_BALANCE_THRESHOLD) && (
+      {(vWallet.balance < LOW_BALANCE_THRESHOLD || hWallet.balance < LOW_BALANCE_THRESHOLD || pWallet.balance < LOW_BALANCE_THRESHOLD) && (
         <motion.div {...fade(0.14)}>
           <div className="space-y-2">
             {vWallet.balance <= 0 && (
@@ -295,6 +347,32 @@ export default function WalletPage() {
                 </button>
               </div>
             )}
+            {pWallet.balance <= 0 && (
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-red-700">Property Wallet is empty</p>
+                  <p className="text-[11px] text-red-500">Property maintenance and infrastructure expenses cannot be logged until you deposit funds.</p>
+                </div>
+                <button onClick={() => openDeposit('property')}
+                  className="shrink-0 text-[12px] font-bold text-red-700 bg-red-100 px-3 py-1.5 rounded-xl hover:bg-red-200 transition-colors">
+                  Deposit Now
+                </button>
+              </div>
+            )}
+            {pWallet.balance > 0 && pWallet.balance < LOW_BALANCE_THRESHOLD && (
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-cyan-50 border border-cyan-200">
+                <AlertTriangle className="w-5 h-5 text-cyan-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-cyan-700">Property Wallet running low — AED {fmt(pWallet.balance)} left</p>
+                  <p className="text-[11px] text-cyan-600">Consider topping up before the next property expense.</p>
+                </div>
+                <button onClick={() => openDeposit('property')}
+                  className="shrink-0 text-[12px] font-bold text-cyan-700 bg-cyan-100 px-3 py-1.5 rounded-xl hover:bg-cyan-200 transition-colors">
+                  Top Up
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
@@ -319,14 +397,17 @@ export default function WalletPage() {
       </motion.div>
 
       {/* ── Recent Transactions ── */}
-      {allTxns.length > 0 && (
-        <motion.div {...fade(0.22)}>
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
+      <motion.div {...fade(0.22)}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+
+          {/* Header */}
+          <div className="px-5 pt-4 pb-3 border-b border-slate-100">
+            <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-[14px] font-bold text-slate-800">Recent Transactions</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{allTxns.length} total across all wallets</p>
+                <p className="text-[14px] font-bold text-slate-800">Transactions</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 tabular-nums">
+                  {txnFetching ? 'Loading…' : `${txnTotal} record${txnTotal !== 1 ? 's' : ''} · Page ${txnPage} of ${txnPages}`}
+                </p>
               </div>
               <button onClick={() => setShowReports(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
@@ -334,101 +415,24 @@ export default function WalletPage() {
               </button>
             </div>
 
-            {/* Transaction rows */}
-            <div className="divide-y divide-slate-50">
-              {pageTxns.map((txn) => {
-                const isCredit = txn.type === 'credit';
-                const wCfg     = WALLETS[txn.walletType] ?? WALLETS.vehicle;
-                const WIcon    = wCfg.icon;
+            {/* Wallet filter tabs */}
+            <div className="flex gap-1 overflow-x-auto pb-0.5 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+              {[
+                { k: 'all',      l: 'All Wallets' },
+                { k: 'vehicle',  l: 'Vehicle'     },
+                { k: 'home',     l: 'Home'        },
+                { k: 'property', l: 'Property'    },
+                { k: 'salary',   l: 'Salary'      },
+              ].map(({ k, l }) => {
+                const wCfg  = k !== 'all' ? WALLETS[k] : null;
+                const isAct = txnWalletFlt === k;
                 return (
-                  <div key={txn._id ?? txn.id} className="flex items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
-                    <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
-                      isCredit ? 'bg-emerald-50' : 'bg-red-50')}>
-                      {isCredit
-                        ? <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
-                        : <ArrowUpRight  className="w-4 h-4 text-red-500"     />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-slate-800 truncate">
-                        {isCredit ? (txn.note || 'Deposit received') : (txn.description || 'Expense deducted')}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                          style={{ background: wCfg.bg, color: wCfg.color }}>
-                          <WIcon className="w-2.5 h-2.5" />
-                          {wCfg.label.replace(' Wallet', '')}
-                        </span>
-                        {txn.category && (
-                          <>
-                            <span className="text-[10px] text-slate-300">·</span>
-                            <span className="text-[10px] text-slate-400 capitalize">{txn.category}</span>
-                          </>
-                        )}
-                        <span className="text-[10px] text-slate-300">·</span>
-                        <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className={cn('text-[14px] font-bold tabular-nums', isCredit ? 'text-emerald-600' : 'text-red-500')}>
-                        {isCredit ? '+' : '−'}AED {fmt(txn.amount)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Pagination */}
-            {txnPages > 1 && (
-              <div className="flex items-center justify-between px-5 py-3 bg-slate-50/60 border-t border-slate-100">
-                <p className="text-[11px] text-slate-400 tabular-nums">
-                  {allTxns.length} transactions · Page {txnPage} of {txnPages}
-                </p>
-                <div className="flex items-center gap-1">
-                  <button disabled={txnPage === 1} onClick={() => setTxnPage(1)}
-                    className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">«</button>
-                  <button disabled={txnPage === 1} onClick={() => setTxnPage((p) => p - 1)}
-                    className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">‹</button>
-                  {Array.from({ length: Math.min(txnPages, 5) }, (_, i) => {
-                    const n = txnPage <= 3 ? i + 1 : txnPage >= txnPages - 2 ? txnPages - 4 + i : txnPage - 2 + i;
-                    if (n < 1 || n > txnPages) return null;
-                    return (
-                      <button key={n} onClick={() => setTxnPage(n)}
-                        className={cn('w-7 h-7 rounded-lg text-[12px] font-bold transition-all',
-                          n === txnPage ? 'text-white' : 'text-slate-500 hover:bg-slate-200')}
-                        style={n === txnPage ? { background: '#0b1d3a' } : {}}>
-                        {n}
-                      </button>
-                    );
-                  })}
-                  <button disabled={txnPage === txnPages} onClick={() => setTxnPage((p) => p + 1)}
-                    className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">›</button>
-                  <button disabled={txnPage === txnPages} onClick={() => setTxnPage(txnPages)}
-                    className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">»</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </motion.div>
-      )}
-
-      {/* ── Reports Modal ── */}
-      <Modal open={showReports} onClose={() => { if (!reportLoading) setShowReports(false); }}
-        title="Generate Wallet Report" subtitle="Select wallet and period — downloads as PDF" size="sm">
-        <div className="space-y-4">
-
-          {/* Wallet selector */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Wallet</label>
-            <div className="grid grid-cols-2 gap-2">
-              {REPORT_WALLETS.map(({ k, l }) => {
-                const wCfg = k === 'all' ? null : WALLETS[k];
-                const active = reportWallet === k;
-                return (
-                  <button key={k} type="button" onClick={() => setReportWallet(k)}
-                    className={cn('py-2.5 px-3 rounded-xl border-2 text-[12px] font-bold transition-all',
-                      active ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
-                    style={active ? { background: wCfg?.gradient ?? 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', borderColor: 'transparent' } : {}}>
+                  <button key={k} type="button" onClick={() => handleTxnFilter(k)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap"
+                    style={isAct
+                      ? { background: wCfg?.gradient ?? 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', color: '#fff' }
+                      : { background: '#f1f5f9', color: '#64748b' }}>
+                    {wCfg && <wCfg.icon className="w-3 h-3" />}
                     {l}
                   </button>
                 );
@@ -436,48 +440,209 @@ export default function WalletPage() {
             </div>
           </div>
 
-          {/* Period selector */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Period</label>
-            <div className="grid grid-cols-3 gap-2">
-              {REPORT_PERIODS.map(({ k, l }) => (
-                <button key={k} type="button" onClick={() => setReportPeriod(k)}
-                  className={cn('py-2 px-2 rounded-xl border-2 text-[11px] font-bold transition-all',
-                    reportPeriod === k ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
-                  style={reportPeriod === k ? { background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', borderColor: 'transparent' } : {}}>
-                  {l}
-                </button>
-              ))}
-            </div>
+          {/* Rows */}
+          <div className={cn('divide-y divide-slate-50 transition-opacity duration-150', txnFetching && 'opacity-50 pointer-events-none')}>
+            {allTxns.length === 0 && !txnFetching ? (
+              <div className="py-14 text-center">
+                <Wallet className="w-10 h-10 text-slate-200 mx-auto mb-3" strokeWidth={1.5} />
+                <p className="text-slate-400 text-[13px]">No transactions yet</p>
+              </div>
+            ) : allTxns.map((txn) => {
+              const isCredit = txn.type === 'credit';
+              const wCfg     = WALLETS[txn.walletType] ?? WALLETS.vehicle;
+              const WIcon    = wCfg.icon;
+              return (
+                <div key={txn._id ?? txn.id} className="flex items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
+                  <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
+                    isCredit ? 'bg-emerald-50' : 'bg-red-50')}>
+                    {isCredit
+                      ? <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+                      : <ArrowUpRight  className="w-4 h-4 text-red-500"     />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-slate-800 truncate">
+                      {isCredit ? (txn.note || 'Deposit received') : (txn.description || 'Expense deducted')}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{ background: wCfg.bg, color: wCfg.color }}>
+                        <WIcon className="w-2.5 h-2.5" />
+                        {wCfg.label.replace(' Wallet', '')}
+                      </span>
+                      {txn.category && (
+                        <>
+                          <span className="text-[10px] text-slate-300">·</span>
+                          <span className="text-[10px] text-slate-400 capitalize">{txn.category}</span>
+                        </>
+                      )}
+                      <span className="text-[10px] text-slate-300">·</span>
+                      <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={cn('text-[14px] font-bold tabular-nums', isCredit ? 'text-emerald-600' : 'text-red-500')}>
+                      {isCredit ? '+' : '−'}AED {fmt(txn.amount)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Custom date range */}
-          {reportPeriod === 'custom' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Start Date</label>
-                <DatePicker value={reportStart} onChange={setReportStart} className={INP} />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">End Date</label>
-                <DatePicker value={reportEnd} onChange={setReportEnd} className={INP} />
+          {/* Pagination footer */}
+          {txnPages > 1 && (
+            <div className="flex items-center justify-between px-5 py-3 bg-slate-50/60 border-t border-slate-100">
+              <p className="text-[11px] text-slate-400 tabular-nums">
+                {txnTotal} total · Page {txnPage} of {txnPages}
+              </p>
+              <div className="flex items-center gap-1">
+                <PagBtn disabled={txnPage === 1 || txnFetching} onClick={() => setTxnPage(1)}>«</PagBtn>
+                <PagBtn disabled={txnPage === 1 || txnFetching} onClick={() => setTxnPage((p) => p - 1)}>‹</PagBtn>
+                {getPagNums(txnPage, txnPages).map((n, idx) => n === '…' ? (
+                  <span key={`e-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
+                ) : (
+                  <button key={n} onClick={() => setTxnPage(n)} disabled={txnFetching}
+                    className={cn('w-7 h-7 rounded-lg text-[12px] font-bold transition-all',
+                      n === txnPage ? 'text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200 disabled:opacity-40')}
+                    style={n === txnPage ? { background: '#0b1d3a' } : {}}>
+                    {n}
+                  </button>
+                ))}
+                <PagBtn disabled={txnPage === txnPages || txnFetching} onClick={() => setTxnPage((p) => p + 1)}>›</PagBtn>
+                <PagBtn disabled={txnPage === txnPages || txnFetching} onClick={() => setTxnPage(txnPages)}>»</PagBtn>
               </div>
             </div>
           )}
+        </div>
+      </motion.div>
 
-          {/* Generate button */}
+      {/* ── Reports Modal ── */}
+      <Modal open={showReports} onClose={() => { if (!reportLoading) { setShowReports(false); resetReport(); } }}
+        title="Generate Wallet Report" subtitle="A4 PDF · header & footer on every page · max 14 rows" size="sm">
+        <div className="space-y-4">
+
+          {/* Settings — only shown when idle or ready (hide while generating/sharing/done) */}
+          {(reportStep === 'idle' || reportStep === 'ready') && (
+            <>
+              {/* Wallet selector */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Wallet</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {REPORT_WALLETS.map(({ k, l }) => {
+                    const wCfg = k === 'all' ? null : WALLETS[k];
+                    const active = reportWallet === k;
+                    return (
+                      <button key={k} type="button" onClick={() => { setReportWallet(k); resetReport(); }}
+                        className={cn('py-2.5 px-3 rounded-xl border-2 text-[12px] font-bold transition-all',
+                          active ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
+                        style={active ? { background: wCfg?.gradient ?? 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', borderColor: 'transparent' } : {}}>
+                        {l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Period selector */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Period</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {REPORT_PERIODS.map(({ k, l }) => (
+                    <button key={k} type="button" onClick={() => { setReportPeriod(k); resetReport(); }}
+                      className={cn('py-2 px-2 rounded-xl border-2 text-[11px] font-bold transition-all',
+                        reportPeriod === k ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
+                      style={reportPeriod === k ? { background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', borderColor: 'transparent' } : {}}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom date range */}
+              {reportPeriod === 'custom' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Start Date</label>
+                    <DatePicker value={reportStart} onChange={(v) => { setReportStart(v); resetReport(); }} className={INP} />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">End Date</label>
+                    <DatePicker value={reportEnd} onChange={(v) => { setReportEnd(v); resetReport(); }} className={INP} />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Action area — step machine */}
           <div className="pt-1 border-t border-slate-100">
-            <button onClick={handleReport}
-              disabled={reportLoading || (reportPeriod === 'custom' && (!reportStart || !reportEnd))}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
-              {reportLoading
-                ? <><Loader2 className="w-4 h-4 animate-spin" />Generating PDF…</>
-                : <><BarChart3 className="w-4 h-4" />Generate & Download PDF</>}
-            </button>
-            <p className="text-[10px] text-slate-400 text-center mt-2">
-              Professional PDF · balance cards, full transaction table &amp; totals
-            </p>
+
+            {/* IDLE */}
+            {reportStep === 'idle' && (
+              <button onClick={handleReport}
+                disabled={reportPeriod === 'custom' && (!reportStart || !reportEnd)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+                <BarChart3 className="w-4 h-4" />Build Report PDF
+              </button>
+            )}
+
+            {/* GENERATING */}
+            {reportStep === 'generating' && (
+              <div className="flex flex-col items-center gap-2 py-5">
+                <Loader2 className="w-7 h-7 animate-spin text-navy-900" />
+                <p className="text-[13px] font-bold text-slate-700">Building your PDF…</p>
+                <p className="text-[11px] text-slate-400">Compiling transactions, formatting A4 pages</p>
+              </div>
+            )}
+
+            {/* READY — file info + action buttons */}
+            {reportStep === 'ready' && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <div className="w-9 h-9 rounded-xl bg-navy-900 flex items-center justify-center shrink-0">
+                    <FileDown className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-bold text-navy-900 truncate">{walletReportFilename()}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">A4 PDF · {fmtSize(reportSizeKB)} · Ready</p>
+                  </div>
+                </div>
+                <div className={cn('grid gap-2', canShare ? 'grid-cols-2' : 'grid-cols-1')}>
+                  <button onClick={handleDownloadReport}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold border-2 border-navy-900 text-navy-900 bg-blue-50 transition-all">
+                    <FileDown className="w-3.5 h-3.5" />Save to Device
+                  </button>
+                  {canShare && (
+                    <button onClick={handleShareReport}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold text-white transition-all"
+                      style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+                      <Share2 className="w-3.5 h-3.5" />Share via App
+                    </button>
+                  )}
+                </div>
+                <button onClick={resetReport} className="w-full text-[11px] text-slate-400 hover:text-slate-600 py-1 transition-colors">
+                  ← Change settings
+                </button>
+              </div>
+            )}
+
+            {/* SHARING */}
+            {reportStep === 'sharing' && (
+              <div className="flex flex-col items-center gap-2 py-5">
+                <Loader2 className="w-7 h-7 animate-spin text-navy-900" />
+                <p className="text-[13px] font-bold text-slate-700">Opening share sheet…</p>
+                <p className="text-[11px] text-slate-400">Choose WhatsApp or any app to send the PDF</p>
+              </div>
+            )}
+
+            {/* DONE */}
+            {reportStep === 'done' && (
+              <div className="flex flex-col items-center gap-2 py-5">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                <p className="text-[13px] font-bold text-slate-700">Done!</p>
+              </div>
+            )}
           </div>
         </div>
       </Modal>
@@ -489,8 +654,8 @@ export default function WalletPage() {
 
           <div>
             <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Wallet</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['vehicle', 'home']).map((k) => {
+            <div className="grid grid-cols-3 gap-2">
+              {(['vehicle', 'home', 'property']).map((k) => {
                 const w = WALLETS[k];
                 const Icon = w.icon;
                 const bal = walletsMap[k].balance ?? 0;
@@ -563,4 +728,27 @@ export default function WalletPage() {
       </Modal>
     </div>
   );
+}
+
+function PagBtn({ onClick, disabled, children }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      className="w-7 h-7 rounded-lg text-[12px] font-bold text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+      {children}
+    </button>
+  );
+}
+
+function getPagNums(page, pages) {
+  if (pages <= 7) return Array.from({ length: pages }, (_, i) => i + 1);
+  const set = new Set([1, pages, page]);
+  if (page > 1) set.add(page - 1);
+  if (page < pages) set.add(page + 1);
+  const sorted = [...set].sort((a, b) => a - b);
+  const result = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) result.push('…');
+    result.push(n);
+  });
+  return result;
 }

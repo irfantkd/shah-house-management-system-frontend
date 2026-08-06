@@ -66,10 +66,20 @@ export default function QuickFuelModal({ open, onClose }) {
     }
   };
 
-  if (!cars.length) return null;
-
   return (
     <Modal open={open} onClose={handleClose} title="Log Fuel Fill-up" subtitle="Select vehicle and enter fuel details" size="md">
+      {!cars.length ? (
+        <div className="py-10 text-center">
+          <Fuel className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+          <p className="text-[14px] font-semibold text-slate-500">No vehicles in your fleet</p>
+          <p className="text-[12px] text-slate-400 mt-1">Add a vehicle first to log fuel.</p>
+          <Link to="/cars" onClick={handleClose}
+            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-bold text-white"
+            style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+            <Plus className="w-3.5 h-3.5" /> Go to Fleet
+          </Link>
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-5">
 
         {/* Vehicle selector */}
@@ -144,6 +154,7 @@ export default function QuickFuelModal({ open, onClose }) {
           <Button type="submit" icon={Plus} loading={isSubmitting}>Log Fill-up</Button>
         </div>
       </form>
+      )}
     </Modal>
   );
 }

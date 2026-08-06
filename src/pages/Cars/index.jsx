@@ -90,13 +90,13 @@ export default function CarsPage() {
   const [localImages, setLocalImages] = useState({});
   const fileRefs = useRef({});
 
-  const now  = new Date();
-  const curM = now.getMonth(), curY = now.getFullYear();
-  const thisMonth = (d) => { const dt = new Date(d); return dt.getMonth() === curM && dt.getFullYear() === curY; };
-
-  const monthlyFuel = cars.reduce((s, c) => s + (c.fuelLogs ?? []).filter((f) => thisMonth(f.date)).reduce((ss, f) => ss + (f.totalPrice || 0), 0), 0);
-  const monthlyExp  = cars.reduce((s, c) => s + (c.expenses ?? []).filter((e) => thisMonth(e.date)).reduce((ss, e) => ss + (e.amount || 0), 0), 0);
-  const alertCount  = cars.filter((c) => getDays(c.registrationExpiry) <= 30).length;
+  // Per-car expense/fuel totals now come from the API (attached by the list endpoint).
+  // Summing across all cars in the fleet for the stat cards.
+  const monthlyFuel    = cars.reduce((s, c) => s + (c.thisMonthFuel     ?? 0), 0);
+  const monthlyExp     = cars.reduce((s, c) => s + (c.thisMonthExpenses ?? 0), 0);
+  const totalFuelAll   = cars.reduce((s, c) => s + (c.totalFuel         ?? 0), 0);
+  const totalExpAll    = cars.reduce((s, c) => s + (c.totalExpenses     ?? 0), 0);
+  const alertCount     = cars.filter((c) => getDays(c.registrationExpiry) <= 30).length;
 
   const filtered = cars.filter((c) => {
     const q     = search.toLowerCase();
@@ -323,10 +323,10 @@ export default function CarsPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Vehicles',     value: cars.length,  icon: Car,           color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', sub: `${cars.filter(c => c.status === 'active').length} active` },
-            { label: 'Reg. Alerts',        value: alertCount,   icon: AlertTriangle,  color: '#dc2626', bg: '#fef2f2', border: '#fecaca', sub: 'Expiring within 30 days' },
-            { label: 'Fleet Fuel (Month)', value: `AED ${monthlyFuel.toFixed(0)}`, icon: Fuel, color: '#d97706', bg: '#fffbeb', border: '#fde68a', sub: 'All vehicles this month' },
-            { label: 'Fleet Expenses',     value: `AED ${monthlyExp.toLocaleString()}`, icon: Gauge, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', sub: 'Service & repairs this month' },
+            { label: 'Total Vehicles',     value: cars.length,  icon: Car,          color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', sub: `${cars.filter(c => c.status === 'active').length} active` },
+            { label: 'Reg. Alerts',        value: alertCount,   icon: AlertTriangle, color: '#dc2626', bg: '#fef2f2', border: '#fecaca', sub: 'Expiring within 30 days' },
+            { label: 'Total Fuel Cost',    value: `AED ${totalFuelAll.toLocaleString('en-AE', { maximumFractionDigits: 0 })}`, icon: Fuel,  color: '#d97706', bg: '#fffbeb', border: '#fde68a', sub: `AED ${monthlyFuel.toFixed(0)} this month` },
+            { label: 'Total Expenses',     value: `AED ${totalExpAll.toLocaleString('en-AE',  { maximumFractionDigits: 0 })}`, icon: Gauge, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', sub: `AED ${monthlyExp.toLocaleString()} this month` },
           ].map((s, i) => (
             <motion.div key={s.label} {...fade(0.05 + i * 0.05)}>
               <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: s.border, boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
@@ -394,7 +394,7 @@ export default function CarsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             <AnimatePresence>
               {filtered.map((car, i) => {
-                const canDelete = !car.expenses?.length && !car.fuelLogs?.length && !car.maintenance?.length;
+                const canDelete = !car.expenseCount && !car.fillCount && !car.maintenance?.length;
                 return (
                   <MotionSwipeableRow
                     key={car.id}
@@ -413,7 +413,6 @@ export default function CarsPage() {
                   >
                     <CarCard
                       car={{ ...car, images: [...(car.images ?? []), ...(localImages[car.id] ?? [])] }}
-                      thisMonth={thisMonth}
                       fileRefs={fileRefs}
                       onImageUpload={handleImageUpload}
                       onEdit={() => openEdit(car)}
@@ -645,11 +644,12 @@ export default function CarsPage() {
 }
 
 // ── CarCard — inner content only (MotionSwipeableRow provides the shell) ──────
-function CarCard({ car, thisMonth, fileRefs, onImageUpload, onEdit, onDelete, onToggleStatus, canDelete }) {
-  const reg      = regStatus(car.registrationExpiry);
-  const ins      = regStatus(car.insuranceExpiry);
-  const fuel     = (car.fuelLogs ?? []).filter((f) => thisMonth(f.date)).reduce((s, f) => s + (f.totalPrice || 0), 0);
-  const exp      = (car.expenses ?? []).filter((e) => thisMonth(e.date)).reduce((s, e) => s + (e.amount || 0), 0);
+function CarCard({ car, fileRefs, onImageUpload, onEdit, onDelete, onToggleStatus, canDelete }) {
+  const reg  = regStatus(car.registrationExpiry);
+  const ins  = regStatus(car.insuranceExpiry);
+  // Use the API-supplied per-car totals (computed on the backend from separate collections)
+  const fuel = car.thisMonthFuel     ?? 0;
+  const exp  = car.thisMonthExpenses ?? 0;
   const hasImg   = car.images?.[0];
   const accent   = car.color || '#2563eb';
   const makeInits = car.make.substring(0, 2).toUpperCase();

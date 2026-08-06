@@ -123,8 +123,9 @@ export default function ExpensesPage() {
     { path: '/wallet', params: { propertyId } },
     { skip: !propertyId },
   );
-  const homeBalance    = walletData?.home?.balance    ?? 0;
-  const vehicleBalance = walletData?.vehicle?.balance ?? 0;
+  const homeBalance     = walletData?.home?.balance     ?? 0;
+  const vehicleBalance  = walletData?.vehicle?.balance  ?? 0;
+  const propertyBalance = walletData?.property?.balance ?? 0;
 
   // All categories for this property (color lookup in rows + breakdown chart)
   const { data: allCats = [] } = useGetQuery(
@@ -573,6 +574,7 @@ export default function ExpensesPage() {
         item={modal !== 'add' ? modal : null}
         homeBalance={homeBalance}
         vehicleBalance={vehicleBalance}
+        propertyBalance={propertyBalance}
         onClose={() => setModal(null)}
         onSave={handleSave}
       />
@@ -583,7 +585,7 @@ export default function ExpensesPage() {
         onClose={() => setDelTarget(null)}
         onConfirm={handleDelete}
         title="Delete Expense"
-        message={`Delete "${delTarget?.description}" (${fmtAED(delTarget?.amount)})? The amount will be refunded back to your ${delTarget?.walletType === 'vehicle' ? 'Vehicle' : 'Home'} Wallet.`}
+        message={`Delete "${delTarget?.description}" (${fmtAED(delTarget?.amount)})? The amount will be refunded back to your ${delTarget?.walletType === 'vehicle' ? 'Vehicle' : delTarget?.walletType === 'property' ? 'Property' : 'Home'} Wallet.`}
         confirmLabel="Delete"
         destructive
       />
@@ -598,7 +600,7 @@ const LOW_THRESHOLD = 5000;
 const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 const CUSTOM_SENTINEL = '__custom__';
 
-function ExpenseModal({ open, item, homeBalance, vehicleBalance, onClose, onSave }) {
+function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance, onClose, onSave }) {
   const propertyId = useSelector(selectCurrentPropertyId);
 
   const {
@@ -696,7 +698,7 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, onClose, onSave
   const watchedWallet = watch('walletType', 'home');
   const watchedAmount = parseFloat(watch('amount', '0')) || 0;
   const watchedCat    = watch('category', '');
-  const balance       = watchedWallet === 'vehicle' ? vehicleBalance : homeBalance;
+  const balance       = watchedWallet === 'vehicle' ? vehicleBalance : watchedWallet === 'property' ? propertyBalance : homeBalance;
   const after         = balance - watchedAmount;
   const selectedCatCfg = segCats.find((c) => c.name === watchedCat) ?? { color: '#64748b', bg: '#f1f5f9' };
 
@@ -732,10 +734,11 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, onClose, onSave
         {!isEdit && (
           <div>
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Deduct from Wallet</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
-                { k: 'home',    label: 'Home Wallet',    bal: homeBalance,    color: '#16a34a', bg: '#f0fdf4' },
-                { k: 'vehicle', label: 'Vehicle Wallet', bal: vehicleBalance, color: '#0b1d3a', bg: '#eef2fb' },
+                { k: 'home',     label: 'Home Wallet',     bal: homeBalance,     color: '#16a34a', bg: '#f0fdf4' },
+                { k: 'property', label: 'Property Wallet', bal: propertyBalance, color: '#0891b2', bg: '#ecfeff' },
+                { k: 'vehicle',  label: 'Vehicle Wallet',  bal: vehicleBalance,  color: '#0b1d3a', bg: '#eef2fb' },
               ].map(({ k, label, bal, color, bg }) => {
                 const sel = watchedWallet === k;
                 return (
@@ -752,7 +755,7 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, onClose, onSave
             {watchedAmount > 0 && (
               <div className={cn('mt-2 flex items-center justify-between px-4 py-2.5 rounded-xl border text-[12px]',
                 after < 0 ? 'bg-red-50 border-red-200' : after < LOW_THRESHOLD ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
-                <span className="text-slate-500">{watchedWallet === 'vehicle' ? 'Vehicle' : 'Home'} wallet after deduction</span>
+                <span className="text-slate-500">{watchedWallet === 'vehicle' ? 'Vehicle' : watchedWallet === 'property' ? 'Property' : 'Home'} wallet after deduction</span>
                 <span className={cn('font-black', after < 0 ? 'text-red-600' : after < LOW_THRESHOLD ? 'text-amber-600' : 'text-emerald-700')}>
                   {after < 0 ? `− ${fmtAED(Math.abs(after))}` : fmtAED(after)}
                 </span>

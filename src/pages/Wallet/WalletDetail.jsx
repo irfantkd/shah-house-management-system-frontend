@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, Car, Home, Banknote, Plus, ArrowDownLeft, ArrowUpRight,
+  ArrowLeft, Car, Home, Banknote, Building2, Plus, ArrowDownLeft, ArrowUpRight,
   AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2, Pencil, Trash2, Users,
-  FileDown, BarChart3,
+  FileDown, BarChart3, Share2, CheckCircle2,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePatchMutation, useDeleteMutation, API_BASE_URL } from '../../api/apiSlice';
 import DatePicker from '../../components/ui/DatePicker';
@@ -21,9 +21,10 @@ const LOW_BALANCE_THRESHOLD = 5000;
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.32, delay: d, ease: [0.4, 0, 0.2, 1] } });
 
 const WALLET_CFG = {
-  vehicle: { label: 'Vehicle Wallet', desc: 'Fuel, maintenance, repairs & fleet costs',  icon: Car,      color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-  home:    { label: 'Home Wallet',    desc: 'Property services, grocery & household',    icon: Home,     color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
-  salary:  { label: 'Salary Wallet',  desc: 'Employee salary payments only',             icon: Banknote, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+  vehicle:  { label: 'Vehicle Wallet',  desc: 'Fuel, maintenance, repairs & fleet costs',          icon: Car,       color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+  home:     { label: 'Home Wallet',     desc: 'Property services, grocery & household',            icon: Home,      color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
+  property: { label: 'Property Wallet', desc: 'Property maintenance, infrastructure & capital',   icon: Building2, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', gradient: 'linear-gradient(135deg,#164e63,#0891b2)' },
+  salary:   { label: 'Salary Wallet',   desc: 'Employee salary payments only',                    icon: Banknote,  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
 };
 
 const PERIODS = [
@@ -124,7 +125,7 @@ export default function WalletDetail() {
   const property       = useSelector(selectCurrentProperty);
   const authToken      = useSelector((s) => s.auth?.token);
 
-  const type       = ['home', 'salary'].includes(walletType) ? walletType : 'vehicle';
+  const type       = ['home', 'salary', 'property'].includes(walletType) ? walletType : 'vehicle';
   const isSalary   = type === 'salary';
   const cfg        = WALLET_CFG[type];
   const Icon       = cfg.icon;
@@ -198,34 +199,91 @@ export default function WalletDetail() {
     setReportPeriod(period === 'all' ? 'all' : period === 'custom' ? 'custom' : period === 'lastm' ? 'lastMonth' : period);
     setReportStart(customStart);
     setReportEnd(customEnd);
+    setReportStep('idle');
+    setReportBlob(null);
     setShowReports(true);
   };
 
-  const handleBackendReport = async () => {
-    if (!propertyId) return;
-    setReportLoading(true);
-    try {
-      const params = new URLSearchParams({ propertyId, walletType: reportWallet, period: reportPeriod });
-      if (reportPeriod === 'custom' && reportStart && reportEnd) {
-        params.append('startDate', reportStart);
-        params.append('endDate', reportEnd);
-      }
-      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
-      const res = await fetch(`${API_BASE_URL}/reports/wallet?${params}`, { credentials: 'include', headers });
-      if (!res.ok) throw new Error('Report generation failed');
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `Shah-Wallet-${reportWallet}-${reportPeriod}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setShowReports(false);
-    } catch { toast.error('Failed to generate report'); }
-    finally { setReportLoading(false); }
+  const [reportStep, setReportStep] = useState('idle'); // idle | generating | ready | sharing | done
+  const [reportBlob, setReportBlob] = useState(null);
+  const [reportSizeKB, setReportSizeKB] = useState(0);
+
+  const reportFilename = () =>
+    `Shah-${cfg.label.replace(/\s+/g, '-')}-${reportPeriod}-Statement.pdf`;
+
+  const fmtSize = (kb) => kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share;
+
+  const generateBlob = async () => {
+    const params = new URLSearchParams({ propertyId, walletType: reportWallet, period: reportPeriod });
+    if (reportPeriod === 'custom' && reportStart && reportEnd) {
+      params.append('startDate', reportStart);
+      params.append('endDate', reportEnd);
+    }
+    const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+    const res = await fetch(`${API_BASE_URL}/reports/wallet?${params}`, { credentials: 'include', headers });
+    if (!res.ok) throw new Error('Failed to generate report');
+    return res.blob();
   };
+
+  const handleGenerate = async () => {
+    if (!propertyId) return;
+    setReportStep('generating');
+    try {
+      const blob = await generateBlob();
+      setReportBlob(blob);
+      setReportSizeKB(Math.round(blob.size / 1024));
+      setReportStep('ready');
+    } catch {
+      toast.error('Failed to generate report');
+      setReportStep('idle');
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (!reportBlob) return;
+    const url = URL.createObjectURL(reportBlob);
+    const a   = document.createElement('a');
+    a.href = url; a.download = reportFilename();
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setReportStep('done');
+    setTimeout(() => { setShowReports(false); setReportStep('idle'); setReportBlob(null); }, 1200);
+  };
+
+  const handleSharePDF = async () => {
+    if (!reportBlob) return;
+    setReportStep('sharing');
+    try {
+      const file = new File([reportBlob], reportFilename(), { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: cfg.label + ' — Statement', text: `${cfg.label} PDF report from Shah House Management` });
+        setReportStep('done');
+        setTimeout(() => { setShowReports(false); setReportStep('idle'); setReportBlob(null); }, 1200);
+      } else {
+        handleDownloadPDF();
+        toast('Sharing not supported on this device — downloaded instead');
+      }
+    } catch (e) {
+      if (e?.name === 'AbortError') {
+        setReportStep('ready');
+      } else {
+        toast.error('Failed to share');
+        setReportStep('ready');
+      }
+    }
+  };
+
+  const closeReports = () => {
+    if (reportStep === 'generating' || reportStep === 'sharing') return;
+    setShowReports(false);
+    setReportStep('idle');
+    setReportBlob(null);
+  };
+
+  const reportLoading = reportStep === 'generating' || reportStep === 'sharing';
 
   // ── Deposit form ─────────────────────────────────────────────────────────────
   const [showDeposit, setShowDeposit] = useState(false);
@@ -674,21 +732,23 @@ export default function WalletDetail() {
       </Modal>
 
       {/* ── Reports Modal ── */}
-      <Modal open={showReports} onClose={() => { if (!reportLoading) setShowReports(false); }}
-        title="Generate Wallet Report" subtitle="Select wallet and period — downloads as PDF" size="sm">
+      <Modal open={showReports} onClose={closeReports}
+        title="Generate Wallet Report" subtitle="A4 PDF · header & footer on every page · max 14 rows" size="sm">
         <div className="space-y-4">
 
           {/* Wallet selector */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Wallet</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
-                { k: 'all',     l: 'All Wallets',    color: '#0b1d3a', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-                { k: 'vehicle', l: 'Vehicle Wallet',  color: '#0b1d3a', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-                { k: 'home',    l: 'Home Wallet',     color: '#16a34a', g: 'linear-gradient(135deg,#14532d,#16a34a)' },
-                { k: 'salary',  l: 'Salary Wallet',   color: '#7c3aed', g: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+                { k: 'all',      l: 'All Wallets',    color: '#0b1d3a', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+                { k: 'vehicle',  l: 'Vehicle',         color: '#0b1d3a', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+                { k: 'home',     l: 'Home',            color: '#16a34a', g: 'linear-gradient(135deg,#14532d,#16a34a)' },
+                { k: 'property', l: 'Property',        color: '#0891b2', g: 'linear-gradient(135deg,#164e63,#0891b2)' },
+                { k: 'salary',   l: 'Salary',          color: '#7c3aed', g: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
               ].map(({ k, l, color, g }) => (
-                <button key={k} type="button" onClick={() => setReportWallet(k)}
+                <button key={k} type="button"
+                  onClick={() => { setReportWallet(k); setReportStep('idle'); setReportBlob(null); }}
                   className={cn('py-2.5 px-3 rounded-xl border-2 text-[12px] font-bold transition-all',
                     reportWallet === k ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
                   style={reportWallet === k ? { background: g, borderColor: 'transparent' } : {}}>
@@ -710,7 +770,8 @@ export default function WalletDetail() {
                 { k: 'all',       l: 'All Time'    },
                 { k: 'custom',    l: 'Custom Range' },
               ].map(({ k, l }) => (
-                <button key={k} type="button" onClick={() => setReportPeriod(k)}
+                <button key={k} type="button"
+                  onClick={() => { setReportPeriod(k); setReportStep('idle'); setReportBlob(null); }}
                   className={cn('py-2 px-2 rounded-xl border-2 text-[11px] font-bold transition-all',
                     reportPeriod === k ? 'text-white border-transparent' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200')}
                   style={reportPeriod === k ? { background: cfg.gradient, borderColor: 'transparent' } : {}}>
@@ -734,19 +795,82 @@ export default function WalletDetail() {
             </div>
           )}
 
-          {/* Generate button */}
+          {/* Action area — state machine */}
           <div className="pt-1 border-t border-slate-100">
-            <button onClick={handleBackendReport}
-              disabled={reportLoading || (reportPeriod === 'custom' && (!reportStart || !reportEnd))}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: cfg.gradient }}>
-              {reportLoading
-                ? <><Loader2 className="w-4 h-4 animate-spin" />Generating PDF…</>
-                : <><BarChart3 className="w-4 h-4" />Generate & Download PDF</>}
-            </button>
-            <p className="text-[10px] text-slate-400 text-center mt-2">
-              Professional PDF with balance cards, transaction table & totals
-            </p>
+
+            {/* IDLE / SELECTING — show Generate button */}
+            {(reportStep === 'idle') && (
+              <button onClick={handleGenerate}
+                disabled={reportPeriod === 'custom' && (!reportStart || !reportEnd)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: cfg.gradient }}>
+                <BarChart3 className="w-4 h-4" />Build Report PDF
+              </button>
+            )}
+
+            {/* GENERATING — spinner */}
+            {reportStep === 'generating' && (
+              <div className="flex flex-col items-center gap-2 py-5">
+                <Loader2 className="w-7 h-7 animate-spin" style={{ color: cfg.color }} />
+                <p className="text-[13px] font-bold text-slate-700">Building your PDF…</p>
+                <p className="text-[11px] text-slate-400">Compiling transactions, formatting A4 pages</p>
+              </div>
+            )}
+
+            {/* READY — show file info + Download / Share */}
+            {reportStep === 'ready' && (
+              <div className="space-y-3">
+                {/* File info card */}
+                <div className="flex items-center gap-3 p-3.5 rounded-xl border"
+                  style={{ background: cfg.bg, borderColor: cfg.border ?? '#e2e8f0' }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: cfg.gradient }}>
+                    <FileDown className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-bold truncate" style={{ color: cfg.color }}>{reportFilename()}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">A4 PDF · {fmtSize(reportSizeKB)} · Ready to download or share</p>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className={cn('grid gap-2', canShare ? 'grid-cols-2' : 'grid-cols-1')}>
+                  <button onClick={handleDownloadPDF}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold border-2 transition-all"
+                    style={{ borderColor: cfg.color, color: cfg.color, background: cfg.bg }}>
+                    <FileDown className="w-3.5 h-3.5" />Save to Device
+                  </button>
+                  {canShare && (
+                    <button onClick={handleSharePDF}
+                      className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold text-white transition-all"
+                      style={{ background: cfg.gradient }}>
+                      <Share2 className="w-3.5 h-3.5" />Share via App
+                    </button>
+                  )}
+                </div>
+                <button onClick={() => { setReportStep('idle'); setReportBlob(null); }}
+                  className="w-full text-[11px] text-slate-400 hover:text-slate-600 py-1 transition-colors">
+                  ← Change settings
+                </button>
+              </div>
+            )}
+
+            {/* SHARING — spinner */}
+            {reportStep === 'sharing' && (
+              <div className="flex flex-col items-center gap-2 py-5">
+                <Loader2 className="w-7 h-7 animate-spin" style={{ color: cfg.color }} />
+                <p className="text-[13px] font-bold text-slate-700">Opening share sheet…</p>
+                <p className="text-[11px] text-slate-400">Choose WhatsApp or any app</p>
+              </div>
+            )}
+
+            {/* DONE */}
+            {reportStep === 'done' && (
+              <div className="flex flex-col items-center gap-2 py-5">
+                <CheckCircle2 className="w-8 h-8" style={{ color: cfg.color }} />
+                <p className="text-[13px] font-bold text-slate-700">Done!</p>
+              </div>
+            )}
           </div>
         </div>
       </Modal>
