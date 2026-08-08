@@ -76,7 +76,7 @@ export default function WarrantiesPage() {
 
   const { data, isFetching, isLoading } = useGetQuery(
     { path: '/assets/warranties', params },
-    { skip: !propertyId },
+    { skip: !propertyId, refetchOnMountOrArgChange: 60 },
   );
 
   const items      = data?.items  ?? [];
@@ -142,6 +142,21 @@ export default function WarrantiesPage() {
             <p className="text-[12px] text-warning-700 mt-0.5">Contact the warranty providers to check renewal options before they lapse.</p>
           </div>
           <button onClick={() => setStatusFilter('expiring')} className="text-[12px] font-semibold text-warning-700 hover:text-warning-900 shrink-0">View →</button>
+        </motion.div>
+      )}
+
+      {/* Expired alert */}
+      {!isLoading && stats.expired > 0 && (
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+          className="flex items-start gap-3 p-4 bg-danger-50 border border-danger-200 rounded-2xl">
+          <ShieldX className="w-5 h-5 text-danger-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-[13px] font-semibold text-danger-800">
+              {stats.expired} warrant{stats.expired > 1 ? 'ies have' : 'y has'} expired
+            </p>
+            <p className="text-[12px] text-danger-700 mt-0.5">These assets are no longer covered. Renew or replace the warranty immediately.</p>
+          </div>
+          <button onClick={() => setStatusFilter('expired')} className="text-[12px] font-semibold text-danger-700 hover:text-danger-900 shrink-0">View →</button>
         </motion.div>
       )}
 

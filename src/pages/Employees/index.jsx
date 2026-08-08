@@ -830,172 +830,267 @@ export default function EmployeesPage() {
           <>
             <motion.div key="emp-bg" initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
               onClick={() => { if (!isSavingEmp) { setEmpDrawer(null); setEmpErrors({}); } }}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" />
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
             <motion.div key="emp-panel"
               initial={{ x:'100%' }} animate={{ x:0 }} exit={{ x:'100%' }}
               transition={{ type:'spring', damping:28, stiffness:280 }}
-              className="fixed right-0 top-0 h-full w-full max-w-sm bg-white z-50 flex flex-col shadow-2xl">
+              className="fixed right-0 top-0 h-full w-full max-w-md bg-white z-50 flex flex-col"
+              style={{ boxShadow:'-8px 0 40px rgba(0,0,0,0.2)' }}>
 
-              <div className="px-6 py-5 shrink-0 flex items-center justify-between"
-                style={{ background:'linear-gradient(150deg, #0a172e, #0c1f3f)' }}>
-                <div>
-                  <p className="text-[16px] font-black text-white">{empDrawer === 'add' ? 'Add Employee' : 'Edit Employee'}</p>
-                  <p className="text-[11px] mt-0.5" style={{ color:'rgba(255,255,255,0.35)' }}>Shah House Staff</p>
+              {/* ─ Header with live preview ─ */}
+              <div className="relative overflow-hidden shrink-0"
+                style={{ background:'linear-gradient(150deg,#060e1e,#0a172e,#0c2145)' }}>
+                {/* Decorative rings */}
+                <div style={{ position:'absolute', top:-50, right:-50, width:200, height:200, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.04)', pointerEvents:'none' }} />
+                <div style={{ position:'absolute', top:-25, right:-25, width:120, height:120, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.07)', pointerEvents:'none' }} />
+                <div style={{ position:'absolute', bottom:-20, left:-20, width:100, height:100, borderRadius:'50%', background:'rgba(30,58,110,0.4)', pointerEvents:'none' }} />
+
+                <div className="relative px-6 pt-5 pb-6" style={{ zIndex:5 }}>
+                  {/* Top bar */}
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color:'rgba(255,255,255,0.35)' }}>
+                        {empDrawer === 'add' ? 'New Staff Member' : 'Edit Staff Member'}
+                      </p>
+                      <h2 className="text-[19px] font-black text-white mt-0.5 leading-tight">
+                        {empDrawer === 'add' ? 'Add Employee' : 'Edit Employee'}
+                      </h2>
+                    </div>
+                    <button onClick={() => { setEmpDrawer(null); setEmpErrors({}); }} disabled={isSavingEmp}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/12 border border-white/10 transition-all disabled:opacity-40">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Live preview card */}
+                  <div className="flex items-center gap-4 p-4 rounded-2xl"
+                    style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.09)' }}>
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-[18px] font-black shrink-0"
+                      style={{
+                        background: empForm.name ? avatarGrad(empForm.name) : 'rgba(255,255,255,0.1)',
+                        border: '2px solid rgba(255,255,255,0.15)',
+                        boxShadow: empForm.name ? `0 4px 16px ${avatarColor(empForm.name)}50` : 'none',
+                      }}>
+                      {empForm.name ? initials(empForm.name) : <Users className="w-5 h-5 opacity-30" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[16px] font-black text-white leading-tight truncate">
+                        {empForm.name || <span className="opacity-30">New Employee</span>}
+                      </p>
+                      <p className="text-[11px] mt-1 truncate" style={{ color:'rgba(255,255,255,0.4)' }}>
+                        {empForm.role}
+                        {empForm.nationality ? ` · ${empForm.nationality}` : ''}
+                        {empForm.monthlySalary ? ` · AED ${fmtAmt(empForm.monthlySalary)}/mo` : ''}
+                        {empForm.dateOfBirth ? ` · ${calcAge(empForm.dateOfBirth)} yrs` : ''}
+                      </p>
+                      <div className="mt-1.5">
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase"
+                          style={empForm.status === 'active'
+                            ? { background:'rgba(22,163,74,0.25)', color:'#86efac', border:'1px solid rgba(22,163,74,0.3)' }
+                            : { background:'rgba(255,255,255,0.07)', color:'rgba(255,255,255,0.35)', border:'1px solid rgba(255,255,255,0.12)' }}>
+                          {empForm.status === 'active' ? '● Active' : '○ Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <button onClick={() => { setEmpDrawer(null); setEmpErrors({}); }} disabled={isSavingEmp}
-                  className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition-all disabled:opacity-40">
-                  <X className="w-4 h-4" />
-                </button>
               </div>
 
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-4 shrink-0 bg-slate-50">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-[16px] font-black"
-                  style={{ background: empForm.name ? avatarGrad(empForm.name) : '#cbd5e1' }}>
-                  {empForm.name ? initials(empForm.name) : <Users className="w-5 h-5 text-white/60" />}
-                </div>
-                <div>
-                  <p className="text-[15px] font-bold text-slate-800">{empForm.name || 'New Employee'}</p>
-                  <p className="text-[12px] text-slate-400">{empForm.role}{empForm.monthlySalary ? ` · AED ${fmtAmt(empForm.monthlySalary)}` : ''}</p>
-                </div>
-              </div>
+              {/* ─ Scrollable form body ─ */}
+              <form onSubmit={handleSaveEmp} className="flex-1 overflow-y-auto" style={{ scrollbarWidth:'thin' }}>
+                <div className="px-6 py-5 space-y-6">
 
-              <form onSubmit={handleSaveEmp} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-
-                {/* Required fields notice */}
-                <p className="text-[11px] text-slate-400">Fields marked <span className="text-red-500 font-bold">*</span> are required.</p>
-
-                {/* Name */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                    Full Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    value={empForm.name}
-                    onChange={(e) => setEF('name', e.target.value)}
-                    onBlur={() => blurEmpField('name')}
-                    placeholder="e.g. Ahmad Khan"
-                    className={cn(INP, empErrors.name ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
-                  />
-                  {empErrors.name && <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{empErrors.name}</p>}
-                </div>
-
-                {/* Role + Status */}
-                <div className="grid grid-cols-2 gap-3">
+                  {/* ── Section 1: Personal Information ── */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                      Role <span className="text-red-500">*</span>
-                    </label>
-                    <select value={empForm.role} onChange={(e) => setEF('role', e.target.value)} className={SEL}>
-                      {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                    {empErrors.role && <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{empErrors.role}</p>}
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+                        <Users className="w-3 h-3 text-white" />
+                      </div>
+                      <p className="text-[11px] font-black text-slate-700 uppercase tracking-[0.12em]">Personal Information</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Full Name */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">
+                          Full Name <span className="text-red-500">*</span>
+                        </label>
+                        <input value={empForm.name}
+                          onChange={(e) => setEF('name', e.target.value)}
+                          onBlur={() => blurEmpField('name')}
+                          placeholder="e.g. Ahmad Khan"
+                          className={cn(INP, empErrors.name ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
+                        />
+                        {empErrors.name && <p className="text-[11px] text-red-500 mt-1.5 ml-1 flex items-center gap-1"><span>⚠</span>{empErrors.name}</p>}
+                      </div>
+
+                      {/* Date of Birth */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">
+                          Date of Birth <span className="text-red-500">*</span>
+                        </label>
+                        <DatePicker
+                          value={empForm.dateOfBirth}
+                          onChange={(v) => { setEF('dateOfBirth', v); blurEmpField('dateOfBirth'); }}
+                          className={cn(INP, empErrors.dateOfBirth ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
+                          hasError={!!empErrors.dateOfBirth}
+                          maxYear={new Date().getFullYear()}
+                        />
+                        {empErrors.dateOfBirth
+                          ? <p className="text-[11px] text-red-500 mt-1.5 ml-1 flex items-center gap-1"><span>⚠</span>{empErrors.dateOfBirth}</p>
+                          : empForm.dateOfBirth && (
+                            <p className="text-[11px] text-slate-400 mt-1.5 ml-1 flex items-center gap-1">
+                              <span className="w-3.5 h-3.5 inline-flex items-center justify-center rounded-full bg-slate-100 text-[8px]">✓</span>
+                              {calcAge(empForm.dateOfBirth)} years old
+                            </p>
+                          )
+                        }
+                      </div>
+
+                      {/* Nationality + Phone */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Nationality</label>
+                          <input value={empForm.nationality}
+                            onChange={(e) => setEF('nationality', e.target.value)}
+                            placeholder="e.g. Pakistani"
+                            className={INP}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Phone Number</label>
+                          <input value={empForm.phone}
+                            onChange={(e) => setEF('phone', e.target.value)}
+                            onBlur={() => blurEmpField('phone')}
+                            placeholder="+971 50 000 0000"
+                            className={cn(INP, empErrors.phone ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
+                          />
+                          {empErrors.phone && <p className="text-[11px] text-red-500 mt-1 ml-1">{empErrors.phone}</p>}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Status</label>
-                    <select value={empForm.status} onChange={(e) => setEF('status', e.target.value)} className={SEL}>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                </div>
 
-                {/* Nationality + Phone */}
-                <div className="grid grid-cols-2 gap-3">
+                  {/* Divider */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-slate-100" />
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Employment</span>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+
+                  {/* ── Section 2: Employment Details ── */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Nationality</label>
-                    <input
-                      value={empForm.nationality}
-                      onChange={(e) => setEF('nationality', e.target.value)}
-                      placeholder="e.g. Pakistani"
-                      className={INP}
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background:'linear-gradient(135deg,#16a34a,#15803d)' }}>
+                        <BadgeCheck className="w-3 h-3 text-white" />
+                      </div>
+                      <p className="text-[11px] font-black text-slate-700 uppercase tracking-[0.12em]">Employment Details</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Role + Status */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 mb-1.5">
+                            Role <span className="text-red-500">*</span>
+                          </label>
+                          <select value={empForm.role} onChange={(e) => setEF('role', e.target.value)} className={SEL}>
+                            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Status</label>
+                          <select value={empForm.status} onChange={(e) => setEF('status', e.target.value)} className={SEL}>
+                            <option value="active">● Active</option>
+                            <option value="inactive">○ Inactive</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Join Date */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">
+                          Join Date <span className="text-red-500">*</span>
+                        </label>
+                        <DatePicker
+                          value={empForm.joinDate}
+                          onChange={(v) => { setEF('joinDate', v); blurEmpField('joinDate'); }}
+                          className={cn(INP, empErrors.joinDate ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
+                          hasError={!!empErrors.joinDate}
+                          minYear={1950}
+                          maxYear={new Date().getFullYear() + 2}
+                        />
+                        {empErrors.joinDate && <p className="text-[11px] text-red-500 mt-1.5 ml-1 flex items-center gap-1"><span>⚠</span>{empErrors.joinDate}</p>}
+                      </div>
+
+                      {/* Monthly Salary */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">
+                          Monthly Salary <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <div className="absolute left-0 top-0 h-full flex items-center pl-4 pr-3 text-[13px] font-bold text-slate-400 select-none pointer-events-none border-r border-slate-200">
+                            AED
+                          </div>
+                          <input value={empForm.monthlySalary}
+                            onChange={(e) => setEF('monthlySalary', e.target.value)}
+                            onBlur={() => blurEmpField('monthlySalary')}
+                            type="number" min="0" step="50" placeholder="2,500"
+                            className={cn(INP, 'pl-16', empErrors.monthlySalary ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
+                          />
+                        </div>
+                        {empErrors.monthlySalary
+                          ? <p className="text-[11px] text-red-500 mt-1.5 ml-1 flex items-center gap-1"><span>⚠</span>{empErrors.monthlySalary}</p>
+                          : empForm.monthlySalary
+                            ? <p className="text-[11px] text-emerald-600 mt-1.5 ml-1 font-semibold">AED {fmtAmt(Number(empForm.monthlySalary))} per month</p>
+                            : null
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-slate-100" />
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Notes</span>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+
+                  {/* ── Section 3: Notes ── */}
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background:'linear-gradient(135deg,#7c3aed,#6d28d9)' }}>
+                        <FileText className="w-3 h-3 text-white" />
+                      </div>
+                      <p className="text-[11px] font-black text-slate-700 uppercase tracking-[0.12em]">Notes</p>
+                      <span className="text-[10px] text-slate-300 font-medium">optional</span>
+                    </div>
+                    <textarea value={empForm.notes}
+                      onChange={(e) => setEF('notes', e.target.value)}
+                      rows={3}
+                      placeholder="Accommodation details, visa status, contract notes…"
+                      className={`${INP} h-auto py-3 resize-none leading-relaxed`}
                     />
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Phone</label>
-                    <input
-                      value={empForm.phone}
-                      onChange={(e) => setEF('phone', e.target.value)}
-                      onBlur={() => blurEmpField('phone')}
-                      placeholder="+971 50 000 0000"
-                      className={cn(INP, empErrors.phone ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
-                    />
-                    {empErrors.phone && <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{empErrors.phone}</p>}
-                  </div>
-                </div>
 
-                {/* Date of Birth + Join Date */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                      Date of Birth <span className="text-red-500">*</span>
-                    </label>
-                    <DatePicker
-                      value={empForm.dateOfBirth}
-                      onChange={(v) => { setEF('dateOfBirth', v); blurEmpField('dateOfBirth'); }}
-                      className={cn(INP, empErrors.dateOfBirth ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
-                      hasError={!!empErrors.dateOfBirth}
-                    />
-                    {empErrors.dateOfBirth
-                      ? <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{empErrors.dateOfBirth}</p>
-                      : empForm.dateOfBirth && <p className="text-[11px] text-slate-400 mt-1 ml-1">{calcAge(empForm.dateOfBirth)} years old</p>
-                    }
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                      Join Date <span className="text-red-500">*</span>
-                    </label>
-                    <DatePicker
-                      value={empForm.joinDate}
-                      onChange={(v) => { setEF('joinDate', v); blurEmpField('joinDate'); }}
-                      className={cn(INP, empErrors.joinDate ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
-                      hasError={!!empErrors.joinDate}
-                    />
-                    {empErrors.joinDate && <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{empErrors.joinDate}</p>}
-                  </div>
-                </div>
-
-                {/* Monthly Salary */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                    Monthly Salary (AED) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    value={empForm.monthlySalary}
-                    onChange={(e) => setEF('monthlySalary', e.target.value)}
-                    onBlur={() => blurEmpField('monthlySalary')}
-                    type="number"
-                    min="0"
-                    step="50"
-                    placeholder="e.g. 2500"
-                    className={cn(INP, empErrors.monthlySalary ? 'border-red-400 bg-red-50 focus:border-red-400 focus:ring-red-400/10' : '')}
-                  />
-                  {empErrors.monthlySalary && <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{empErrors.monthlySalary}</p>}
-                  {!empErrors.monthlySalary && empForm.monthlySalary && (
-                    <p className="text-[11px] text-slate-400 mt-1 ml-1">AED {fmtAmt(Number(empForm.monthlySalary))} / month</p>
-                  )}
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Notes</label>
-                  <textarea
-                    value={empForm.notes}
-                    onChange={(e) => setEF('notes', e.target.value)}
-                    rows={3}
-                    placeholder="Any additional notes…"
-                    className={`${INP} h-auto py-3 resize-none`}
-                  />
+                  <p className="text-[10px] text-slate-300 text-center pb-2">
+                    Fields marked <span className="text-red-400 font-bold">*</span> are required
+                  </p>
                 </div>
               </form>
 
-              <div className="px-6 py-4 border-t border-slate-100 flex gap-3 shrink-0">
+              {/* ─ Footer actions ─ */}
+              <div className="px-6 py-4 border-t border-slate-100 flex gap-3 shrink-0 bg-slate-50/60">
                 <button type="button" onClick={() => { setEmpDrawer(null); setEmpErrors({}); }} disabled={isSavingEmp}
-                  className="flex-1 h-11 rounded-2xl border-2 border-slate-200 text-[14px] font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50">
+                  className="flex-1 h-11 rounded-2xl border-2 border-slate-200 text-[14px] font-bold text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-50">
                   Cancel
                 </button>
                 <button onClick={handleSaveEmp} disabled={isSavingEmp}
-                  className="flex-1 h-11 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-60"
-                  style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow:'0 4px 14px rgba(11,29,58,0.3)' }}>
+                  className="flex-[2] h-11 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60"
+                  style={{ background:'linear-gradient(135deg,#0b1d3a,#1e3a6e)', boxShadow:'0 4px 16px rgba(11,29,58,0.35)' }}>
                   {isSavingEmp ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
                   {isSavingEmp ? 'Saving…' : empDrawer === 'add' ? 'Add Employee' : 'Save Changes'}
                 </button>

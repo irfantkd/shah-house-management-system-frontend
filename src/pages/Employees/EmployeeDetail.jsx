@@ -627,11 +627,11 @@ export default function EmployeeDetail() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Date of Birth *</label>
-                    <DatePicker value={editForm.dateOfBirth ?? ''} onChange={(v) => setEF('dateOfBirth', v)} required className={INP} />
+                    <DatePicker value={editForm.dateOfBirth ?? ''} onChange={(v) => setEF('dateOfBirth', v)} required className={INP} maxYear={new Date().getFullYear()} />
                   </div>
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Join Date</label>
-                    <DatePicker value={editForm.joinDate ?? ''} onChange={(v) => setEF('joinDate', v)} className={INP} />
+                    <DatePicker value={editForm.joinDate ?? ''} onChange={(v) => setEF('joinDate', v)} className={INP} minYear={1950} maxYear={new Date().getFullYear() + 2} />
                   </div>
                 </div>
                 <div>
