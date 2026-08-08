@@ -10,6 +10,7 @@ import {
   RiEditLine, RiDeleteBinLine, RiWalletLine, RiHome4Line, RiShoppingCart2Line,
   RiFilter3Line, RiReceiptLine, RiCheckboxCircleLine, RiCloseLine,
   RiArrowUpLine, RiArrowDownLine, RiStore2Line, RiLeafLine,
+  RiCarLine, RiBankCardLine, RiBuildingLine,
 } from 'react-icons/ri';
 import {
   useGetQuery, usePostMutation, usePutMutation, useDeleteMutation,
@@ -49,6 +50,26 @@ const SEG_CFG = {
   household: { label: 'Household & Daily',   color: '#16a34a', bg: '#f0fdf4', Icon: RiShoppingCart2Line },
 };
 
+const WALLET_CFG = {
+  home:     { label: 'Home',     color: '#16a34a', bg: '#f0fdf4', Icon: RiHome4Line    },
+  property: { label: 'Property', color: '#0891b2', bg: '#ecfeff', Icon: RiBuildingLine },
+  vehicle:  { label: 'Vehicle',  color: '#7c3aed', bg: '#ede9fe', Icon: RiCarLine      },
+  salary:   { label: 'Salary',   color: '#0b1d3a', bg: '#eef2fb', Icon: RiBankCardLine },
+};
+
+function WalletBadge({ walletType, className }) {
+  const cfg = WALLET_CFG[walletType];
+  if (!cfg) return null;
+  const Icon = cfg.Icon;
+  return (
+    <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold shrink-0', className)}
+      style={{ background: cfg.bg, color: cfg.color }}>
+      <Icon className="w-3 h-3" />
+      {cfg.label}
+    </span>
+  );
+}
+
 const MONTH_NAMES = [
   'January','February','March','April','May','June',
   'July','August','September','October','November','December',
@@ -72,16 +93,18 @@ export default function ExpensesPage() {
   const now = new Date();
 
   // ── Filter state (all sent to backend) ────────────────────────────────────
-  const [year,        setYear]        = useState(now.getFullYear());
-  const [month,       setMonth]       = useState(now.getMonth());
-  const [segment,     setSegment]     = useState('all');
-  const [searchInput, setSearchInput] = useState('');
-  const [search,      setSearch]      = useState('');
-  const [page,        setPage]        = useState(1);
+  const [year,         setYear]         = useState(now.getFullYear());
+  const [month,        setMonth]        = useState(now.getMonth());
+  const [segment,      setSegment]      = useState('all');
+  const [walletFilter, setWalletFilter] = useState('all');
+  const [searchInput,  setSearchInput]  = useState('');
+  const [search,       setSearch]       = useState('');
+  const [page,         setPage]         = useState(1);
 
   // ── Modal state ───────────────────────────────────────────────────────────
   const [modal,     setModal]     = useState(null); // null | 'add' | expense obj
   const [delTarget, setDelTarget] = useState(null);
+  const [deleting,  setDeleting]  = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -90,7 +113,7 @@ export default function ExpensesPage() {
   }, [searchInput]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(1); }, [year, month, segment]);
+  useEffect(() => { setPage(1); }, [year, month, segment, walletFilter]);
 
   // ── API params ────────────────────────────────────────────────────────────
   const baseParams = {
@@ -100,13 +123,14 @@ export default function ExpensesPage() {
   };
   const listParams = {
     ...baseParams,
-    ...(segment !== 'all' && { segment }),
+    ...(segment      !== 'all' && { segment }),
+    ...(walletFilter !== 'all' && { walletType: walletFilter }),
     ...(search && { search }),
     page,
     limit: PAGE_SIZE,
   };
 
-  const { data: listResult = {} } = useGetQuery(
+  const { data: listResult = {}, isLoading: listLoading } = useGetQuery(
     { path: '/expenses', params: listParams },
     { skip: !propertyId },
   );
@@ -195,6 +219,7 @@ export default function ExpensesPage() {
   };
 
   const handleDelete = async () => {
+    setDeleting(true);
     try {
       await deleteMut({ path: `/expenses/${delTarget.id}` }).unwrap();
       await refetchWallet();
@@ -202,6 +227,8 @@ export default function ExpensesPage() {
       setDelTarget(null);
     } catch {
       toast.error('Failed to delete');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -437,19 +464,98 @@ export default function ExpensesPage() {
                 ))}
               </div>
             </div>
+
+            {/* Wallet filter pills */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 flex items-center gap-1">
+                <RiWalletLine className="w-3 h-3" /> Wallet
+              </span>
+              {([
+                { k: 'all', label: 'All Wallets', color: null, bg: null },
+                ...Object.entries(WALLET_CFG).map(([k, v]) => ({ k, label: v.label, color: v.color, bg: v.bg })),
+              ]).map(({ k, label, color, bg }) => {
+                const active = walletFilter === k;
+                return (
+                  <button key={k} onClick={() => setWalletFilter(k)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border whitespace-nowrap',
+                      active
+                        ? k === 'all' ? 'bg-navy-900 text-white border-navy-900 shadow-sm' : 'text-white border-transparent shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700',
+                    )}
+                    style={active && k !== 'all' && color ? { background: color, borderColor: color } : {}}
+                  >
+                    <RiWalletLine className="w-3 h-3" />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Rows */}
-          {expenses.length === 0 ? (
+          {/* ── Table header (desktop) ── */}
+          {!listLoading && expenses.length > 0 && (
+            <div className="hidden md:grid items-center px-5 py-2.5 border-b border-slate-100 bg-slate-50/80"
+              style={{ gridTemplateColumns: '40px 1fr 152px 124px 90px 108px 56px', gap: '12px' }}>
+              <div />
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Description</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Wallet</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</div>
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Amount</div>
+              <div />
+            </div>
+          )}
+
+          {/* ── Rows ── */}
+          {listLoading ? (
+            <>
+              <div className="hidden md:grid items-center px-5 py-2.5 border-b border-slate-100 bg-slate-50/80 animate-pulse"
+                style={{ gridTemplateColumns: '40px 1fr 152px 124px 90px 108px 56px', gap: '12px' }}>
+                {[60, 200, 80, 70, 60, 50, 0].map((w, i) => (
+                  <div key={i} className={w ? 'h-2.5 bg-slate-200 rounded-full' : ''} style={{ width: w || undefined }} />
+                ))}
+              </div>
+              <div className="divide-y divide-slate-50">
+                {Array.from({ length: PAGE_SIZE }).map((_, i) => (
+                  <div key={i} className="animate-pulse px-5 py-3.5">
+                    {/* Desktop skeleton */}
+                    <div className="hidden md:grid items-center"
+                      style={{ gridTemplateColumns: '40px 1fr 152px 124px 90px 108px 56px', gap: '12px' }}>
+                      <div className="w-9 h-9 rounded-xl bg-slate-100" />
+                      <div className="space-y-2">
+                        <div className="h-3 bg-slate-100 rounded-full w-3/4" />
+                        <div className="h-2.5 bg-slate-100 rounded-full w-1/2" />
+                      </div>
+                      <div className="h-6 bg-slate-100 rounded-lg w-28" />
+                      <div className="h-6 bg-slate-100 rounded-lg w-20" />
+                      <div className="h-3 bg-slate-100 rounded-full w-16" />
+                      <div className="h-3 bg-slate-100 rounded-full w-14 ml-auto" />
+                      <div className="h-6 bg-slate-100 rounded-lg w-10 ml-auto" />
+                    </div>
+                    {/* Mobile skeleton */}
+                    <div className="md:hidden flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-slate-100 shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-slate-100 rounded-full w-3/4" />
+                        <div className="h-2.5 bg-slate-100 rounded-full w-1/2" />
+                      </div>
+                      <div className="h-3 bg-slate-100 rounded-full w-16 shrink-0" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : expenses.length === 0 ? (
             <div className="py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                 <RiReceiptLine className="w-7 h-7 text-slate-300" strokeWidth={1.5} />
               </div>
               <p className="font-semibold text-slate-400 text-[14px]">
-                {search || segment !== 'all' ? 'No matching expenses' : `No expenses for ${MONTH_NAMES[month]} ${year}`}
+                {search || segment !== 'all' || walletFilter !== 'all' ? 'No matching expenses' : `No expenses for ${MONTH_NAMES[month]} ${year}`}
               </p>
               <p className="text-slate-300 text-[12px] mt-1">
-                {search || segment !== 'all' ? 'Try adjusting your filters.' : 'Log property or household spending to get started.'}
+                {search || segment !== 'all' || walletFilter !== 'all' ? 'Try adjusting your filters.' : 'Log property or household spending to get started.'}
               </p>
               <button onClick={() => setModal('add')}
                 className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all"
@@ -461,8 +567,8 @@ export default function ExpensesPage() {
             <div className="divide-y divide-slate-50">
               <AnimatePresence mode="popLayout">
                 {expenses.map((item, i) => {
-                  const cfg    = catCfgFrom(allCats, item.category);
-                  const segCfg = SEG_CFG[item.segment] ?? SEG_CFG.property;
+                  const cfg     = catCfgFrom(allCats, item.category);
+                  const segCfg  = SEG_CFG[item.segment] ?? SEG_CFG.property;
                   const SegIcon = segCfg.Icon;
                   return (
                     <MotionSwipeableRow
@@ -477,56 +583,98 @@ export default function ExpensesPage() {
                       rightIcon={<RiDeleteBinLine style={{ color: '#dc2626', width: 20, height: 20 }} />}
                       rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                     >
-                      <div className="group flex items-center gap-3.5 px-5 py-3.5 hover:bg-slate-50/70 transition-colors">
+                      {/* ── Mobile card row ── */}
+                      <div className="md:hidden flex items-start gap-3 px-4 py-3.5 hover:bg-slate-50/60 transition-colors">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                          style={{ background: cfg.bg }}>
+                          <SegIcon className="w-4 h-4" style={{ color: cfg.color }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">{item.description}</p>
+                          {item.vendor && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <RiStore2Line className="w-3 h-3 text-slate-300" />
+                              <span className="text-[11px] text-slate-400 truncate">{item.vendor}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold"
+                              style={{ background: cfg.bg, color: cfg.color }}>{item.category}</span>
+                            <WalletBadge walletType={item.walletType} />
+                            <span className="text-[11px] text-slate-400">{fmtDate(item.date)}</span>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-[13px] font-bold text-slate-900 tabular-nums">{fmtAED(item.amount)}</p>
+                          <div className="flex items-center gap-0.5 mt-1 justify-end">
+                            <button onClick={() => setModal(item)}
+                              className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                              <RiEditLine className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setDelTarget(item)}
+                              className="w-6 h-6 rounded flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+                              <RiDeleteBinLine className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
 
-                        {/* Category avatar */}
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      {/* ── Desktop table row ── */}
+                      <div className="hidden md:grid items-center px-5 py-3 hover:bg-slate-50/60 transition-colors"
+                        style={{ gridTemplateColumns: '40px 1fr 152px 124px 90px 108px 56px', gap: '12px' }}>
+
+                        {/* Col 1 — Icon */}
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center"
                           style={{ background: cfg.bg }}>
                           <SegIcon className="w-4 h-4" style={{ color: cfg.color }} />
                         </div>
 
-                        {/* Text */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">
-                            {item.description}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            {item.vendor && (
-                              <>
-                                <RiStore2Line className="w-3 h-3 text-slate-300 shrink-0" />
-                                <span className="text-[11px] text-slate-400 truncate max-w-35">{item.vendor}</span>
-                                <span className="text-slate-200 text-[10px]">·</span>
-                              </>
-                            )}
-                            <span className="text-[11px] text-slate-400">{fmtDate(item.date)}</span>
-                          </div>
+                        {/* Col 2 — Description + vendor */}
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-slate-800 leading-tight truncate">{item.description}</p>
+                          {item.vendor ? (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <RiStore2Line className="w-3 h-3 text-slate-300 shrink-0" />
+                              <span className="text-[11px] text-slate-400 truncate">{item.vendor}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-300">—</span>
+                          )}
                         </div>
 
-                        {/* Category chip (hidden on mobile) */}
-                        <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-xl text-[10px] font-bold shrink-0"
-                          style={{ background: cfg.bg, color: cfg.color }}>
-                          {item.category}
-                        </span>
+                        {/* Col 3 — Category */}
+                        <div className="min-w-0">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold leading-none max-w-full"
+                            style={{ background: cfg.bg, color: cfg.color }}>
+                            <span className="truncate">{item.category}</span>
+                          </span>
+                          <p className="text-[10px] text-slate-400 mt-1 pl-0.5 uppercase tracking-wide font-semibold">
+                            {item.segment === 'property' ? 'Property' : 'Household'}
+                          </p>
+                        </div>
 
-                        {/* Segment chip */}
-                        <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold shrink-0"
-                          style={{ background: segCfg.bg, color: segCfg.color }}>
-                          <segCfg.Icon className="w-3 h-3" />
-                          {item.segment === 'property' ? 'Property' : 'Household'}
-                        </span>
+                        {/* Col 4 — Wallet */}
+                        <div>
+                          <WalletBadge walletType={item.walletType} />
+                        </div>
 
-                        {/* Amount */}
-                        <p className="text-[14px] font-bold text-slate-900 shrink-0 tabular-nums">
-                          {fmtAED(item.amount)}
-                        </p>
+                        {/* Col 5 — Date */}
+                        <div>
+                          <span className="text-[12px] text-slate-600 font-medium">{fmtDate(item.date)}</span>
+                        </div>
 
-                        {/* Actions — desktop only, swipe on mobile */}
-                        <div className="hidden sm:flex items-center gap-1 shrink-0">
-                          <button onClick={() => setModal(item)} title="Edit expense"
+                        {/* Col 6 — Amount */}
+                        <div className="text-right">
+                          <p className="text-[14px] font-bold text-slate-900 tabular-nums">{fmtAED(item.amount)}</p>
+                        </div>
+
+                        {/* Col 7 — Actions */}
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => setModal(item)} title="Edit"
                             className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-all">
                             <RiEditLine className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => setDelTarget(item)} title="Delete expense"
+                          <button onClick={() => setDelTarget(item)} title="Delete"
                             className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
                             <RiDeleteBinLine className="w-3.5 h-3.5" />
                           </button>
@@ -582,10 +730,11 @@ export default function ExpensesPage() {
       {/* ── Delete confirm ── */}
       <ConfirmDialog
         open={!!delTarget}
-        onClose={() => setDelTarget(null)}
+        onClose={() => !deleting && setDelTarget(null)}
         onConfirm={handleDelete}
+        loading={deleting}
         title="Delete Expense"
-        message={`Delete "${delTarget?.description}" (${fmtAED(delTarget?.amount)})? The amount will be refunded back to your ${delTarget?.walletType === 'vehicle' ? 'Vehicle' : delTarget?.walletType === 'property' ? 'Property' : 'Home'} Wallet.`}
+        message={`Delete "${delTarget?.description}" (${fmtAED(delTarget?.amount)})? The amount will be refunded back to your ${WALLET_CFG[delTarget?.walletType]?.label ?? 'Home'} Wallet.`}
         confirmLabel="Delete"
         destructive
       />
