@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Wallet, Car, Home, Banknote, Building2, Plus, ArrowDownLeft, ArrowUpRight,
   AlertTriangle, ChevronRight, Loader2, FileDown, BarChart3, Share2, CheckCircle2,
+  RefreshCw, Search, X, CalendarDays, SlidersHorizontal,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, API_BASE_URL } from '../../api/apiSlice';
 import DatePicker from '../../components/ui/DatePicker';
@@ -42,35 +43,101 @@ const REPORT_WALLETS = [
   { k: 'salary',   l: 'Salary'      },
 ];
 
-const TXN_PAGE_SIZE = 8;
+const TXN_PAGE_SIZE = 10;
+
+const TXN_PERIODS = [
+  { k: 'all',    label: 'All Time'   },
+  { k: 'month',  label: 'This Month' },
+  { k: 'lastm',  label: 'Last Month' },
+  { k: '3month', label: '3 Months'   },
+  { k: 'year',   label: 'This Year'  },
+  { k: 'custom', label: 'Custom'     },
+];
+const TXN_PERIOD_LABEL = {
+  all: 'All Time', month: 'This Month', lastm: 'Last Month',
+  '3month': 'Last 3 Months', year: 'This Year', custom: 'Custom Range',
+};
 
 function fmt(n) { return Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 }); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
 const INP = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 
+function WalletSkeleton() {
+  const p = 'rounded-2xl bg-slate-100 animate-pulse';
+  return (
+    <div className="space-y-6">
+      {/* header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-2">
+          <div className={`${p} h-7 w-24`} />
+          <div className={`${p} h-4 w-64`} />
+        </div>
+        <div className="flex gap-2">
+          <div className={`${p} h-10 w-28`} />
+          <div className={`${p} h-10 w-36`} />
+        </div>
+      </div>
+      {/* wallet cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {[...Array(4)].map((_, i) => <div key={i} className={`${p} h-52`} />)}
+      </div>
+      {/* salary strip */}
+      <div className={`${p} h-16`} />
+      {/* transaction list */}
+      <div className={`${p} h-72`} />
+    </div>
+  );
+}
+
 export default function WalletPage() {
   const propertyId  = useSelector(selectCurrentPropertyId);
   const property    = useSelector(selectCurrentProperty);
   const authToken   = useSelector((s) => s.auth?.token);
 
-  const { data: walletData, refetch: refetchWallets } = useGetQuery(
+  const {
+    data: walletData,
+    isLoading: walletLoading,
+    isError:   walletError,
+    error:     walletErr,
+    refetch:   refetchWallets,
+  } = useGetQuery(
     { path: '/wallet', params: { propertyId } },
     { skip: !propertyId },
   );
 
-  // ── Transaction list state (server-side pagination + wallet filter) ──────────
-  const [txnPage,       setTxnPage]       = useState(1);
-  const [txnWalletFlt,  setTxnWalletFlt]  = useState('all');
+  // ── Transaction list state ─────────────────────────────────────────────────
+  const [txnPage,        setTxnPage]        = useState(1);
+  const [txnWalletFlt,   setTxnWalletFlt]   = useState('all');
+  const [txnType,        setTxnType]        = useState('all');    // all | credit | debit
+  const [txnPeriod,      setTxnPeriod]      = useState('all');
+  const [txnCustomFrom,  setTxnCustomFrom]  = useState('');
+  const [txnCustomTo,    setTxnCustomTo]    = useState('');
+  const [txnSearchInput, setTxnSearchInput] = useState('');
+  const [txnSearch,      setTxnSearch]      = useState('');
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => { setTxnSearch(txnSearchInput); setTxnPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [txnSearchInput]);
+
+  // Reset page on any filter change
+  useEffect(() => { setTxnPage(1); }, [txnWalletFlt, txnType, txnPeriod, txnCustomFrom, txnCustomTo, txnSearch]);
 
   const txnParams = useMemo(() => ({
     propertyId,
-    limit:  TXN_PAGE_SIZE,
-    page:   txnPage,
-    ...(txnWalletFlt !== 'all' && { walletType: txnWalletFlt }),
-  }), [propertyId, txnPage, txnWalletFlt]);
+    limit: TXN_PAGE_SIZE,
+    page:  txnPage,
+    ...(txnWalletFlt !== 'all'    && { walletType: txnWalletFlt }),
+    ...(txnType      !== 'all'    && { txnType }),
+    ...(txnPeriod !== 'all' && txnPeriod !== 'custom' && { period: txnPeriod }),
+    ...(txnPeriod === 'custom' && txnCustomFrom && { startDate: txnCustomFrom }),
+    ...(txnPeriod === 'custom' && txnCustomTo   && { endDate:   txnCustomTo   }),
+    ...(txnSearch && { search: txnSearch }),
+  }), [propertyId, txnPage, txnWalletFlt, txnType, txnPeriod, txnCustomFrom, txnCustomTo, txnSearch]);
 
-  const { data: recentResult, isFetching: txnFetching } = useGetQuery(
+  const { data: recentResult, isLoading: txnLoading, isFetching: txnFetching } = useGetQuery(
     { path: '/wallet/transactions', params: txnParams },
     { skip: !propertyId },
   );
@@ -185,8 +252,26 @@ export default function WalletPage() {
   const reportLoading = reportStep === 'generating' || reportStep === 'sharing';
   const resetReport   = () => { setReportStep('idle'); setReportBlob(null); };
 
-  // Reset to page 1 when wallet filter changes
-  const handleTxnFilter = (w) => { setTxnWalletFlt(w); setTxnPage(1); };
+  const handleTxnWallet = (w) => { setTxnWalletFlt(w); setTxnPage(1); };
+
+  // ── Loading / error gates ─────────────────────────────────────────────────────
+  if (walletLoading || !propertyId) return <WalletSkeleton />;
+  if (walletError) return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-4">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#fef2f2' }}>
+        <AlertTriangle className="w-8 h-8 text-red-500" />
+      </div>
+      <div>
+        <h2 className="text-lg font-bold text-slate-900 mb-1">Failed to load wallets</h2>
+        <p className="text-sm text-slate-500 max-w-xs">{walletErr?.data?.message ?? walletErr?.message ?? 'An error occurred'}</p>
+      </div>
+      <button onClick={refetchWallets}
+        className="mt-2 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white"
+        style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+        <RefreshCw className="w-4 h-4" /> Retry
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -220,67 +305,81 @@ export default function WalletPage() {
       </motion.div>
 
       {/* ── Wallet Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {Object.entries(WALLETS).map(([key, w], i) => {
-          const wallet  = walletsMap[key];
-          const balance = wallet.balance ?? 0;
-          const low     = balance < LOW_BALANCE_THRESHOLD;
-          const empty   = balance <= 0;
-          const Icon    = w.icon;
+          const wallet   = walletsMap[key];
+          const balance  = wallet.balance ?? 0;
+          const low      = balance < LOW_BALANCE_THRESHOLD;
+          const empty    = balance <= 0;
+          const Icon     = w.icon;
           const isSalary = key === 'salary';
 
           return (
-            <motion.div key={key} {...fade(0.06 + i * 0.06)}>
-              <div className="rounded-2xl overflow-hidden" style={{ background: w.gradient, boxShadow: `0 8px 32px ${w.color}30` }}>
+            <motion.div key={key} {...fade(0.06 + i * 0.06)} className="flex flex-col">
+              <div className="rounded-2xl overflow-hidden flex flex-col flex-1"
+                style={{ background: w.gradient, boxShadow: `0 6px 24px ${w.color}28` }}>
 
-                <Link to={w.detailLink} className="block p-6 pb-5 hover:bg-white/5 transition-colors group">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/10">
-                      <Icon className="w-5 h-5 text-white" />
+                <Link to={w.detailLink} className="block p-4 sm:p-5 pb-3 sm:pb-4 hover:bg-white/5 transition-colors group flex-1">
+                  {/* Icon + badge row */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center bg-white/10 shrink-0">
+                      <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       {!isSalary && (empty || low) && (
-                        <span className={cn('flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-xl',
-                          empty ? 'bg-red-500 text-white' : 'bg-amber-400 text-amber-900')}>
-                          <AlertTriangle className="w-3 h-3" />
-                          {empty ? 'Empty' : 'Low'}
+                        <span className={cn(
+                          'flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-1 rounded-lg',
+                          empty ? 'bg-red-500 text-white' : 'bg-amber-400 text-amber-900',
+                        )}>
+                          <AlertTriangle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                          <span className="hidden sm:inline">{empty ? 'Empty' : 'Low'}</span>
+                          <span className="sm:hidden">{empty ? '!' : '!'}</span>
                         </span>
                       )}
-                      <span className="flex items-center gap-0.5 text-white/50 group-hover:text-white/80 transition-colors text-[11px] font-semibold whitespace-nowrap">
-                        {isSalary ? 'Manage' : 'View'} <ChevronRight className="w-3.5 h-3.5" />
-                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-white/40 group-hover:text-white/70 transition-colors" />
                     </div>
                   </div>
-                  <p className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">{w.label}</p>
-                  <p className="text-white font-bold text-3xl leading-tight">AED {fmt(balance)}</p>
-                  <p className="text-white/40 text-[12px] mt-1.5">{w.desc}</p>
+
+                  {/* Label */}
+                  <p className="text-white/55 text-[9px] sm:text-[10px] font-black uppercase tracking-wider mb-1 leading-none">
+                    {w.label.replace(' Wallet', '')}
+                  </p>
+
+                  {/* Balance */}
+                  <p className="text-white font-black text-lg sm:text-2xl leading-tight tabular-nums">
+                    AED <span className="text-xl sm:text-3xl">{fmt(balance)}</span>
+                  </p>
+
+                  {/* Description — hidden on small mobile */}
+                  <p className="hidden sm:block text-white/35 text-[11px] mt-1.5 leading-tight line-clamp-2">{w.desc}</p>
                 </Link>
 
+                {/* Footer actions */}
                 <div className="border-t border-white/10">
                   {isSalary ? (
                     <div className="flex">
                       <Link to="/wallet/salary"
-                        className="flex-1 px-5 py-3.5 flex items-center justify-center gap-1.5 hover:bg-white/10 transition-colors border-r border-white/10">
-                        <ChevronRight className="w-3.5 h-3.5 text-white" />
-                        <span className="text-white text-[12px] font-bold">Transactions</span>
+                        className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-center gap-1 sm:gap-1.5 hover:bg-white/10 transition-colors border-r border-white/10">
+                        <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                        <span className="text-white text-[10px] sm:text-[11px] font-bold">History</span>
                       </Link>
                       <Link to="/employees"
-                        className="flex-1 px-5 py-3.5 flex items-center justify-center gap-1.5 hover:bg-white/10 transition-colors">
-                        <Banknote className="w-3.5 h-3.5 text-white" />
-                        <span className="text-white text-[12px] font-bold">Pay Salary</span>
+                        className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-center gap-1 sm:gap-1.5 hover:bg-white/10 transition-colors">
+                        <Banknote className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                        <span className="text-white text-[10px] sm:text-[11px] font-bold">Pay</span>
                       </Link>
                     </div>
                   ) : (
                     <div className="flex">
                       <Link to={w.detailLink}
-                        className="flex-1 px-5 py-3.5 flex items-center justify-center gap-1.5 hover:bg-white/10 transition-colors border-r border-white/10">
-                        <ChevronRight className="w-3.5 h-3.5 text-white" />
-                        <span className="text-white text-[12px] font-bold">Details</span>
+                        className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-center gap-1 sm:gap-1.5 hover:bg-white/10 transition-colors border-r border-white/10">
+                        <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                        <span className="text-white text-[10px] sm:text-[11px] font-bold">Details</span>
                       </Link>
                       <button onClick={() => openDeposit(key)}
-                        className="flex-1 px-5 py-3.5 flex items-center justify-center gap-1.5 hover:bg-white/10 transition-colors">
-                        <Plus className="w-3.5 h-3.5 text-white" />
-                        <span className="text-white text-[12px] font-bold">Deposit</span>
+                        className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-center gap-1 sm:gap-1.5 hover:bg-white/10 transition-colors">
+                        <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                        <span className="text-white text-[10px] sm:text-[11px] font-bold">Deposit</span>
                       </button>
                     </div>
                   )}
@@ -396,121 +495,401 @@ export default function WalletPage() {
         </div>
       </motion.div>
 
-      {/* ── Recent Transactions ── */}
+      {/* ── Transactions ── */}
       <motion.div {...fade(0.22)}>
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+        {/* isFetching progress bar */}
+        {txnFetching && !txnLoading && (
+          <div className="fixed top-0 left-0 right-0 z-9999 h-0.5 overflow-hidden">
+            <div className="h-full bg-blue-500" style={{ animation: 'walletProgress 1.4s ease-in-out infinite' }} />
+            <style>{`@keyframes walletProgress{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}`}</style>
+          </div>
+        )}
 
-          {/* Header */}
-          <div className="px-5 pt-4 pb-3 border-b border-slate-100">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-[14px] font-bold text-slate-800">Transactions</p>
-                <p className="text-[11px] text-slate-400 mt-0.5 tabular-nums">
-                  {txnFetching ? 'Loading…' : `${txnTotal} record${txnTotal !== 1 ? 's' : ''} · Page ${txnPage} of ${txnPages}`}
-                </p>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 16px rgba(0,0,0,0.06)' }}>
+
+          {/* ── Panel header ── */}
+          <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-4 border-b border-slate-100 space-y-4">
+
+            {/* Title row */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+                  <Wallet className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-slate-800 leading-none">All Transactions</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 tabular-nums">
+                    {txnFetching
+                      ? <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Loading…</span>
+                      : `${txnTotal} record${txnTotal !== 1 ? 's' : ''} · ${TXN_PERIOD_LABEL[txnPeriod]}`}
+                  </p>
+                </div>
               </div>
               <button onClick={() => setShowReports(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
-                <FileDown className="w-3.5 h-3.5" /> Export
+                className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors whitespace-nowrap">
+                <FileDown className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Export PDF</span>
+                <span className="sm:hidden">PDF</span>
               </button>
             </div>
 
-            {/* Wallet filter tabs */}
-            <div className="flex gap-1 overflow-x-auto pb-0.5 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
-              {[
-                { k: 'all',      l: 'All Wallets' },
-                { k: 'vehicle',  l: 'Vehicle'     },
-                { k: 'home',     l: 'Home'        },
-                { k: 'property', l: 'Property'    },
-                { k: 'salary',   l: 'Salary'      },
-              ].map(({ k, l }) => {
-                const wCfg  = k !== 'all' ? WALLETS[k] : null;
-                const isAct = txnWalletFlt === k;
-                return (
-                  <button key={k} type="button" onClick={() => handleTxnFilter(k)}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap"
-                    style={isAct
-                      ? { background: wCfg?.gradient ?? 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', color: '#fff' }
-                      : { background: '#f1f5f9', color: '#64748b' }}>
-                    {wCfg && <wCfg.icon className="w-3 h-3" />}
-                    {l}
-                  </button>
-                );
-              })}
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                value={txnSearchInput}
+                onChange={(e) => setTxnSearchInput(e.target.value)}
+                placeholder="Search by description, category, note…"
+                className="w-full h-10 pl-9 pr-9 rounded-xl border border-slate-200 bg-white text-[13px] placeholder-slate-400 outline-none transition-all focus:border-blue-400"
+              />
+              {txnSearchInput && (
+                <button onClick={() => { setTxnSearchInput(''); setTxnSearch(''); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
-          </div>
 
-          {/* Rows */}
-          <div className={cn('divide-y divide-slate-50 transition-opacity duration-150', txnFetching && 'opacity-50 pointer-events-none')}>
-            {allTxns.length === 0 && !txnFetching ? (
-              <div className="py-14 text-center">
-                <Wallet className="w-10 h-10 text-slate-200 mx-auto mb-3" strokeWidth={1.5} />
-                <p className="text-slate-400 text-[13px]">No transactions yet</p>
-              </div>
-            ) : allTxns.map((txn) => {
-              const isCredit = txn.type === 'credit';
-              const wCfg     = WALLETS[txn.walletType] ?? WALLETS.vehicle;
-              const WIcon    = wCfg.icon;
+            {/* Period pills + custom date range */}
+            {(() => {
+              const today = new Date().toISOString().split('T')[0];
+              const hasRange = txnCustomFrom || txnCustomTo;
+              const dayCount = txnCustomFrom && txnCustomTo
+                ? Math.max(0, Math.round((new Date(txnCustomTo) - new Date(txnCustomFrom)) / 86400000) + 1)
+                : null;
               return (
-                <div key={txn._id ?? txn.id} className="flex items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
-                  <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
-                    isCredit ? 'bg-emerald-50' : 'bg-red-50')}>
-                    {isCredit
-                      ? <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
-                      : <ArrowUpRight  className="w-4 h-4 text-red-500"     />}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', paddingBottom: '2px' }}>
+                    {TXN_PERIODS.map(({ k, label }) => {
+                      const active   = txnPeriod === k;
+                      const isCustom = k === 'custom';
+                      return (
+                        <button key={k}
+                          onClick={() => { setTxnPeriod(k); if (k !== 'custom') { setTxnCustomFrom(''); setTxnCustomTo(''); } }}
+                          className={cn(
+                            'shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold transition-all border whitespace-nowrap',
+                            active
+                              ? 'text-white border-transparent shadow-md'
+                              : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700',
+                          )}
+                          style={active ? { background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' } : {}}>
+                          {isCustom && <CalendarDays className="w-3.5 h-3.5 shrink-0" />}
+                          {label}
+                          {isCustom && hasRange && active && (
+                            <span className="ml-0.5 w-2 h-2 rounded-full bg-blue-300 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-slate-800 truncate">
-                      {isCredit ? (txn.note || 'Deposit received') : (txn.description || 'Expense deducted')}
-                    </p>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                        style={{ background: wCfg.bg, color: wCfg.color }}>
-                        <WIcon className="w-2.5 h-2.5" />
-                        {wCfg.label.replace(' Wallet', '')}
-                      </span>
-                      {txn.category && (
-                        <>
-                          <span className="text-[10px] text-slate-300">·</span>
-                          <span className="text-[10px] text-slate-400 capitalize">{txn.category}</span>
-                        </>
-                      )}
-                      <span className="text-[10px] text-slate-300">·</span>
-                      <span className="text-[11px] text-slate-400">{fmtDate(txn.date)}</span>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={cn('text-[14px] font-bold tabular-nums', isCredit ? 'text-emerald-600' : 'text-red-500')}>
-                      {isCredit ? '+' : '−'}AED {fmt(txn.amount)}
-                    </p>
-                  </div>
+
+                  {/* Custom date range card */}
+                  <AnimatePresence>
+                    {txnPeriod === 'custom' && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -6, scaleY: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                        exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
+                        transition={{ duration: 0.18, ease: 'easeOut' }}
+                        style={{ transformOrigin: 'top' }}>
+                        <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                style={{ background: 'linear-gradient(135deg,#eff6ff,#ecfeff)' }}>
+                                <CalendarDays className="w-3.5 h-3.5 text-blue-600" />
+                              </div>
+                              <div>
+                                <p className="text-[12px] font-bold text-slate-800 leading-none">Custom Date Range</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Filter by specific period</p>
+                              </div>
+                            </div>
+                            {hasRange && (
+                              <button onClick={() => { setTxnCustomFrom(''); setTxnCustomTo(''); }}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                                <X className="w-3.5 h-3.5" /> Clear
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Start Date</label>
+                              <div className="relative">
+                                <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
+                                  style={{ color: txnCustomFrom ? '#2563eb' : '#94a3b8' }} />
+                                <input type="date" value={txnCustomFrom}
+                                  max={txnCustomTo || today}
+                                  onChange={(e) => setTxnCustomFrom(e.target.value)}
+                                  className="w-full h-10 pl-8 pr-2 rounded-xl border text-[12px] outline-none transition-all"
+                                  style={{
+                                    borderColor: txnCustomFrom ? '#93c5fd' : '#e2e8f0',
+                                    background:  txnCustomFrom ? '#eff6ff' : '#fff',
+                                    color:       txnCustomFrom ? '#1d4ed8' : '#374151',
+                                    fontWeight:  txnCustomFrom ? '600' : '400',
+                                  }} />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">End Date</label>
+                              <div className="relative">
+                                <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
+                                  style={{ color: txnCustomTo ? '#2563eb' : '#94a3b8' }} />
+                                <input type="date" value={txnCustomTo}
+                                  min={txnCustomFrom || undefined}
+                                  max={today}
+                                  onChange={(e) => setTxnCustomTo(e.target.value)}
+                                  className="w-full h-10 pl-8 pr-2 rounded-xl border text-[12px] outline-none transition-all"
+                                  style={{
+                                    borderColor: txnCustomTo ? '#93c5fd' : '#e2e8f0',
+                                    background:  txnCustomTo ? '#eff6ff' : '#fff',
+                                    color:       txnCustomTo ? '#1d4ed8' : '#374151',
+                                    fontWeight:  txnCustomTo ? '600' : '400',
+                                  }} />
+                              </div>
+                            </div>
+                          </div>
+
+                          {hasRange ? (
+                            <div className="mt-2.5 flex items-center justify-between gap-2 px-3 py-2 rounded-xl"
+                              style={{ background: 'linear-gradient(135deg,#eff6ff,#ecfeff)', border: '1px solid #bfdbfe' }}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                                <span className="text-[11px] font-semibold text-slate-700 truncate">
+                                  {txnCustomFrom ? fmtDate(txnCustomFrom) : 'Any start'} → {txnCustomTo ? fmtDate(txnCustomTo) : 'Today'}
+                                </span>
+                              </div>
+                              {dayCount !== null && (
+                                <span className="shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black text-blue-700"
+                                  style={{ background: '#dbeafe' }}>
+                                  {dayCount}d
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-[10px] text-slate-400 text-center">Select start and end date to filter</p>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
-            })}
-          </div>
+            })()}
 
-          {/* Pagination footer */}
-          {txnPages > 1 && (
-            <div className="flex items-center justify-between px-5 py-3 bg-slate-50/60 border-t border-slate-100">
-              <p className="text-[11px] text-slate-400 tabular-nums">
-                {txnTotal} total · Page {txnPage} of {txnPages}
-              </p>
-              <div className="flex items-center gap-1">
-                <PagBtn disabled={txnPage === 1 || txnFetching} onClick={() => setTxnPage(1)}>«</PagBtn>
-                <PagBtn disabled={txnPage === 1 || txnFetching} onClick={() => setTxnPage((p) => p - 1)}>‹</PagBtn>
-                {getPagNums(txnPage, txnPages).map((n, idx) => n === '…' ? (
-                  <span key={`e-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
-                ) : (
-                  <button key={n} onClick={() => setTxnPage(n)} disabled={txnFetching}
-                    className={cn('w-7 h-7 rounded-lg text-[12px] font-bold transition-all',
-                      n === txnPage ? 'text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200 disabled:opacity-40')}
-                    style={n === txnPage ? { background: '#0b1d3a' } : {}}>
-                    {n}
+            {/* Type filter + Wallet filter */}
+            <div className="flex flex-col sm:flex-row gap-2.5 sm:items-center">
+              {/* Type (All / Deposits / Expenses) */}
+              <div className="flex gap-1 p-1 bg-slate-100 rounded-xl shrink-0">
+                {[
+                  { k: 'all',    l: 'All'      },
+                  { k: 'credit', l: 'Deposits'  },
+                  { k: 'debit',  l: 'Expenses'  },
+                ].map(({ k, l }) => (
+                  <button key={k} onClick={() => setTxnType(k)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap',
+                      txnType === k ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700',
+                    )}>
+                    {l}
                   </button>
                 ))}
-                <PagBtn disabled={txnPage === txnPages || txnFetching} onClick={() => setTxnPage((p) => p + 1)}>›</PagBtn>
-                <PagBtn disabled={txnPage === txnPages || txnFetching} onClick={() => setTxnPage(txnPages)}>»</PagBtn>
               </div>
+
+              {/* Wallet filter tabs */}
+              <div className="flex gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                {[
+                  { k: 'all',      l: 'All Wallets', wCfg: null },
+                  { k: 'vehicle',  l: 'Vehicle',  wCfg: WALLETS.vehicle  },
+                  { k: 'home',     l: 'Home',     wCfg: WALLETS.home     },
+                  { k: 'property', l: 'Property', wCfg: WALLETS.property },
+                  { k: 'salary',   l: 'Salary',   wCfg: WALLETS.salary   },
+                ].map(({ k, l, wCfg }) => {
+                  const isAct = txnWalletFlt === k;
+                  return (
+                    <button key={k} type="button" onClick={() => handleTxnWallet(k)}
+                      className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap"
+                      style={isAct
+                        ? { background: wCfg?.gradient ?? 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', color: '#fff' }
+                        : { background: '#f1f5f9', color: '#64748b' }}>
+                      {wCfg && <wCfg.icon className="w-3 h-3" />}
+                      {l}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Active filter chips summary */}
+            {(txnSearch || txnType !== 'all' || txnWalletFlt !== 'all' || txnPeriod !== 'all') && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Active:</span>
+                {txnSearch && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700">
+                    "{txnSearch}"
+                    <button onClick={() => { setTxnSearchInput(''); setTxnSearch(''); }} className="hover:text-red-500">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {txnPeriod !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-700">
+                    {txnPeriod === 'custom' && (txnCustomFrom || txnCustomTo)
+                      ? `${txnCustomFrom || '—'} → ${txnCustomTo || 'Today'}`
+                      : TXN_PERIOD_LABEL[txnPeriod]}
+                    <button onClick={() => { setTxnPeriod('all'); setTxnCustomFrom(''); setTxnCustomTo(''); }} className="hover:text-red-500">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {txnType !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700">
+                    {txnType === 'credit' ? 'Deposits only' : 'Expenses only'}
+                    <button onClick={() => setTxnType('all')} className="hover:text-red-500"><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                {txnWalletFlt !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold"
+                    style={{ background: WALLETS[txnWalletFlt]?.bg, color: WALLETS[txnWalletFlt]?.color }}>
+                    {WALLETS[txnWalletFlt]?.label}
+                    <button onClick={() => handleTxnWallet('all')} className="hover:opacity-60"><X className="w-3 h-3" /></button>
+                  </span>
+                )}
+                <button onClick={() => {
+                  setTxnSearch(''); setTxnSearchInput(''); setTxnPeriod('all');
+                  setTxnCustomFrom(''); setTxnCustomTo(''); setTxnType('all'); handleTxnWallet('all');
+                }} className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors ml-auto">
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── Transaction rows ── */}
+          <div className={cn('transition-opacity duration-150', txnFetching && !txnLoading && 'opacity-40 pointer-events-none')}>
+            {txnLoading ? (
+              <div className="divide-y divide-slate-50">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 sm:px-5 py-3.5 animate-pulse">
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 bg-slate-100 rounded-full w-3/5" />
+                      <div className="h-2.5 bg-slate-100 rounded-full w-2/5" />
+                    </div>
+                    <div className="h-3.5 w-20 bg-slate-100 rounded-full shrink-0" />
+                  </div>
+                ))}
+              </div>
+            ) : allTxns.length === 0 ? (
+              <div className="py-16 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                  <Wallet className="w-7 h-7 text-slate-300" strokeWidth={1.5} />
+                </div>
+                <p className="text-[14px] font-semibold text-slate-400">
+                  {txnSearch || txnType !== 'all' || txnWalletFlt !== 'all' || txnPeriod !== 'all'
+                    ? 'No matching transactions'
+                    : 'No transactions yet'}
+                </p>
+                <p className="text-[12px] text-slate-300 mt-1">
+                  {txnSearch || txnType !== 'all' || txnWalletFlt !== 'all' || txnPeriod !== 'all'
+                    ? 'Try adjusting your filters or search term.'
+                    : 'Deposit funds or log an expense to get started.'}
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {allTxns.map((txn, i) => {
+                  const isCredit = txn.type === 'credit';
+                  const wCfg     = WALLETS[txn.walletType] ?? WALLETS.vehicle;
+                  const WIcon    = wCfg.icon;
+                  return (
+                    <motion.div key={txn._id ?? txn.id}
+                      initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.02 }}
+                      className="flex items-center gap-3 px-4 sm:px-5 py-3 sm:py-3.5 hover:bg-slate-50/70 transition-colors group">
+
+                      {/* Icon */}
+                      <div className={cn(
+                        'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105',
+                        isCredit ? 'bg-emerald-50' : 'bg-red-50',
+                      )}>
+                        {isCredit
+                          ? <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
+                          : <ArrowUpRight  className="w-4 h-4 text-red-500"     />}
+                      </div>
+
+                      {/* Details */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-slate-800 truncate leading-tight">
+                          {isCredit ? (txn.note || txn.description || 'Deposit received') : (txn.description || 'Expense deducted')}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-lg"
+                            style={{ background: wCfg.bg, color: wCfg.color }}>
+                            <WIcon className="w-2.5 h-2.5 shrink-0" />
+                            {wCfg.label.replace(' Wallet', '')}
+                          </span>
+                          {txn.category && txn.category !== 'Deposit' && (
+                            <>
+                              <span className="text-[9px] text-slate-300">·</span>
+                              <span className="text-[10px] text-slate-400 capitalize truncate max-w-20">{txn.category}</span>
+                            </>
+                          )}
+                          <span className="text-[9px] text-slate-300">·</span>
+                          <span className="text-[10px] text-slate-400 shrink-0">{fmtDate(txn.date)}</span>
+                        </div>
+                      </div>
+
+                      {/* Amount */}
+                      <div className="text-right shrink-0">
+                        <p className={cn(
+                          'text-[13px] sm:text-[14px] font-bold tabular-nums',
+                          isCredit ? 'text-emerald-600' : 'text-red-500',
+                        )}>
+                          {isCredit ? '+' : '−'}AED {fmt(txn.amount)}
+                        </p>
+                        {txn.balanceAfter != null && (
+                          <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 tabular-nums">
+                            Bal: {fmt(txn.balanceAfter)}
+                          </p>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Pagination footer ── */}
+          {(txnPages > 1 || allTxns.length > 0) && (
+            <div className="px-4 sm:px-5 py-3 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <p className="text-[11px] text-slate-500 tabular-nums">
+                {txnTotal > 0
+                  ? `Showing ${(txnPage - 1) * TXN_PAGE_SIZE + 1}–${Math.min(txnPage * TXN_PAGE_SIZE, txnTotal)} of ${txnTotal}`
+                  : '0 results'}
+              </p>
+              {txnPages > 1 && (
+                <div className="flex items-center gap-1 self-end sm:self-auto">
+                  <PagBtn disabled={txnPage === 1 || txnFetching} onClick={() => setTxnPage(1)}>«</PagBtn>
+                  <PagBtn disabled={txnPage === 1 || txnFetching} onClick={() => setTxnPage((p) => p - 1)}>‹</PagBtn>
+                  {getPagNums(txnPage, txnPages).map((n, idx) => n === '…' ? (
+                    <span key={`e-${idx}`} className="w-7 text-center text-[11px] text-slate-400">…</span>
+                  ) : (
+                    <button key={n} onClick={() => setTxnPage(n)} disabled={txnFetching}
+                      className={cn(
+                        'w-7 h-7 rounded-lg text-[12px] font-bold transition-all',
+                        n === txnPage ? 'text-white shadow-sm' : 'text-slate-500 hover:bg-slate-200 disabled:opacity-40',
+                      )}
+                      style={n === txnPage ? { background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' } : {}}>
+                      {n}
+                    </button>
+                  ))}
+                  <PagBtn disabled={txnPage === txnPages || txnFetching} onClick={() => setTxnPage((p) => p + 1)}>›</PagBtn>
+                  <PagBtn disabled={txnPage === txnPages || txnFetching} onClick={() => setTxnPage(txnPages)}>»</PagBtn>
+                </div>
+              )}
             </div>
           )}
         </div>

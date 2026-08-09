@@ -6,11 +6,10 @@ import DatePicker from '../../components/ui/DatePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
-  RiAddLine, RiSearchLine, RiCalendar2Line, RiArrowLeftLine, RiArrowRightLine,
+  RiAddLine, RiSearchLine, RiArrowLeftLine, RiArrowRightLine,
   RiEditLine, RiDeleteBinLine, RiWalletLine, RiHome4Line, RiShoppingCart2Line,
-  RiFilter3Line, RiReceiptLine, RiCheckboxCircleLine, RiCloseLine,
-  RiArrowUpLine, RiArrowDownLine, RiStore2Line, RiLeafLine,
-  RiCarLine, RiBankCardLine, RiBuildingLine,
+  RiFilter3Line, RiReceiptLine, RiCloseLine, RiCalendar2Line,
+  RiStore2Line, RiCarLine, RiBankCardLine, RiBuildingLine, RiAlertLine,
 } from 'react-icons/ri';
 import {
   useGetQuery, usePostMutation, usePutMutation, useDeleteMutation,
@@ -41,9 +40,8 @@ const COLOR_PRESETS = [
   { color: '#64748b', bg: '#f1f5f9' },
 ];
 
-// Look up color/bg from the live backend category list; fallback to slate
-const catCfgFrom = (cats, name) =>
-  cats.find((c) => c.name === name) ?? { color: '#64748b', bg: '#f1f5f9' };
+// Look up color/bg from the server-supplied catMap (keyed by category name)
+const catCfgFrom = (catMap, name) => catMap[name] ?? { color: '#64748b', bg: '#f1f5f9' };
 
 const SEG_CFG = {
   property:  { label: 'Property & Services', color: '#2563eb', bg: '#eff6ff', Icon: RiHome4Line },
@@ -70,10 +68,18 @@ function WalletBadge({ walletType, className }) {
   );
 }
 
-const MONTH_NAMES = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
+const PERIOD_PILLS = [
+  { k: 'all',    label: 'All Time'   },
+  { k: 'month',  label: 'This Month' },
+  { k: 'lastm',  label: 'Last Month' },
+  { k: '3month', label: '3 Months'   },
+  { k: 'year',   label: 'This Year'  },
+  { k: 'custom', label: 'Custom'     },
 ];
+const PERIOD_LABEL = {
+  all: 'All Time', month: 'This Month', lastm: 'Last Month',
+  '3month': 'Last 3 Months', year: 'This Year', custom: 'Custom Range',
+};
 
 function fmtAED(n) {
   return `AED ${(n ?? 0).toLocaleString('en-AE', { maximumFractionDigits: 0 })}`;
@@ -86,51 +92,128 @@ function fmtDate(s) {
 const PAGE_SIZE = 10;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Skeleton — shown on first load while stats are in-flight
+// ─────────────────────────────────────────────────────────────────────────────
+function ExpensesSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-slate-200 shrink-0" />
+          <div>
+            <div className="h-5 w-32 bg-slate-200 rounded-full mb-2" />
+            <div className="h-3 w-52 bg-slate-100 rounded-full" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <div className="h-9 w-28 bg-slate-100 rounded-xl" />
+          <div className="h-9 w-36 bg-slate-100 rounded-xl" />
+          <div className="h-9 w-28 bg-slate-200 rounded-xl" />
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-2xl h-28 bg-slate-200" />
+        <div className="rounded-2xl h-28 bg-slate-100 border border-slate-100" />
+        <div className="rounded-2xl h-28 bg-slate-100 border border-slate-100" />
+      </div>
+
+      {/* Transaction list shell */}
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 space-y-3">
+          <div className="h-4 w-36 bg-slate-200 rounded-full" />
+          <div className="h-9 bg-slate-100 rounded-xl" />
+        </div>
+        <div className="divide-y divide-slate-50">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="px-5 py-4 flex items-center gap-4">
+              <div className="w-9 h-9 rounded-xl bg-slate-100 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-slate-100 rounded-full w-3/4" />
+                <div className="h-2.5 bg-slate-100 rounded-full w-1/2" />
+              </div>
+              <div className="h-3 bg-slate-100 rounded-full w-16 shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Error screen
+// ─────────────────────────────────────────────────────────────────────────────
+function ExpensesError({ message, onRetry }) {
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-4">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#fef2f2' }}>
+        <RiAlertLine className="w-8 h-8 text-red-500" />
+      </div>
+      <h2 className="text-lg font-bold text-slate-900 mb-1">Failed to load expenses</h2>
+      <p className="text-sm text-slate-500 max-w-sm">{message}</p>
+      <button
+        onClick={onRetry}
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all hover:opacity-90"
+        style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+        Try Again
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ExpensesPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
-  const now = new Date();
 
-  // ── Filter state (all sent to backend) ────────────────────────────────────
-  const [year,         setYear]         = useState(now.getFullYear());
-  const [month,        setMonth]        = useState(now.getMonth());
+  // ── Filter state ──────────────────────────────────────────────────────────
+  const [period,       setPeriod]       = useState('all'); // all | month | lastm | 3month | year | custom
+  const [customFrom,   setCustomFrom]   = useState('');
+  const [customTo,     setCustomTo]     = useState('');
   const [segment,      setSegment]      = useState('all');
   const [walletFilter, setWalletFilter] = useState('all');
   const [searchInput,  setSearchInput]  = useState('');
   const [search,       setSearch]       = useState('');
   const [page,         setPage]         = useState(1);
+  const [showFilters,  setShowFilters]  = useState(false); // mobile filter toggle
 
   // ── Modal state ───────────────────────────────────────────────────────────
-  const [modal,     setModal]     = useState(null); // null | 'add' | expense obj
+  const [modal,     setModal]     = useState(null);
   const [delTarget, setDelTarget] = useState(null);
   const [deleting,  setDeleting]  = useState(false);
 
-  // Debounce search
+  // Debounce search input
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(1); }, [year, month, segment, walletFilter]);
+  // Reset to page 1 when any filter changes
+  useEffect(() => { setPage(1); }, [period, segment, walletFilter, search, customFrom, customTo]);
 
   // ── API params ────────────────────────────────────────────────────────────
-  const baseParams = {
-    propertyId,
-    year,
-    month,
-  };
-  const listParams = {
-    ...baseParams,
+  const baseParams = { propertyId };
+  const filterParams = {
+    ...(period !== 'all' && period !== 'custom' && { period }),
+    ...(period === 'custom' && customFrom && { startDate: customFrom }),
+    ...(period === 'custom' && customTo   && { endDate:   customTo   }),
     ...(segment      !== 'all' && { segment }),
     ...(walletFilter !== 'all' && { walletType: walletFilter }),
+  };
+  const statsParams = { ...baseParams, ...filterParams };
+  const listParams  = {
+    ...baseParams,
+    ...filterParams,
     ...(search && { search }),
     page,
     limit: PAGE_SIZE,
   };
 
-  const { data: listResult = {}, isLoading: listLoading } = useGetQuery(
+  const { data: listResult = {}, isLoading: listLoading, isFetching: listFetching, refetch: refetchList } = useGetQuery(
     { path: '/expenses', params: listParams },
     { skip: !propertyId },
   );
@@ -138,62 +221,51 @@ export default function ExpensesPage() {
   const totalRows = listResult.total  ?? 0;
   const totalPages = listResult.pages ?? 1;
 
-  const { data: stats = {} } = useGetQuery(
-    { path: '/expenses/stats', params: baseParams },
+  const {
+    data: stats = {}, isLoading: statsLoading, isError: statsError, error: statsErr, refetch: refetchStats,
+  } = useGetQuery(
+    { path: '/expenses/stats', params: statsParams },
     { skip: !propertyId },
   );
 
-  const { data: walletData, refetch: refetchWallet } = useGetQuery(
-    { path: '/wallet', params: { propertyId } },
-    { skip: !propertyId },
-  );
-  const homeBalance     = walletData?.home?.balance     ?? 0;
-  const vehicleBalance  = walletData?.vehicle?.balance  ?? 0;
-  const propertyBalance = walletData?.property?.balance ?? 0;
+  // Wallet balances come from the stats endpoint — no extra round-trip
+  const homeBalance     = stats.walletBalances?.home     ?? 0;
+  const vehicleBalance  = stats.walletBalances?.vehicle  ?? 0;
+  const propertyBalance = stats.walletBalances?.property ?? 0;
 
-  // All categories for this property (color lookup in rows + breakdown chart)
-  const { data: allCats = [] } = useGetQuery(
-    { path: '/expense-categories', params: { propertyId } },
-    { skip: !propertyId },
-  );
+  // Category colour map built from stats.byCategory (backend attaches color/bg per category)
+  const catMap = useMemo(() => {
+    const map = {};
+    (stats.byCategory ?? []).forEach((c) => { map[c.category] = { color: c.color, bg: c.bg }; });
+    return map;
+  }, [stats.byCategory]);
 
   const [addMut]    = usePostMutation();
   const [updateMut] = usePutMutation();
   const [deleteMut] = useDeleteMutation();
   const [deductMut] = usePostMutation();
 
-  // ── Month navigation ──────────────────────────────────────────────────────
-  const prevMonth = () => {
-    if (month === 0) { setYear((y) => y - 1); setMonth(11); }
-    else setMonth((m) => m - 1);
-  };
-  const nextMonth = () => {
-    if (month === 11) { setYear((y) => y + 1); setMonth(0); }
-    else setMonth((m) => m + 1);
-  };
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
-
-  // ── Category breakdown (only for current month, all segments) ─────────────
+  // ── Category breakdown ────────────────────────────────────────────────────
   const catBreakdown = useMemo(() => {
     if (!stats.byCategory) return [];
     return stats.byCategory.map((c) => ({
       ...c,
-      cfg: catCfgFrom(allCats, c.category),
+      cfg: { color: c.color, bg: c.bg },
       pct: stats.total > 0 ? Math.round((c.amount / stats.total) * 100) : 0,
     }));
-  }, [stats, allCats]);
+  }, [stats.byCategory, stats.total]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSave = async (data) => {
     try {
       if (modal !== 'add' && modal?.id) {
         await updateMut({ path: `/expenses/${modal.id}`, body: data }).unwrap();
-        await refetchWallet();
+        await Promise.all([refetchStats(), refetchList()]);
         toast.success('Expense updated');
       } else {
         // Create expense first to get its id, then link the wallet transaction via sourceId
         const result = await addMut({ path: '/expenses', body: { ...data, propertyId } }).unwrap();
-        const sourceId = result.data?.id ?? '';
+        const sourceId = result.id ?? '';
         if (Number(data.amount) > 0) {
           await deductMut({
             path: '/wallet/deduct',
@@ -208,7 +280,8 @@ export default function ExpensesPage() {
               sourceModel: 'Expense',
             },
           }).unwrap();
-          await refetchWallet();
+          setPage(1);
+          await Promise.all([refetchStats(), refetchList()]);
         }
         toast.success('Expense logged');
       }
@@ -222,7 +295,7 @@ export default function ExpensesPage() {
     setDeleting(true);
     try {
       await deleteMut({ path: `/expenses/${delTarget.id}` }).unwrap();
-      await refetchWallet();
+      await Promise.all([refetchStats(), refetchList()]);
       toast.success('Expense deleted');
       setDelTarget(null);
     } catch {
@@ -260,8 +333,26 @@ export default function ExpensesPage() {
     },
   ];
 
+  // ── Loading / error gates ─────────────────────────────────────────────────
+  if (statsLoading || !propertyId) return <ExpensesSkeleton />;
+  if (statsError) return (
+    <ExpensesError
+      message={statsErr?.data?.message ?? 'Something went wrong. Please try again.'}
+      onRetry={refetchStats}
+    />
+  );
+
   return (
     <div className="space-y-6">
+
+      {/* isFetching progress bar — shown when list is silently refreshing */}
+      {listFetching && !listLoading && (
+        <div className="fixed top-0 left-0 right-0 z-9999 h-0.75 overflow-hidden">
+          <div className="h-full bg-blue-500"
+            style={{ animation: 'expProgress 1.5s ease-in-out infinite' }} />
+          <style>{`@keyframes expProgress { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }`}</style>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
@@ -278,31 +369,186 @@ export default function ExpensesPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          {/* Wallet balances */}
-          <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
-            <RiWalletLine className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span className="text-[12px] font-bold text-emerald-700">{fmtAED(homeBalance)}</span>
-            <span className="text-[10px] text-emerald-500 hidden sm:inline">Home</span>
-          </div>
-
-          {/* Month picker */}
-          <div className="flex items-center bg-white border border-slate-200 rounded-xl px-1 py-1">
-            <button onClick={prevMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors">
-              <RiArrowLeftLine className="w-4 h-4 text-slate-500" />
-            </button>
-            <span className="text-[13px] font-bold text-slate-800 min-w-27.5 text-center">
-              {MONTH_NAMES[month]} {year}
-            </span>
-            <button onClick={nextMonth} disabled={isCurrentMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-30">
-              <RiArrowRightLine className="w-4 h-4 text-slate-500" />
-            </button>
-          </div>
-
+          {/* Wallet balances — hidden on very small screens, shown sm+ */}
+          {[
+            { label: 'Home',     bal: homeBalance,     color: '#16a34a', border: '#bbf7d0', bg: '#f0fdf4' },
+            { label: 'Property', bal: propertyBalance, color: '#0891b2', border: '#a5f3fc', bg: '#ecfeff' },
+            { label: 'Vehicle',  bal: vehicleBalance,  color: '#7c3aed', border: '#ddd6fe', bg: '#f5f3ff' },
+          ].map(({ label, bal, color, border, bg }) => (
+            <div key={label} className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl border"
+              style={{ background: bg, borderColor: border }}>
+              <RiWalletLine className="w-3.5 h-3.5 shrink-0" style={{ color }} />
+              <span className="text-[12px] font-bold" style={{ color }}>{fmtAED(bal)}</span>
+              <span className="text-[10px] hidden lg:inline" style={{ color, opacity: 0.7 }}>{label}</span>
+            </div>
+          ))}
           <Button variant="primary" icon={RiAddLine} onClick={() => setModal('add')}>Log Expense</Button>
         </div>
       </motion.div>
+
+      {/* ── Mobile wallet balances (shown only on xs screens) ── */}
+      <div className="flex sm:hidden items-center gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+        {[
+          { label: 'Home',     bal: homeBalance,     color: '#16a34a', border: '#bbf7d0', bg: '#f0fdf4' },
+          { label: 'Property', bal: propertyBalance, color: '#0891b2', border: '#a5f3fc', bg: '#ecfeff' },
+          { label: 'Vehicle',  bal: vehicleBalance,  color: '#7c3aed', border: '#ddd6fe', bg: '#f5f3ff' },
+        ].map(({ label, bal, color, border, bg }) => (
+          <div key={label} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border shrink-0"
+            style={{ background: bg, borderColor: border }}>
+            <RiWalletLine className="w-3 h-3 shrink-0" style={{ color }} />
+            <span className="text-[11px] font-bold" style={{ color }}>{label} · {fmtAED(bal)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Period filter ── */}
+      {(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const dayCount = customFrom && customTo
+          ? Math.max(0, Math.round((new Date(customTo) - new Date(customFrom)) / 86400000) + 1)
+          : null;
+        const hasRange = customFrom || customTo;
+        return (
+          <div className="space-y-3">
+            {/* Period pill row */}
+            <div className="flex items-center gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', paddingBottom: '2px' }}>
+              {PERIOD_PILLS.map(({ k, label }) => {
+                const active   = period === k;
+                const isCustom = k === 'custom';
+                return (
+                  <button key={k}
+                    onClick={() => {
+                      setPeriod(k);
+                      if (k !== 'custom') { setCustomFrom(''); setCustomTo(''); }
+                    }}
+                    className={cn(
+                      'shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[12px] font-bold transition-all border whitespace-nowrap',
+                      active
+                        ? 'text-white border-transparent shadow-md'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700',
+                    )}
+                    style={active ? { background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' } : {}}>
+                    {isCustom && <RiCalendar2Line className="w-3.5 h-3.5 shrink-0" />}
+                    {label}
+                    {isCustom && hasRange && active && (
+                      <span className="ml-0.5 w-2 h-2 rounded-full bg-blue-300 shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Custom date range card — animated */}
+            <AnimatePresence>
+              {period === 'custom' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scaleY: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                  exit={{ opacity: 0, y: -6, scaleY: 0.96 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  style={{ transformOrigin: 'top' }}>
+                  <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5"
+                    style={{ boxShadow: '0 2px 12px rgba(11,29,58,0.07)' }}>
+
+                    {/* Card header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                          style={{ background: 'linear-gradient(135deg, #eff6ff, #ecfeff)' }}>
+                          <RiCalendar2Line className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-bold text-slate-800 leading-none">Custom Date Range</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Filter expenses by a specific period</p>
+                        </div>
+                      </div>
+                      {hasRange && (
+                        <button
+                          onClick={() => { setCustomFrom(''); setCustomTo(''); }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                          <RiCloseLine className="w-3.5 h-3.5" /> Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Date inputs — 2-col grid, stacks to 1-col on very small screens */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">
+                          Start Date
+                        </label>
+                        <div className="relative">
+                          <RiCalendar2Line className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
+                            style={{ color: customFrom ? '#2563eb' : '#94a3b8' }} />
+                          <input
+                            type="date"
+                            value={customFrom}
+                            max={customTo || today}
+                            onChange={(e) => setCustomFrom(e.target.value)}
+                            className="w-full h-11 pl-9 pr-3 rounded-xl border text-[13px] outline-none transition-all"
+                            style={{
+                              borderColor: customFrom ? '#93c5fd' : '#e2e8f0',
+                              background:  customFrom ? '#eff6ff' : '#fff',
+                              color: customFrom ? '#1d4ed8' : '#374151',
+                              fontWeight: customFrom ? '600' : '400',
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">
+                          End Date
+                        </label>
+                        <div className="relative">
+                          <RiCalendar2Line className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
+                            style={{ color: customTo ? '#2563eb' : '#94a3b8' }} />
+                          <input
+                            type="date"
+                            value={customTo}
+                            min={customFrom || undefined}
+                            max={today}
+                            onChange={(e) => setCustomTo(e.target.value)}
+                            className="w-full h-11 pl-9 pr-3 rounded-xl border text-[13px] outline-none transition-all"
+                            style={{
+                              borderColor: customTo ? '#93c5fd' : '#e2e8f0',
+                              background:  customTo ? '#eff6ff' : '#fff',
+                              color: customTo ? '#1d4ed8' : '#374151',
+                              fontWeight: customTo ? '600' : '400',
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selected range summary */}
+                    {hasRange ? (
+                      <div className="mt-3 flex items-center justify-between gap-2 px-4 py-3 rounded-xl"
+                        style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%)', border: '1px solid #bfdbfe' }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                          <span className="text-[12px] font-semibold text-slate-700 truncate">
+                            {customFrom ? fmtDate(customFrom) : 'Any start'}&nbsp;&nbsp;→&nbsp;&nbsp;{customTo ? fmtDate(customTo) : 'Today'}
+                          </span>
+                        </div>
+                        {dayCount !== null && (
+                          <span className="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-black text-blue-700"
+                            style={{ background: '#dbeafe' }}>
+                            {dayCount} day{dayCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-[11px] text-slate-400 text-center py-1">
+                        Select a start and end date to filter
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })()}
 
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -342,7 +588,9 @@ export default function ExpensesPage() {
           <div className="bg-white rounded-2xl border border-slate-100 p-5"
             style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
             <p className="text-[14px] font-bold text-slate-800 mb-4">
-              Breakdown — {MONTH_NAMES[month]} {year}
+              Breakdown — {period === 'custom' && (customFrom || customTo)
+                ? `${customFrom ? fmtDate(customFrom) : '—'} → ${customTo ? fmtDate(customTo) : 'Today'}`
+                : PERIOD_LABEL[period]}
             </p>
 
             {/* Stacked bar */}
@@ -421,7 +669,11 @@ export default function ExpensesPage() {
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div>
                 <p className="text-[14px] font-bold text-slate-800">Transactions</p>
-                <p className="text-[11px] text-slate-400">{totalRows} records · {MONTH_NAMES[month]} {year}</p>
+                <p className="text-[11px] text-slate-400">{totalRows} records · {
+                  period === 'custom' && (customFrom || customTo)
+                    ? `${customFrom ? fmtDate(customFrom) : '—'} → ${customTo ? fmtDate(customTo) : 'Today'}`
+                    : PERIOD_LABEL[period]
+                }</p>
               </div>
               <div className="sm:ml-auto flex items-center gap-2">
                 <Button variant="outline" size="sm" icon={RiAddLine} onClick={() => setModal('add')}>
@@ -431,15 +683,15 @@ export default function ExpensesPage() {
             </div>
 
             {/* Filters row */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              {/* Search */}
+            {/* Search row + filter toggle */}
+            <div className="flex gap-2">
               <div className="relative flex-1 min-w-0">
                 <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 <input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search description, vendor, category…"
-                  className="w-full h-9 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-[13px] placeholder-slate-400 outline-none transition-all focus:border-navy-400"
+                  placeholder="Search any expense…"
+                  className="w-full h-10 pl-9 pr-9 rounded-xl border border-slate-200 bg-white text-[13px] placeholder-slate-400 outline-none transition-all focus:border-blue-400"
                 />
                 {searchInput && (
                   <button onClick={() => { setSearchInput(''); setSearch(''); }}
@@ -448,48 +700,69 @@ export default function ExpensesPage() {
                   </button>
                 )}
               </div>
-
-              {/* Segment filter */}
-              <div className="flex gap-1 p-1 bg-slate-100 rounded-xl shrink-0">
-                {[
-                  { k: 'all',       l: 'All'       },
-                  { k: 'property',  l: 'Property'  },
-                  { k: 'household', l: 'Household' },
-                ].map(({ k, l }) => (
-                  <button key={k} onClick={() => setSegment(k)}
-                    className={cn('px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap',
-                      segment === k ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700')}>
-                    {l}
-                  </button>
-                ))}
-              </div>
+              {/* Filter toggle — visible on mobile, hidden on desktop where filters are always shown */}
+              <button
+                onClick={() => setShowFilters((v) => !v)}
+                className={cn(
+                  'sm:hidden shrink-0 h-10 px-3 rounded-xl border text-[12px] font-bold transition-all flex items-center gap-1.5',
+                  (segment !== 'all' || walletFilter !== 'all')
+                    ? 'bg-navy-900 text-white border-navy-900'
+                    : 'bg-white text-slate-500 border-slate-200',
+                )}>
+                <RiFilter3Line className="w-4 h-4" />
+                {(segment !== 'all' || walletFilter !== 'all') ? 'Filtered' : 'Filter'}
+              </button>
             </div>
 
-            {/* Wallet filter pills */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 flex items-center gap-1">
-                <RiWalletLine className="w-3 h-3" /> Wallet
-              </span>
-              {([
-                { k: 'all', label: 'All Wallets', color: null, bg: null },
-                ...Object.entries(WALLET_CFG).map(([k, v]) => ({ k, label: v.label, color: v.color, bg: v.bg })),
-              ]).map(({ k, label, color, bg }) => {
-                const active = walletFilter === k;
-                return (
-                  <button key={k} onClick={() => setWalletFilter(k)}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border whitespace-nowrap',
-                      active
-                        ? k === 'all' ? 'bg-navy-900 text-white border-navy-900 shadow-sm' : 'text-white border-transparent shadow-sm'
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700',
-                    )}
-                    style={active && k !== 'all' && color ? { background: color, borderColor: color } : {}}
-                  >
-                    <RiWalletLine className="w-3 h-3" />
-                    {label}
+            {/* Segment + Wallet filters — always shown on desktop, toggleable on mobile */}
+            <div className={cn('space-y-2.5', showFilters ? 'block' : 'hidden sm:block')}>
+              {/* Segment */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 w-14">Type</span>
+                <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
+                  {[
+                    { k: 'all',       l: 'All'       },
+                    { k: 'property',  l: 'Property'  },
+                    { k: 'household', l: 'Household' },
+                  ].map(({ k, l }) => (
+                    <button key={k} onClick={() => setSegment(k)}
+                      className={cn('px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap',
+                        segment === k ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700')}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                {segment !== 'all' && (
+                  <button onClick={() => setSegment('all')} className="text-slate-300 hover:text-slate-500">
+                    <RiCloseLine className="w-3.5 h-3.5" />
                   </button>
-                );
-              })}
+                )}
+              </div>
+
+              {/* Wallet */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 w-14">Wallet</span>
+                <div className="flex gap-1.5 flex-wrap">
+                  {([
+                    { k: 'all', label: 'All', color: null, bg: null },
+                    ...Object.entries(WALLET_CFG).map(([k, v]) => ({ k, label: v.label, color: v.color, bg: v.bg })),
+                  ]).map(({ k, label, color, bg }) => {
+                    const active = walletFilter === k;
+                    return (
+                      <button key={k} onClick={() => setWalletFilter(k)}
+                        className={cn(
+                          'inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border whitespace-nowrap',
+                          active
+                            ? k === 'all' ? 'bg-navy-900 text-white border-navy-900 shadow-sm' : 'text-white border-transparent shadow-sm'
+                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700',
+                        )}
+                        style={active && k !== 'all' && color ? { background: color, borderColor: color } : {}}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -552,10 +825,10 @@ export default function ExpensesPage() {
                 <RiReceiptLine className="w-7 h-7 text-slate-300" strokeWidth={1.5} />
               </div>
               <p className="font-semibold text-slate-400 text-[14px]">
-                {search || segment !== 'all' || walletFilter !== 'all' ? 'No matching expenses' : `No expenses for ${MONTH_NAMES[month]} ${year}`}
+                {search || segment !== 'all' || walletFilter !== 'all' || period !== 'all' ? 'No matching expenses' : 'No expenses yet'}
               </p>
               <p className="text-slate-300 text-[12px] mt-1">
-                {search || segment !== 'all' || walletFilter !== 'all' ? 'Try adjusting your filters.' : 'Log property or household spending to get started.'}
+                {search || segment !== 'all' || walletFilter !== 'all' || period !== 'all' ? 'Try adjusting your filters or search.' : 'Log property or household spending to get started.'}
               </p>
               <button onClick={() => setModal('add')}
                 className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-bold text-white transition-all"
@@ -567,7 +840,7 @@ export default function ExpensesPage() {
             <div className="divide-y divide-slate-50">
               <AnimatePresence mode="popLayout">
                 {expenses.map((item, i) => {
-                  const cfg     = catCfgFrom(allCats, item.category);
+                  const cfg     = catCfgFrom(catMap, item.category);
                   const segCfg  = SEG_CFG[item.segment] ?? SEG_CFG.property;
                   const SegIcon = segCfg.Icon;
                   return (
@@ -891,7 +1164,12 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance
               ].map(({ k, label, bal, color, bg }) => {
                 const sel = watchedWallet === k;
                 return (
-                  <button key={k} type="button" onClick={() => setValue('walletType', k)}
+                  <button key={k} type="button" onClick={() => {
+                    setValue('walletType', k);
+                    const autoSeg = k === 'property' ? 'property' : 'household';
+                    setSegment(autoSeg);
+                    setValue('category', '');
+                  }}
                     className="flex flex-col gap-1 p-3 rounded-xl border-2 text-left transition-all"
                     style={sel ? { borderColor: color, background: bg } : { borderColor: '#e2e8f0', background: '#f8fafc' }}>
                     <span className="text-[11px] font-bold" style={{ color: sel ? color : '#64748b' }}>{label}</span>

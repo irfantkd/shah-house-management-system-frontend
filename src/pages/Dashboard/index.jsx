@@ -104,7 +104,7 @@ export default function Dashboard() {
   const [homeExpenseOpen, setHomeExpenseOpen] = useState(false);
   const [fabOpen,         setFabOpen]         = useState(false);
 
-  const { data: dash = EMPTY_DASH, isLoading, isFetching } = useGetQuery(
+  const { data: dash = EMPTY_DASH, isLoading, isFetching, isError, error } = useGetQuery(
     { path: '/dashboard', params: { propertyId } },
     { skip: !propertyId, refetchOnMountOrArgChange: 60 },
   );
@@ -150,12 +150,27 @@ export default function Dashboard() {
   ];
 
   if (loading) return <DashboardSkeleton />;
+  if (isError)  return <DashboardError message={error?.data?.message ?? error?.message ?? 'Failed to load dashboard'} />;
 
   const alertCount = (stats.openRepairs ?? 0) + (allExpiryAlerts?.length ?? 0) + (stats.carAlerts ?? 0);
   const unread = dash.unreadNotifications ?? 0;
 
   return (
     <div className="space-y-5 pb-24 sm:pb-6">
+
+      {/* ── Refetch progress bar (subtle, top-of-page) ── */}
+      {isFetching && !isLoading && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] overflow-hidden">
+          <div className="h-full bg-blue-500 animate-[progress_1.5s_ease-in-out_infinite]"
+            style={{ width: '100%', animation: 'dashProgress 1.5s ease-in-out infinite' }} />
+          <style>{`
+            @keyframes dashProgress {
+              0%   { transform: translateX(-100%); }
+              100% { transform: translateX(100%); }
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* ── Hero banner ── */}
       <motion.div {...fadeUp(0)}>
@@ -801,6 +816,27 @@ function HealthDonut({ score }) {
         style={{ background: color + '18', color }}>
         {label}
       </span>
+    </div>
+  );
+}
+
+function DashboardError({ message }) {
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-4">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+        style={{ background: '#fef2f2' }}>
+        <RiAlertLine className="w-8 h-8 text-red-500" />
+      </div>
+      <div>
+        <h2 className="text-lg font-bold text-navy-900 mb-1">Failed to load dashboard</h2>
+        <p className="text-sm text-slate-500 max-w-sm">{message}</p>
+      </div>
+      <button
+        onClick={() => window.location.reload()}
+        className="mt-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
+        style={{ background: '#0b1d3a' }}>
+        Retry
+      </button>
     </div>
   );
 }

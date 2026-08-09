@@ -96,7 +96,7 @@ export default function QuickHomeExpenseModal({ open, onClose }) {
           walletType:  wallet,
         },
       }).unwrap();
-      const sourceId = result.data?.id ?? '';
+      const sourceId = result.id ?? '';
       await deductWallet({
         path: '/wallet/deduct',
         body: {

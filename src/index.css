@@ -101,3 +101,9 @@ body {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
+
+/* ─── Progress bar animation ────────────────────── */
+@keyframes slide {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

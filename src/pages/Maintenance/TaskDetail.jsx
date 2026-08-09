@@ -99,10 +99,11 @@ export default function TaskDetail() {
   const homeWallet    = { balance: walletData?.home?.balance    ?? 0 };
   const vehicleWallet = { balance: walletData?.vehicle?.balance ?? 0 };
 
-  const [patchTaskMut]    = usePatchMutation();
-  const [deleteTaskMut]   = useDeleteMutation();
-  const [addExpenseMut]   = usePostMutation();
-  const [deductWalletMut] = usePostMutation();
+  const [patchTaskMut]     = usePatchMutation();
+  const [deleteTaskMut]    = useDeleteMutation();
+  const [addExpenseMut]    = usePostMutation();
+  const [deductWalletMut]  = usePostMutation();
+  const [createExpenseMut] = usePostMutation();
 
   const [showExpense,  setShowExpense]  = useState(false);
   const [showComplete, setShowComplete] = useState(false);
@@ -429,10 +430,14 @@ export default function TaskDetail() {
         onClose={() => setShowExpense(false)}
         onSave={async (expense) => {
           try {
+            const walletType = expense.walletType ?? 'home';
+            const desc = `${task.title} — ${expense.description || expense.category}`;
             const ops = [addExpenseMut({ path: `/tasks/${id}/expenses`, body: { ...expense, propertyId } }).unwrap()];
             if (expense.amount > 0) {
-              const walletType = expense.walletType ?? 'home';
-              ops.push(deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType, amount: expense.amount, description: `${task.title} — ${expense.description || expense.category}`, category: task.category, date: expense.date } }).unwrap());
+              ops.push(
+                deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType, amount: expense.amount, description: desc, category: task.category, date: expense.date } }).unwrap(),
+                createExpenseMut({ path: '/expenses', body: { propertyId, walletType, category: task.category, description: desc, amount: expense.amount, date: expense.date, segment: 'property' } }).unwrap(),
+              );
             }
             await Promise.all(ops);
             await refetchWallet();

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Home, Banknote, Building2, Plus, ArrowDownLeft, ArrowUpRight,
   AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2, Pencil, Trash2, Users,
-  FileDown, BarChart3, Share2, CheckCircle2,
+  FileDown, BarChart3, Share2, CheckCircle2, RefreshCw,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePatchMutation, useDeleteMutation, API_BASE_URL } from '../../api/apiSlice';
 import DatePicker from '../../components/ui/DatePicker';
@@ -21,10 +21,10 @@ const LOW_BALANCE_THRESHOLD = 5000;
 const fade = (d = 0) => ({ initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.32, delay: d, ease: [0.4, 0, 0.2, 1] } });
 
 const WALLET_CFG = {
-  vehicle:  { label: 'Vehicle Wallet',  desc: 'Fuel, maintenance, repairs & fleet costs',          icon: Car,       color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-  home:     { label: 'Home Wallet',     desc: 'Property services, grocery & household',            icon: Home,      color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
-  property: { label: 'Property Wallet', desc: 'Property maintenance, infrastructure & capital',   icon: Building2, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', gradient: 'linear-gradient(135deg,#164e63,#0891b2)' },
-  salary:   { label: 'Salary Wallet',   desc: 'Employee salary payments only',                    icon: Banknote,  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+  vehicle:  { label: 'Vehicle Wallet',  desc: 'Fuel, maintenance, repairs & fleet costs',        icon: Car,       color: '#0b1d3a', bg: '#f0f5ff', border: '#c7d7f5', gradient: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+  home:     { label: 'Home Wallet',     desc: 'Property services, grocery & household',          icon: Home,      color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
+  property: { label: 'Property Wallet', desc: 'Property maintenance, infrastructure & capital', icon: Building2, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', gradient: 'linear-gradient(135deg,#164e63,#0891b2)' },
+  salary:   { label: 'Salary Wallet',   desc: 'Employee salary payments only',                  icon: Banknote,  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
 };
 
 const PERIODS = [
@@ -39,25 +39,6 @@ const PERIODS = [
 const fmt     = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-function applyPeriod(txns, period, customStart, customEnd) {
-  if (period === 'all') return txns;
-  if (period === 'custom') {
-    if (!customStart || !customEnd) return txns;
-    return txns.filter((t) => t.date >= customStart && t.date <= customEnd);
-  }
-  const now = new Date();
-  if (period === 'lastm') {
-    const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const e = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-    return txns.filter((t) => { const d = new Date(t.date); return d >= s && d <= e; });
-  }
-  const cutoff = new Date(now);
-  if (period === 'week')  cutoff.setDate(now.getDate() - 7);
-  if (period === 'month') { cutoff.setDate(1); cutoff.setHours(0, 0, 0, 0); }
-  if (period === 'last3') cutoff.setMonth(now.getMonth() - 3);
-  return txns.filter((t) => new Date(t.date) >= cutoff);
-}
-
 function periodLabel(period, customStart, customEnd) {
   const now = new Date();
   if (period === 'week')   return 'Last 7 Days';
@@ -68,9 +49,61 @@ function periodLabel(period, customStart, customEnd) {
   return 'All Time';
 }
 
-const INP      = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+const INP       = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 const DEP_BLANK = { amount: '', note: '', date: new Date().toISOString().split('T')[0] };
 const EDT_BLANK = { amount: '', note: '', date: '' };
+
+// ── Skeleton ────────────────────────────────────────────────────────────────
+function WalletDetailSkeleton({ cfg }) {
+  const p = 'rounded-2xl bg-slate-100 animate-pulse';
+  return (
+    <div className="space-y-6">
+      {/* back + header */}
+      <div className="space-y-3">
+        <div className={`${p} h-5 w-24`} />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl animate-pulse" style={{ background: cfg.gradient, opacity: 0.3 }} />
+          <div className="space-y-1.5">
+            <div className={`${p} h-6 w-40`} />
+            <div className={`${p} h-3.5 w-56`} />
+          </div>
+        </div>
+      </div>
+      {/* hero card */}
+      <div className="rounded-2xl h-28 animate-pulse" style={{ background: cfg.gradient, opacity: 0.25 }} />
+      {/* period tabs */}
+      <div className={`${p} h-10 rounded-xl`} />
+      {/* stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => <div key={i} className={`${p} h-28`} />)}
+      </div>
+      {/* chart */}
+      <div className={`${p} h-56`} />
+      {/* list */}
+      <div className={`${p} h-64`} />
+    </div>
+  );
+}
+
+// ── Error screen ─────────────────────────────────────────────────────────────
+function WalletError({ message, cfg, onRetry }) {
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-4">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: '#fef2f2' }}>
+        <AlertTriangle className="w-8 h-8 text-red-500" />
+      </div>
+      <div>
+        <h2 className="text-lg font-bold text-slate-900 mb-1">Failed to load {cfg.label}</h2>
+        <p className="text-sm text-slate-500 max-w-xs">{message}</p>
+      </div>
+      <button onClick={onRetry}
+        className="mt-2 flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white"
+        style={{ background: cfg.gradient }}>
+        <RefreshCw className="w-4 h-4" /> Retry
+      </button>
+    </div>
+  );
+}
 
 function PaginationBar({ page, pages, total, isFetching, onPage, color = '#0b1d3a' }) {
   if (pages <= 1) return null;
@@ -125,31 +158,28 @@ export default function WalletDetail() {
   const property       = useSelector(selectCurrentProperty);
   const authToken      = useSelector((s) => s.auth?.token);
 
-  const type       = ['home', 'salary', 'property'].includes(walletType) ? walletType : 'vehicle';
-  const isSalary   = type === 'salary';
-  const cfg        = WALLET_CFG[type];
-  const Icon       = cfg.icon;
-
-  const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
-  const { data: summaryResult, refetch: refetchTxns } = useGetQuery(
-    { path: '/wallet/transactions', params: { propertyId, walletType: type, limit: 500 } },
-    { skip: !propertyId },
-  );
-  const rawTxns = summaryResult?.items ?? [];
-  const wallet = walletData?.[type] ?? { balance: 0 };
-
-  const [listPage, setListPage] = useState(1);
-  const LIST_LIMIT = 10;
-
-  const [depositMut, { isLoading: isDepositing }] = usePostMutation();
-  const [patchMut]                                 = usePatchMutation();
-  const [deleteMut,  { isLoading: isDeleting }]   = useDeleteMutation();
+  const type     = ['home', 'salary', 'property'].includes(walletType) ? walletType : 'vehicle';
+  const isSalary = type === 'salary';
+  const cfg      = WALLET_CFG[type];
+  const Icon     = cfg.icon;
 
   // ── Period filter state ──────────────────────────────────────────────────────
   const [period,      setPeriod]      = useState('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd,   setCustomEnd]   = useState('');
+  const [listPage,    setListPage]    = useState(1);
+  const LIST_LIMIT = 10;
 
+  // ── Summary params — period passed to backend, custom dates only for 'custom' ──
+  const summaryParams = useMemo(() => ({
+    propertyId,
+    walletType: type,
+    period,
+    ...(period === 'custom' && customStart && { startDate: customStart }),
+    ...(period === 'custom' && customEnd   && { endDate:   customEnd   }),
+  }), [propertyId, type, period, customStart, customEnd]);
+
+  // ── Paginated list range — same logic, derived in frontend for the list query ──
   const listRange = useMemo(() => {
     const now   = new Date();
     const today = now.toISOString().split('T')[0];
@@ -158,8 +188,7 @@ export default function WalletDetail() {
       return { startDate: s.toISOString().split('T')[0], endDate: today };
     }
     if (period === 'month') {
-      const s = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { startDate: s.toISOString().split('T')[0], endDate: today };
+      return { startDate: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0], endDate: today };
     }
     if (period === 'lastm') {
       const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -176,22 +205,55 @@ export default function WalletDetail() {
     return {};
   }, [period, customStart, customEnd]);
 
-  const { data: listResult, isFetching: listFetching } = useGetQuery(
+  // ── Primary summary query (balance + period stats + monthly chart) ──────────
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    isError:   summaryError,
+    error:     summaryErr,
+    refetch:   refetchSummary,
+  } = useGetQuery(
+    { path: '/wallet/summary', params: summaryParams },
+    { skip: !propertyId },
+  );
+
+  // ── Paginated transaction list ───────────────────────────────────────────────
+  const { data: listResult, isFetching: listFetching, refetch: refetchList } = useGetQuery(
     { path: '/wallet/transactions', params: { propertyId, walletType: type, page: listPage, limit: LIST_LIMIT, ...listRange } },
     { skip: !propertyId },
   );
+
   const listTxns  = listResult?.items  ?? [];
   const listTotal = listResult?.total  ?? 0;
   const listPages = listResult?.pages  ?? 1;
 
+  // Derive aggregated values from backend summary
+  const balance        = summary?.balance               ?? 0;
+  const totalDeposited = summary?.totalDeposited        ?? 0;
+  const periodStats    = summary?.periodStats           ?? { deposited: 0, spent: 0, net: 0, txnCount: 0 };
+  const monthlyChart   = summary?.monthlyChart          ?? [];
+  const maxMonthVal    = Math.max(...monthlyChart.flatMap((m) => [m.deposited, m.spent]), 1);
+
+  const low   = balance < LOW_BALANCE_THRESHOLD;
+  const empty = balance <= 0;
+
   useEffect(() => { setListPage(1); }, [period, customStart, customEnd]);
 
+  // ── Mutation hooks ────────────────────────────────────────────────────────────
+  const [depositMut, { isLoading: isDepositing }] = usePostMutation();
+  const [patchMut]                                 = usePatchMutation();
+  const [deleteMut,  { isLoading: isDeleting }]   = useDeleteMutation();
+
   // ── Report modal ─────────────────────────────────────────────────────────────
-  const [showReports,       setShowReports]       = useState(false);
-  const [reportWallet,      setReportWallet]      = useState(type);
-  const [reportPeriod,      setReportPeriod]      = useState('month');
-  const [reportStart,       setReportStart]       = useState('');
-  const [reportEnd,         setReportEnd]         = useState('');
+  const [showReports,  setShowReports]  = useState(false);
+  const [reportWallet, setReportWallet] = useState(type);
+  const [reportPeriod, setReportPeriod] = useState('month');
+  const [reportStart,  setReportStart]  = useState('');
+  const [reportEnd,    setReportEnd]    = useState('');
+  const [reportStep,   setReportStep]   = useState('idle');
+  const [reportBlob,   setReportBlob]   = useState(null);
+  const [reportSizeKB, setReportSizeKB] = useState(0);
+
   const openReports = () => {
     setReportWallet(type);
     setReportPeriod(period === 'all' ? 'all' : period === 'custom' ? 'custom' : period === 'lastm' ? 'lastMonth' : period);
@@ -202,22 +264,15 @@ export default function WalletDetail() {
     setShowReports(true);
   };
 
-  const [reportStep, setReportStep] = useState('idle'); // idle | generating | ready | sharing | done
-  const [reportBlob, setReportBlob] = useState(null);
-  const [reportSizeKB, setReportSizeKB] = useState(0);
-
-  const reportFilename = () =>
-    `Shah-${cfg.label.replace(/\s+/g, '-')}-${reportPeriod}-Statement.pdf`;
-
+  const reportFilename = () => `Shah-${cfg.label.replace(/\s+/g, '-')}-${reportPeriod}-Statement.pdf`;
   const fmtSize = (kb) => kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
-
   const canShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   const generateBlob = async () => {
     const params = new URLSearchParams({ propertyId, walletType: reportWallet, period: reportPeriod });
     if (reportPeriod === 'custom' && reportStart && reportEnd) {
       params.append('startDate', reportStart);
-      params.append('endDate', reportEnd);
+      params.append('endDate',   reportEnd);
     }
     const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
     const res = await fetch(`${API_BASE_URL}/reports/wallet?${params}`, { credentials: 'include', headers });
@@ -233,10 +288,7 @@ export default function WalletDetail() {
       setReportBlob(blob);
       setReportSizeKB(Math.round(blob.size / 1024));
       setReportStep('ready');
-    } catch {
-      toast.error('Failed to generate report');
-      setReportStep('idle');
-    }
+    } catch { toast.error('Failed to generate report'); setReportStep('idle'); }
   };
 
   const handleDownloadPDF = () => {
@@ -265,22 +317,15 @@ export default function WalletDetail() {
         toast('Sharing not supported on this device — downloaded instead');
       }
     } catch (e) {
-      if (e?.name === 'AbortError') {
-        setReportStep('ready');
-      } else {
-        toast.error('Failed to share');
-        setReportStep('ready');
-      }
+      setReportStep(e?.name === 'AbortError' ? 'ready' : 'idle');
+      if (e?.name !== 'AbortError') toast.error('Failed to share');
     }
   };
 
   const closeReports = () => {
     if (reportStep === 'generating' || reportStep === 'sharing') return;
-    setShowReports(false);
-    setReportStep('idle');
-    setReportBlob(null);
+    setShowReports(false); setReportStep('idle'); setReportBlob(null);
   };
-
   const reportLoading = reportStep === 'generating' || reportStep === 'sharing';
 
   // ── Deposit form ─────────────────────────────────────────────────────────────
@@ -288,62 +333,24 @@ export default function WalletDetail() {
   const [depForm,     setDepForm]     = useState(DEP_BLANK);
   const setDF = (k, v) => setDepForm((f) => ({ ...f, [k]: v }));
 
-  // ── Edit deposit state ───────────────────────────────────────────────────────
+  // ── Edit / delete deposit state ──────────────────────────────────────────────
   const [editTx,   setEditTx]   = useState(null);
   const [editForm, setEditForm] = useState(EDT_BLANK);
   const setEF = (k, v) => setEditForm((f) => ({ ...f, [k]: v }));
-
   const openEdit = (txn) => {
     setEditTx(txn);
     setEditForm({ amount: String(txn.amount), date: txn.date, note: txn.note || txn.description || '' });
   };
-
-  // ── Delete deposit state ─────────────────────────────────────────────────────
   const [deleteTx, setDeleteTx] = useState(null);
 
-  // ── Sorted & filtered transactions ──────────────────────────────────────────
-  const allTxns = useMemo(() => [...rawTxns].sort((a, b) => {
-    const d = new Date(b.date) - new Date(a.date);
-    return d !== 0 ? d : String(b.id).localeCompare(String(a.id));
-  }), [rawTxns]);
-
-  const filtered = useMemo(
-    () => applyPeriod(allTxns, period, customStart, customEnd),
-    [allTxns, period, customStart, customEnd],
-  );
-
-  const isCredit = (t) => t.type === 'credit';
-  const isDebit  = (t) => t.type === 'debit';
-  const periodDeposited = filtered.filter(isCredit).reduce((s, t) => s + t.amount, 0);
-  const periodSpent     = filtered.filter(isDebit).reduce((s, t) => s + t.amount, 0);
-  const periodNet       = periodDeposited - periodSpent;
-
-  // ── Monthly chart (all-time, max 6 months) ──────────────────────────────────
-  const byMonth = useMemo(() => {
-    const map = {};
-    allTxns.forEach((t) => {
-      const key = t.date.slice(0, 7);
-      if (!map[key]) map[key] = { key, deposited: 0, spent: 0 };
-      if (isCredit(t)) map[key].deposited += t.amount;
-      else             map[key].spent      += t.amount;
-    });
-    return Object.values(map).sort((a, b) => b.key.localeCompare(a.key)).slice(0, 6).reverse();
-  }, [allTxns]);
-
-  const maxMonthVal = Math.max(...byMonth.flatMap((m) => [m.deposited, m.spent]), 1);
-
-  const balance = wallet.balance ?? 0;
-  const low     = balance < LOW_BALANCE_THRESHOLD;
-  const empty   = balance <= 0;
-
-  // ── Handlers ─────────────────────────────────────────────────────────────────
+  // ── Mutation handlers ─────────────────────────────────────────────────────────
   const handleDeposit = async (e) => {
     e.preventDefault();
     const amt = Number(depForm.amount);
     if (!amt || amt <= 0) return toast.error('Enter a valid amount');
     try {
       await depositMut({ path: '/wallet/deposit', body: { propertyId, walletType: type, amount: amt, description: depForm.note, note: depForm.note, date: depForm.date } }).unwrap();
-      await Promise.all([refetchWallet(), refetchTxns()]);
+      await Promise.all([refetchSummary(), refetchList()]);
       toast.success(`AED ${fmt(amt)} deposited to ${cfg.label}`);
       setShowDeposit(false);
       setDepForm(DEP_BLANK);
@@ -356,7 +363,7 @@ export default function WalletDetail() {
     if (!amt || amt <= 0) return toast.error('Enter a valid amount');
     try {
       await patchMut({ path: `/wallet/transaction/${editTx._id || editTx.id}`, body: { amount: amt, note: editForm.note, description: editForm.note, date: editForm.date } }).unwrap();
-      await Promise.all([refetchWallet(), refetchTxns()]);
+      await Promise.all([refetchSummary(), refetchList()]);
       toast.success('Deposit updated');
       setEditTx(null);
       setEditForm(EDT_BLANK);
@@ -367,13 +374,23 @@ export default function WalletDetail() {
     if (!deleteTx) return;
     try {
       await deleteMut({ path: `/wallet/transaction/${deleteTx._id || deleteTx.id}` }).unwrap();
-      await Promise.all([refetchWallet(), refetchTxns()]);
+      await Promise.all([refetchSummary(), refetchList()]);
       toast.success('Deposit deleted');
       setDeleteTx(null);
     } catch (err) { toast.error(err.data?.error || 'Failed to delete'); }
   };
 
   const pLabel = periodLabel(period, customStart, customEnd);
+
+  // ── Loading & error gates ─────────────────────────────────────────────────────
+  if (summaryLoading || !propertyId) return <WalletDetailSkeleton cfg={cfg} />;
+  if (summaryError) return (
+    <WalletError
+      message={summaryErr?.data?.message ?? summaryErr?.message ?? 'Failed to load wallet data'}
+      cfg={cfg}
+      onRetry={refetchSummary}
+    />
+  );
 
   return (
     <div className="space-y-6">
@@ -447,9 +464,8 @@ export default function WalletDetail() {
         </motion.div>
       )}
 
-      {/* ── Period selector — horizontally scrollable on mobile ── */}
+      {/* ── Period selector ── */}
       <motion.div {...fade(0.1)}>
-        {/* Scrollable tab strip */}
         <div className="overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
           <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 w-max sm:w-auto">
             {PERIODS.map(({ k, l }) => (
@@ -463,7 +479,6 @@ export default function WalletDetail() {
           </div>
         </div>
 
-        {/* Custom date inputs — only shown when custom is selected */}
         {period === 'custom' && (
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div>
@@ -477,16 +492,16 @@ export default function WalletDetail() {
           </div>
         )}
 
-        <p className="text-[12px] text-slate-400 mt-2">{listTotal} transactions · {pLabel}</p>
+        <p className="text-[12px] text-slate-400 mt-2">{periodStats.txnCount} transactions · {pLabel}</p>
       </motion.div>
 
       {/* ── Period stats ── */}
       <motion.div {...fade(0.13)}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            ...(isSalary ? [] : [{ l: 'Received', v: periodDeposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft }]),
-            { l: isSalary ? 'Total Paid' : 'Spent', v: periodSpent, c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight },
-            ...(isSalary ? [] : [{ l: 'Net Balance', v: periodNet, c: periodNet >= 0 ? '#2563eb' : '#dc2626', bg: periodNet >= 0 ? '#eff6ff' : '#fef2f2', b: periodNet >= 0 ? '#bfdbfe' : '#fecaca', icon: periodNet >= 0 ? TrendingUp : TrendingDown }]),
+            ...(isSalary ? [] : [{ l: 'Received', v: periodStats.deposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft }]),
+            { l: isSalary ? 'Total Paid' : 'Spent', v: periodStats.spent, c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight },
+            ...(isSalary ? [] : [{ l: 'Net Balance', v: periodStats.net, c: periodStats.net >= 0 ? '#2563eb' : '#dc2626', bg: periodStats.net >= 0 ? '#eff6ff' : '#fef2f2', b: periodStats.net >= 0 ? '#bfdbfe' : '#fecaca', icon: periodStats.net >= 0 ? TrendingUp : TrendingDown }]),
           ].map((s) => (
             <div key={s.l} className="bg-white rounded-2xl border p-5" style={{ borderColor: s.b, boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
@@ -503,13 +518,13 @@ export default function WalletDetail() {
       </motion.div>
 
       {/* ── Monthly breakdown chart ── */}
-      {byMonth.length > 0 && (
+      {monthlyChart.length > 0 && (
         <motion.div {...fade(0.16)}>
           <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
             <div className="flex items-center justify-between mb-5">
               <div>
                 <p className="text-[14px] font-bold text-slate-800">Monthly Overview</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Last {byMonth.length} months — deposits vs expenses</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Last {monthlyChart.length} months — deposits vs expenses</p>
               </div>
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400" /><span className="text-[11px] text-slate-500">In</span></div>
@@ -517,7 +532,7 @@ export default function WalletDetail() {
               </div>
             </div>
             <div className="space-y-3.5">
-              {byMonth.map((m) => {
+              {monthlyChart.map((m) => {
                 const label = new Date(m.key + '-01').toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
                 const dPct  = (m.deposited / maxMonthVal) * 100;
                 const sPct  = (m.spent     / maxMonthVal) * 100;
@@ -553,21 +568,26 @@ export default function WalletDetail() {
       {/* ── Transaction list ── */}
       <motion.div {...fade(0.2)}>
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
-          <div className="p-5 pb-3 border-b border-slate-50">
-            <p className="text-[14px] font-bold text-slate-800">Transactions</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{listTotal} records · {pLabel}</p>
+          <div className="p-5 pb-3 border-b border-slate-50 flex items-center justify-between">
+            <div>
+              <p className="text-[14px] font-bold text-slate-800">Transactions</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {listFetching ? 'Loading…' : `${listTotal} records · ${pLabel}`}
+              </p>
+            </div>
+            {listFetching && <Loader2 className="w-4 h-4 animate-spin text-slate-300" />}
           </div>
 
-          {listTxns.length === 0 ? (
+          {listTxns.length === 0 && !listFetching ? (
             <div className="py-14 text-center">
               <Wallet className="w-10 h-10 text-slate-200 mx-auto mb-3" strokeWidth={1.5} />
               <p className="text-slate-400 text-[13px]">No transactions for {pLabel}</p>
             </div>
           ) : (
             <>
-              <div className="divide-y divide-slate-50">
+              <div className={cn('divide-y divide-slate-50 transition-opacity duration-150', listFetching && 'opacity-50 pointer-events-none')}>
                 {listTxns.map((txn) => {
-                  const isDepo = isCredit(txn);
+                  const isDepo = txn.type === 'credit';
                   const txnKey = txn._id ?? txn.id;
 
                   const rowInner = (
@@ -633,8 +653,8 @@ export default function WalletDetail() {
               <div className="px-5 py-3.5 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between">
                 <p className="text-[11px] text-slate-400">{listTotal} total · {pLabel}</p>
                 <div className="flex items-center gap-3">
-                  <span className="text-[12px] text-emerald-600 font-bold">+AED {fmt(periodDeposited)}</span>
-                  <span className="text-[12px] text-red-500 font-bold">−AED {fmt(periodSpent)}</span>
+                  <span className="text-[12px] text-emerald-600 font-bold">+AED {fmt(periodStats.deposited)}</span>
+                  <span className="text-[12px] text-red-500 font-bold">−AED {fmt(periodStats.spent)}</span>
                 </div>
               </div>
             </>
@@ -647,7 +667,6 @@ export default function WalletDetail() {
         title="Edit Deposit" subtitle="Correct the amount, date or note" size="sm">
         {editTx && (
           <form onSubmit={handleEdit} className="space-y-4">
-            {/* Wallet badge */}
             <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: cfg.gradient }}>
                 <Icon className="w-4 h-4 text-white" />
@@ -733,18 +752,16 @@ export default function WalletDetail() {
       <Modal open={showReports} onClose={closeReports}
         title="Generate Wallet Report" subtitle="A4 PDF · header & footer on every page · max 14 rows" size="sm">
         <div className="space-y-4">
-
-          {/* Wallet selector */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Wallet</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { k: 'all',      l: 'All Wallets',    color: '#0b1d3a', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-                { k: 'vehicle',  l: 'Vehicle',         color: '#0b1d3a', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-                { k: 'home',     l: 'Home',            color: '#16a34a', g: 'linear-gradient(135deg,#14532d,#16a34a)' },
-                { k: 'property', l: 'Property',        color: '#0891b2', g: 'linear-gradient(135deg,#164e63,#0891b2)' },
-                { k: 'salary',   l: 'Salary',          color: '#7c3aed', g: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
-              ].map(({ k, l, color, g }) => (
+                { k: 'all',      l: 'All Wallets', g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+                { k: 'vehicle',  l: 'Vehicle',     g: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+                { k: 'home',     l: 'Home',        g: 'linear-gradient(135deg,#14532d,#16a34a)' },
+                { k: 'property', l: 'Property',    g: 'linear-gradient(135deg,#164e63,#0891b2)' },
+                { k: 'salary',   l: 'Salary',      g: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+              ].map(({ k, l, g }) => (
                 <button key={k} type="button"
                   onClick={() => { setReportWallet(k); setReportStep('idle'); setReportBlob(null); }}
                   className={cn('py-2.5 px-3 rounded-xl border-2 text-[12px] font-bold transition-all',
@@ -755,17 +772,15 @@ export default function WalletDetail() {
               ))}
             </div>
           </div>
-
-          {/* Period selector */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Period</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { k: 'week',      l: 'This Week'   },
-                { k: 'month',     l: 'This Month'  },
-                { k: 'lastMonth', l: 'Last Month'  },
+                { k: 'week',      l: 'This Week'    },
+                { k: 'month',     l: 'This Month'   },
+                { k: 'lastMonth', l: 'Last Month'   },
                 { k: 'last3',     l: 'Last 3 Months' },
-                { k: 'all',       l: 'All Time'    },
+                { k: 'all',       l: 'All Time'     },
                 { k: 'custom',    l: 'Custom Range' },
               ].map(({ k, l }) => (
                 <button key={k} type="button"
@@ -778,8 +793,6 @@ export default function WalletDetail() {
               ))}
             </div>
           </div>
-
-          {/* Custom date range */}
           {reportPeriod === 'custom' && (
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -792,12 +805,8 @@ export default function WalletDetail() {
               </div>
             </div>
           )}
-
-          {/* Action area — state machine */}
           <div className="pt-1 border-t border-slate-100">
-
-            {/* IDLE / SELECTING — show Generate button */}
-            {(reportStep === 'idle') && (
+            {reportStep === 'idle' && (
               <button onClick={handleGenerate}
                 disabled={reportPeriod === 'custom' && (!reportStart || !reportEnd)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -805,8 +814,6 @@ export default function WalletDetail() {
                 <BarChart3 className="w-4 h-4" />Build Report PDF
               </button>
             )}
-
-            {/* GENERATING — spinner */}
             {reportStep === 'generating' && (
               <div className="flex flex-col items-center gap-2 py-5">
                 <Loader2 className="w-7 h-7 animate-spin" style={{ color: cfg.color }} />
@@ -814,24 +821,18 @@ export default function WalletDetail() {
                 <p className="text-[11px] text-slate-400">Compiling transactions, formatting A4 pages</p>
               </div>
             )}
-
-            {/* READY — show file info + Download / Share */}
             {reportStep === 'ready' && (
               <div className="space-y-3">
-                {/* File info card */}
                 <div className="flex items-center gap-3 p-3.5 rounded-xl border"
                   style={{ background: cfg.bg, borderColor: cfg.border ?? '#e2e8f0' }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: cfg.gradient }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: cfg.gradient }}>
                     <FileDown className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold truncate" style={{ color: cfg.color }}>{reportFilename()}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">A4 PDF · {fmtSize(reportSizeKB)} · Ready to download or share</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">A4 PDF · {fmtSize(reportSizeKB)} · Ready</p>
                   </div>
                 </div>
-
-                {/* Action buttons */}
                 <div className={cn('grid gap-2', canShare ? 'grid-cols-2' : 'grid-cols-1')}>
                   <button onClick={handleDownloadPDF}
                     className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold border-2 transition-all"
@@ -852,8 +853,6 @@ export default function WalletDetail() {
                 </button>
               </div>
             )}
-
-            {/* SHARING — spinner */}
             {reportStep === 'sharing' && (
               <div className="flex flex-col items-center gap-2 py-5">
                 <Loader2 className="w-7 h-7 animate-spin" style={{ color: cfg.color }} />
@@ -861,8 +860,6 @@ export default function WalletDetail() {
                 <p className="text-[11px] text-slate-400">Choose WhatsApp or any app</p>
               </div>
             )}
-
-            {/* DONE */}
             {reportStep === 'done' && (
               <div className="flex flex-col items-center gap-2 py-5">
                 <CheckCircle2 className="w-8 h-8" style={{ color: cfg.color }} />

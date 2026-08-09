@@ -350,9 +350,10 @@ export default function MaintenancePage() {
   const [updateTaskMut] = usePutMutation();
   const [deleteTaskMut] = useDeleteMutation();
   const [patchTaskMut] = usePatchMutation();
-  const [addExpenseMut] = usePostMutation();
-  const [deductWalletMut] = usePostMutation();
-  const [addCategoryMut] = usePostMutation();
+  const [addExpenseMut]    = usePostMutation();
+  const [deductWalletMut]  = usePostMutation();
+  const [createExpenseMut] = usePostMutation();
+  const [addCategoryMut]   = usePostMutation();
 
   const [catTab, setCatTab] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -480,17 +481,17 @@ export default function MaintenancePage() {
       }).unwrap();
       if (expense.amount > 0) {
         const walletType = expense.walletType ?? "home";
-        await deductWalletMut({
-          path: "/wallet/deduct",
-          body: {
-            propertyId,
-            walletType,
-            amount: expense.amount,
-            description: `${task.title} — ${expense.description || expense.category}`,
-            category: task.category,
-            date: expense.date,
-          },
-        }).unwrap();
+        const desc = `${task.title} — ${expense.description || expense.category}`;
+        await Promise.all([
+          deductWalletMut({
+            path: "/wallet/deduct",
+            body: { propertyId, walletType, amount: expense.amount, description: desc, category: task.category, date: expense.date },
+          }).unwrap(),
+          createExpenseMut({
+            path: '/expenses',
+            body: { propertyId, walletType, category: task.category, description: desc, amount: expense.amount, date: expense.date, segment: 'property' },
+          }).unwrap(),
+        ]);
         await refetchWallet();
       }
       toast.success(
