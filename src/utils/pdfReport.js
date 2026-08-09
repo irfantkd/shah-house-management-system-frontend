@@ -227,7 +227,7 @@ function totalsStrip(doc, y, count, cashIn, cashOut) {
 // ── Shared table config ───────────────────────────────────────────────────────
 const TABLE_STYLES = {
   fontSize: 8,
-  cellPadding: { top: 3.5, bottom: 3.5, left: 4, right: 4 },
+  cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
   lineColor: GY200,
   lineWidth: 0.2,
   textColor: SL,
@@ -240,7 +240,7 @@ const HEAD_STYLES = {
   textColor: WHITE,
   fontSize: 7.5,
   fontStyle: "bold",
-  cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
+  cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
 };
 
 const ALT_ROW = { fillColor: GY50 };

@@ -897,7 +897,7 @@ export default function WalletPage() {
 
       {/* ── Reports Modal ── */}
       <Modal open={showReports} onClose={() => { if (!reportLoading) { setShowReports(false); resetReport(); } }}
-        title="Generate Wallet Report" subtitle="A4 PDF · header & footer on every page · max 14 rows" size="sm">
+        title="Generate Wallet Report" subtitle="A4 PDF · header & footer on every page · 20+ rows per page" size="sm">
         <div className="space-y-4">
 
           {/* Settings — only shown when idle or ready (hide while generating/sharing/done) */}
