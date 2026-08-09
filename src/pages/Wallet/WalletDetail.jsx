@@ -750,7 +750,7 @@ export default function WalletDetail() {
 
       {/* ── Reports Modal ── */}
       <Modal open={showReports} onClose={closeReports}
-        title="Generate Wallet Report" subtitle="A4 PDF · header & footer on every page · max 14 rows" size="sm">
+        title="Generate Wallet Report" subtitle="A4 PDF · header & footer on every page · 20+ rows per page" size="sm">
         <div className="space-y-4">
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Wallet</label>
