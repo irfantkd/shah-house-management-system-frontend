@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Wallet, Car, Home, Banknote, Building2, Plus, ArrowDownLeft, ArrowUpRight,
+  Wallet, Car, Home, Banknote, Building2, Crown, Plus, ArrowDownLeft, ArrowUpRight,
   AlertTriangle, ChevronRight, Loader2, FileDown, BarChart3, Share2, CheckCircle2,
   RefreshCw, Search, X, CalendarDays, SlidersHorizontal,
 } from 'lucide-react';
@@ -24,6 +24,7 @@ const WALLETS = {
   home:     { label: 'Home Wallet',     desc: 'Property services, grocery & household',            icon: Home,      color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)', detailLink: '/wallet/home'     },
   property: { label: 'Property Wallet', desc: 'Property maintenance, infrastructure & capital',   icon: Building2, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', gradient: 'linear-gradient(135deg,#164e63,#0891b2)', detailLink: '/wallet/property' },
   salary:   { label: 'Salary Wallet',   desc: 'Employee salary payments · auto-tracked',          icon: Banknote,  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)', detailLink: '/wallet/salary'   },
+  amaraa:   { label: 'Amaraa Wallet',   desc: 'Track office expenses wallet',     icon: Crown,     color: '#831843', bg: '#fdf2f8', border: '#fbcfe8', gradient: 'linear-gradient(135deg,#831843,#db2777)', detailLink: '/wallet/amaraa'   },
 };
 
 const REPORT_PERIODS = [
@@ -41,6 +42,7 @@ const REPORT_WALLETS = [
   { k: 'home',     l: 'Home'        },
   { k: 'property', l: 'Property'    },
   { k: 'salary',   l: 'Salary'      },
+  { k: 'amaraa',   l: 'Amaraa'      },
 ];
 
 const TXN_PAGE_SIZE = 10;
@@ -150,7 +152,8 @@ export default function WalletPage() {
   const hWallet = { ...EMPTY_W, ...walletData?.home     };
   const pWallet = { ...EMPTY_W, ...walletData?.property };
   const sWallet = { ...EMPTY_W, ...walletData?.salary   };
-  const walletsMap = { vehicle: vWallet, home: hWallet, property: pWallet, salary: sWallet };
+  const aWallet = { ...EMPTY_W, ...walletData?.amaraa   };
+  const walletsMap = { vehicle: vWallet, home: hWallet, property: pWallet, salary: sWallet, amaraa: aWallet };
 
   // ── Deposit ─────────────────────────────────────────────────────────────────
   const [depositMut, { isLoading: isDepositing }] = usePostMutation();
@@ -305,7 +308,7 @@ export default function WalletPage() {
       </motion.div>
 
       {/* ── Wallet Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {Object.entries(WALLETS).map(([key, w], i) => {
           const wallet   = walletsMap[key];
           const balance  = wallet.balance ?? 0;
@@ -391,7 +394,7 @@ export default function WalletPage() {
       </div>
 
       {/* ── Low balance alerts ── */}
-      {(vWallet.balance < LOW_BALANCE_THRESHOLD || hWallet.balance < LOW_BALANCE_THRESHOLD || pWallet.balance < LOW_BALANCE_THRESHOLD) && (
+      {(vWallet.balance < LOW_BALANCE_THRESHOLD || hWallet.balance < LOW_BALANCE_THRESHOLD || pWallet.balance < LOW_BALANCE_THRESHOLD || aWallet.balance < LOW_BALANCE_THRESHOLD) && (
         <motion.div {...fade(0.14)}>
           <div className="space-y-2">
             {vWallet.balance <= 0 && (
@@ -468,6 +471,32 @@ export default function WalletPage() {
                 </div>
                 <button onClick={() => openDeposit('property')}
                   className="shrink-0 text-[12px] font-bold text-cyan-700 bg-cyan-100 px-3 py-1.5 rounded-xl hover:bg-cyan-200 transition-colors">
+                  Top Up
+                </button>
+              </div>
+            )}
+            {aWallet.balance <= 0 && (
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-red-50 border border-red-200">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-red-700">Amaraa Wallet is empty</p>
+                  <p className="text-[11px] text-red-500">Deposit funds to the personal wallet to continue tracking.</p>
+                </div>
+                <button onClick={() => openDeposit('amaraa')}
+                  className="shrink-0 text-[12px] font-bold text-red-700 bg-red-100 px-3 py-1.5 rounded-xl hover:bg-red-200 transition-colors">
+                  Deposit Now
+                </button>
+              </div>
+            )}
+            {aWallet.balance > 0 && aWallet.balance < LOW_BALANCE_THRESHOLD && (
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-pink-50 border border-pink-200">
+                <AlertTriangle className="w-5 h-5 text-pink-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-[13px] font-bold text-pink-700">Amaraa Wallet running low — AED {fmt(aWallet.balance)} left</p>
+                  <p className="text-[11px] text-pink-600">Consider topping up the personal wallet.</p>
+                </div>
+                <button onClick={() => openDeposit('amaraa')}
+                  className="shrink-0 text-[12px] font-bold text-pink-700 bg-pink-100 px-3 py-1.5 rounded-xl hover:bg-pink-200 transition-colors">
                   Top Up
                 </button>
               </div>
@@ -705,6 +734,7 @@ export default function WalletPage() {
                   { k: 'home',     l: 'Home',     wCfg: WALLETS.home     },
                   { k: 'property', l: 'Property', wCfg: WALLETS.property },
                   { k: 'salary',   l: 'Salary',   wCfg: WALLETS.salary   },
+                  { k: 'amaraa',   l: 'Amaraa',   wCfg: WALLETS.amaraa   },
                 ].map(({ k, l, wCfg }) => {
                   const isAct = txnWalletFlt === k;
                   return (
@@ -1033,8 +1063,8 @@ export default function WalletPage() {
 
           <div>
             <label className="block text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-2">Select Wallet</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['vehicle', 'home', 'property']).map((k) => {
+            <div className="grid grid-cols-2 gap-2">
+              {(['vehicle', 'home', 'property', 'amaraa']).map((k) => {
                 const w = WALLETS[k];
                 const Icon = w.icon;
                 const bal = walletsMap[k].balance ?? 0;

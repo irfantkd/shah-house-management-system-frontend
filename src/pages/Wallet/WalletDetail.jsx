@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft, Car, Home, Banknote, Building2, Plus, ArrowDownLeft, ArrowUpRight,
+  ArrowLeft, Car, Home, Banknote, Building2, Crown, Plus, ArrowDownLeft, ArrowUpRight,
   AlertTriangle, Wallet, TrendingUp, TrendingDown, Loader2, Pencil, Trash2, Users,
   FileDown, BarChart3, Share2, CheckCircle2, RefreshCw,
 } from 'lucide-react';
@@ -25,6 +25,7 @@ const WALLET_CFG = {
   home:     { label: 'Home Wallet',     desc: 'Property services, grocery & household',          icon: Home,      color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', gradient: 'linear-gradient(135deg,#14532d,#16a34a)' },
   property: { label: 'Property Wallet', desc: 'Property maintenance, infrastructure & capital', icon: Building2, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', gradient: 'linear-gradient(135deg,#164e63,#0891b2)' },
   salary:   { label: 'Salary Wallet',   desc: 'Employee salary payments only',                  icon: Banknote,  color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', gradient: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+  amaraa:   { label: 'Amaraa Wallet',   desc: 'Track office expenses wallet',    icon: Crown,     color: '#831843', bg: '#fdf2f8', border: '#fbcfe8', gradient: 'linear-gradient(135deg,#831843,#db2777)' },
 };
 
 const PERIODS = [
@@ -158,7 +159,7 @@ export default function WalletDetail() {
   const property       = useSelector(selectCurrentProperty);
   const authToken      = useSelector((s) => s.auth?.token);
 
-  const type     = ['home', 'salary', 'property'].includes(walletType) ? walletType : 'vehicle';
+  const type     = ['home', 'salary', 'property', 'amaraa'].includes(walletType) ? walletType : 'vehicle';
   const isSalary = type === 'salary';
   const cfg      = WALLET_CFG[type];
   const Icon     = cfg.icon;
@@ -761,6 +762,7 @@ export default function WalletDetail() {
                 { k: 'home',     l: 'Home',        g: 'linear-gradient(135deg,#14532d,#16a34a)' },
                 { k: 'property', l: 'Property',    g: 'linear-gradient(135deg,#164e63,#0891b2)' },
                 { k: 'salary',   l: 'Salary',      g: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+                { k: 'amaraa',   l: 'Amaraa',      g: 'linear-gradient(135deg,#831843,#db2777)' },
               ].map(({ k, l, g }) => (
                 <button key={k} type="button"
                   onClick={() => { setReportWallet(k); setReportStep('idle'); setReportBlob(null); }}
