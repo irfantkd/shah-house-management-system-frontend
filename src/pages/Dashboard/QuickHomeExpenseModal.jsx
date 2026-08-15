@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { Plus, Home, Car, Building2, Wallet } from 'lucide-react';
+import { Plus, Home, Car, Building2, Wallet, Briefcase } from 'lucide-react';
 import { RiReceiptLine, RiHome4Line, RiShoppingCart2Line } from 'react-icons/ri';
 import { useGetQuery, usePostMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
@@ -50,7 +50,11 @@ export default function QuickHomeExpenseModal({ open, onClose }) {
   const homeBalance     = walletData?.home?.balance     ?? 0;
   const vehicleBalance  = walletData?.vehicle?.balance  ?? 0;
   const propertyBalance = walletData?.property?.balance ?? 0;
-  const activeBalance   = wallet === 'vehicle' ? vehicleBalance : wallet === 'property' ? propertyBalance : homeBalance;
+  const amaraaBalance   = walletData?.amaraa?.balance   ?? 0;
+  const activeBalance   = wallet === 'vehicle'  ? vehicleBalance
+                        : wallet === 'property' ? propertyBalance
+                        : wallet === 'amaraa'   ? amaraaBalance
+                        : homeBalance;
 
   const [addExpense]     = usePostMutation();
   const [deductWallet]   = usePostMutation();
@@ -143,11 +147,12 @@ export default function QuickHomeExpenseModal({ open, onClose }) {
         {/* Wallet selector */}
         <div>
           <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Deduct from Wallet</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {[
               { k: 'home',     label: 'Home Wallet',     icon: Home,      bal: homeBalance,     color: '#16a34a', bg: '#f0fdf4' },
               { k: 'property', label: 'Property Wallet', icon: Building2, bal: propertyBalance, color: '#0891b2', bg: '#ecfeff' },
               { k: 'vehicle',  label: 'Vehicle Wallet',  icon: Car,       bal: vehicleBalance,  color: '#0b1d3a', bg: '#eef2fb' },
+              { k: 'amaraa',   label: 'Amaraa Wallet',   icon: Briefcase, bal: amaraaBalance,   color: '#831843', bg: '#fdf2f8' },
             ].map(({ k, label, icon: Icon, bal, color, bg }) => (
               <button key={k} type="button" onClick={() => setWallet(k)}
                 className="flex flex-col gap-1 p-3 rounded-xl border-2 text-left transition-all"
@@ -169,7 +174,9 @@ export default function QuickHomeExpenseModal({ open, onClose }) {
           {(Number(form.amount) || 0) > 0 && (
             <div className={cn('mt-2 flex items-center justify-between px-4 py-2.5 rounded-xl border text-[12px]',
               after < 0 ? 'bg-red-50 border-red-200' : after < LOW_THRESHOLD ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
-              <span className="text-slate-500">{wallet === 'vehicle' ? 'Vehicle' : wallet === 'property' ? 'Property' : 'Home'} wallet after</span>
+              <span className="text-slate-500">
+                {wallet === 'vehicle' ? 'Vehicle' : wallet === 'property' ? 'Property' : wallet === 'amaraa' ? 'Amaraa' : 'Home'} wallet after
+              </span>
               <span className={cn('font-black', after < 0 ? 'text-red-600' : after < LOW_THRESHOLD ? 'text-amber-600' : 'text-emerald-700')}>
                 {after < 0 ? `− AED ${fmt(Math.abs(after))}` : `AED ${fmt(after)}`}
               </span>
