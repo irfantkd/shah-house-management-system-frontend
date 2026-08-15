@@ -9,7 +9,7 @@ import {
   RiAddLine, RiSearchLine, RiArrowLeftLine, RiArrowRightLine,
   RiEditLine, RiDeleteBinLine, RiWalletLine, RiHome4Line, RiShoppingCart2Line,
   RiFilter3Line, RiReceiptLine, RiCloseLine, RiCalendar2Line,
-  RiStore2Line, RiCarLine, RiBankCardLine, RiBuildingLine, RiAlertLine,
+  RiStore2Line, RiCarLine, RiBankCardLine, RiBuildingLine, RiAlertLine, RiBriefcase2Line,
 } from 'react-icons/ri';
 import {
   useGetQuery, usePostMutation, usePutMutation, useDeleteMutation,
@@ -53,6 +53,7 @@ const WALLET_CFG = {
   property: { label: 'Property', color: '#0891b2', bg: '#ecfeff', Icon: RiBuildingLine },
   vehicle:  { label: 'Vehicle',  color: '#7c3aed', bg: '#ede9fe', Icon: RiCarLine      },
   salary:   { label: 'Salary',   color: '#0b1d3a', bg: '#eef2fb', Icon: RiBankCardLine },
+  amaraa:   { label: 'Amaraa',   color: '#831843', bg: '#fdf2f8', Icon: RiBriefcase2Line },
 };
 
 function WalletBadge({ walletType, className }) {
@@ -232,6 +233,7 @@ export default function ExpensesPage() {
   const homeBalance     = stats.walletBalances?.home     ?? 0;
   const vehicleBalance  = stats.walletBalances?.vehicle  ?? 0;
   const propertyBalance = stats.walletBalances?.property ?? 0;
+  const amaraaBalance   = stats.walletBalances?.amaraa   ?? 0;
 
   // Category colour map built from stats.byCategory (backend attaches color/bg per category)
   const catMap = useMemo(() => {
@@ -374,6 +376,7 @@ export default function ExpensesPage() {
             { label: 'Home',     bal: homeBalance,     color: '#16a34a', border: '#bbf7d0', bg: '#f0fdf4' },
             { label: 'Property', bal: propertyBalance, color: '#0891b2', border: '#a5f3fc', bg: '#ecfeff' },
             { label: 'Vehicle',  bal: vehicleBalance,  color: '#7c3aed', border: '#ddd6fe', bg: '#f5f3ff' },
+            { label: 'Amaraa',   bal: amaraaBalance,   color: '#831843', border: '#fbcfe8', bg: '#fdf2f8' },
           ].map(({ label, bal, color, border, bg }) => (
             <div key={label} className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl border"
               style={{ background: bg, borderColor: border }}>
@@ -392,6 +395,7 @@ export default function ExpensesPage() {
           { label: 'Home',     bal: homeBalance,     color: '#16a34a', border: '#bbf7d0', bg: '#f0fdf4' },
           { label: 'Property', bal: propertyBalance, color: '#0891b2', border: '#a5f3fc', bg: '#ecfeff' },
           { label: 'Vehicle',  bal: vehicleBalance,  color: '#7c3aed', border: '#ddd6fe', bg: '#f5f3ff' },
+          { label: 'Amaraa',   bal: amaraaBalance,   color: '#831843', border: '#fbcfe8', bg: '#fdf2f8' },
         ].map(({ label, bal, color, border, bg }) => (
           <div key={label} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border shrink-0"
             style={{ background: bg, borderColor: border }}>
@@ -996,6 +1000,7 @@ export default function ExpensesPage() {
         homeBalance={homeBalance}
         vehicleBalance={vehicleBalance}
         propertyBalance={propertyBalance}
+        amaraaBalance={amaraaBalance}
         onClose={() => setModal(null)}
         onSave={handleSave}
       />
@@ -1022,7 +1027,7 @@ const LOW_THRESHOLD = 5000;
 const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 const CUSTOM_SENTINEL = '__custom__';
 
-function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance, onClose, onSave }) {
+function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance, amaraaBalance, onClose, onSave }) {
   const propertyId = useSelector(selectCurrentPropertyId);
 
   const {
@@ -1120,7 +1125,10 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance
   const watchedWallet = watch('walletType', 'home');
   const watchedAmount = parseFloat(watch('amount', '0')) || 0;
   const watchedCat    = watch('category', '');
-  const balance       = watchedWallet === 'vehicle' ? vehicleBalance : watchedWallet === 'property' ? propertyBalance : homeBalance;
+  const balance       = watchedWallet === 'vehicle'  ? vehicleBalance
+                      : watchedWallet === 'property' ? propertyBalance
+                      : watchedWallet === 'amaraa'   ? amaraaBalance
+                      : homeBalance;
   const after         = balance - watchedAmount;
   const selectedCatCfg = segCats.find((c) => c.name === watchedCat) ?? { color: '#64748b', bg: '#f1f5f9' };
 
@@ -1156,11 +1164,12 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance
         {!isEdit && (
           <div>
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Deduct from Wallet</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
                 { k: 'home',     label: 'Home Wallet',     bal: homeBalance,     color: '#16a34a', bg: '#f0fdf4' },
                 { k: 'property', label: 'Property Wallet', bal: propertyBalance, color: '#0891b2', bg: '#ecfeff' },
                 { k: 'vehicle',  label: 'Vehicle Wallet',  bal: vehicleBalance,  color: '#0b1d3a', bg: '#eef2fb' },
+                { k: 'amaraa',   label: 'Amaraa Wallet',   bal: amaraaBalance,   color: '#831843', bg: '#fdf2f8' },
               ].map(({ k, label, bal, color, bg }) => {
                 const sel = watchedWallet === k;
                 return (
@@ -1182,7 +1191,7 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance
             {watchedAmount > 0 && (
               <div className={cn('mt-2 flex items-center justify-between px-4 py-2.5 rounded-xl border text-[12px]',
                 after < 0 ? 'bg-red-50 border-red-200' : after < LOW_THRESHOLD ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-100')}>
-                <span className="text-slate-500">{watchedWallet === 'vehicle' ? 'Vehicle' : watchedWallet === 'property' ? 'Property' : 'Home'} wallet after deduction</span>
+                <span className="text-slate-500">{WALLET_CFG[watchedWallet]?.label ?? 'Home'} wallet after deduction</span>
                 <span className={cn('font-black', after < 0 ? 'text-red-600' : after < LOW_THRESHOLD ? 'text-amber-600' : 'text-emerald-700')}>
                   {after < 0 ? `− ${fmtAED(Math.abs(after))}` : fmtAED(after)}
                 </span>
