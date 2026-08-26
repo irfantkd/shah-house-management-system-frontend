@@ -138,6 +138,7 @@ export default function ContractsPage() {
     expiring:     contractStats.expiring     ?? 0,
     expired:      contractStats.expired      ?? 0,
     totalMonthly: contractStats.totalMonthly ?? 0,
+    totalPaid:    contractStats.totalPaid    ?? 0,
   };
   const expiringCount = stats.expiring;
 
@@ -187,10 +188,10 @@ export default function ContractsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label:'Total',         value:stats.total,    grad:'from-navy-600 to-navy-800',       Icon:RiFileTextLine           },
-          { label:'Active',        value:stats.active,   grad:'from-success-500 to-success-700', Icon:RiCheckLine              },
-          { label:'Expiring Soon', value:stats.expiring, grad:'from-warning-500 to-orange-600',  Icon:RiTimeLine               },
-          { label:'Monthly Est.',  value:`AED ${Math.round(stats.totalMonthly).toLocaleString()}`, grad:'from-accent-500 to-accent-700', Icon:RiWalletLine },
+          { label:'Total',         value:stats.total,    sub: null,                                                              grad:'from-navy-600 to-navy-800',       Icon:RiFileTextLine           },
+          { label:'Active',        value:stats.active,   sub: null,                                                              grad:'from-success-500 to-success-700', Icon:RiCheckLine              },
+          { label:'Expiring Soon', value:stats.expiring, sub: null,                                                              grad:'from-warning-500 to-orange-600',  Icon:RiTimeLine               },
+          { label:'Total Spent',   value:`AED ${Math.round(stats.totalPaid).toLocaleString()}`, sub:`~AED ${Math.round(stats.totalMonthly).toLocaleString()}/mo est.`, grad:'from-accent-500 to-accent-700', Icon:RiMoneyDollarCircleLine },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.07 }}
             className={cn('rounded-2xl p-5 text-white flex items-center gap-4 bg-linear-to-br', s.grad)}>
@@ -198,6 +199,7 @@ export default function ContractsPage() {
             <div>
               <p className="text-2xl font-bold leading-none">{s.value}</p>
               <p className="text-[12px] text-white/70 mt-1">{s.label}</p>
+              {s.sub && <p className="text-[10px] text-white/50 mt-0.5">{s.sub}</p>}
             </div>
           </motion.div>
         ))}
