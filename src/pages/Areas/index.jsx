@@ -13,7 +13,7 @@ import {
 import {
   BedDouble, ShowerHead, UtensilsCrossed, Sofa, Utensils,
   TreeDeciduous, Waves, Car, Briefcase, Package, Wrench,
-  Wind, Sun, MapPin, Edit2, Trash2, AlertTriangle, Layers,
+  Wind, Sun, MapPin, Edit2, Trash2, AlertTriangle,
 } from 'lucide-react';
 import {
   useGetQuery, usePostMutation, usePutMutation, useDeleteMutation,
@@ -21,7 +21,6 @@ import {
 import { selectCurrentPropertyId, selectCurrentProperty } from "../../store/slices/propertiesSlice";
 import Modal         from "../../components/ui/Modal";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
-import PageLoader    from "../../components/ui/PageLoader";
 import { MotionSwipeableRow } from "../../components/ui/SwipeableRow";
 import { Field, Input, Select, Textarea, FormGrid, FormActions } from "../../components/ui/FormField";
 import Button from "../../components/ui/Button";
@@ -189,8 +188,25 @@ export default function AreasPage() {
   };
 
   // ── Global loader ────────────────────────────────────────────────────────────
-  if (isLoading && areas.length === 0) {
-    return <PageLoader icon={Layers} text="Loading areas…" />;
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <div className="h-7 w-40 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="h-4 w-56 bg-slate-100 rounded mt-2 animate-pulse" />
+          </div>
+          <div className="h-9 w-28 bg-slate-200 rounded-xl animate-pulse" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+        <div className="h-20 bg-slate-100 rounded-2xl animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1,2,3,4,5,6].map(i => <div key={i} className="h-40 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+      </div>
+    );
   }
 
   if (isError) {
@@ -341,7 +357,7 @@ export default function AreasPage() {
 
       {/* ── Grouped view (All Floors + no search) ── */}
       {areas.length > 0 && showGrouped && (
-        <div className="space-y-8">
+        <div className="space-y-8" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
           {grouped.map(({ floor, floorObj, items }) => (
             <div key={floor}>
               <FloorSectionHeader floor={floor} count={items.length} color={floorObj?.color} />

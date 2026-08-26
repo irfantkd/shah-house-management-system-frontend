@@ -25,7 +25,7 @@ import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from 
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import PageLoader from '../../components/ui/PageLoader';
+
 import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import { Field, Input, Select, Textarea, FormGrid, FormSection, FormActions } from '../../components/ui/FormField';
 import Button from '../../components/ui/Button';
@@ -101,7 +101,7 @@ export default function AssetsPage() {
   };
 
   // Paginated list — response shape: { items, total, page, pages, limit }
-  const { data: assetsResult = {}, isLoading, isError, refetch } = useGetQuery(
+  const { data: assetsResult = {}, isLoading, isFetching, isError, refetch } = useGetQuery(
     { path: '/assets', params: assetParams },
     { skip: !propertyId },
   );
@@ -190,8 +190,28 @@ export default function AssetsPage() {
   };
 
   // ── Global loader & error ─────────────────────────────────────────────────
-  if (isLoading && assets.length === 0) {
-    return <PageLoader icon={Package} text="Loading assets…" />;
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <div className="h-7 w-36 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="h-4 w-52 bg-slate-100 rounded mt-2 animate-pulse" />
+          </div>
+          <div className="flex gap-2">
+            <div className="h-9 w-32 bg-slate-100 rounded-xl animate-pulse" />
+            <div className="h-9 w-28 bg-slate-200 rounded-xl animate-pulse" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <div key={i} className="h-28 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+        <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1,2,3,4,5,6].map(i => <div key={i} className="h-48 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+      </div>
+    );
   }
 
   if (isError) {
@@ -349,7 +369,7 @@ export default function AssetsPage() {
           </p>
 
           {view === 'grid' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
               <AnimatePresence mode="popLayout">
                 {assets.map((a, i) => (
                   <MotionSwipeableRow
@@ -375,7 +395,7 @@ export default function AssetsPage() {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)', opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
               {assets.map((a, i) => (
                 <MotionSwipeableRow
                   key={a.id}

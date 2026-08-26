@@ -13,7 +13,6 @@ import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import PageLoader from '../../components/ui/PageLoader';
 import { MotionSwipeableRow } from '../../components/ui/SwipeableRow';
 import QuickExpenseModal from './QuickExpenseModal';
 import QuickFuelModal from './QuickFuelModal';
@@ -60,8 +59,12 @@ function parseMakeModelYear(input) {
 export default function CarsPage() {
   const propertyId = useSelector(selectCurrentPropertyId);
 
-  const { data: cars = [], isLoading: isFetching, isError } = useGetQuery(
+  const { data: cars = [], isLoading: isCarsLoading, isFetching: isCarsFetching, isError } = useGetQuery(
     { path: '/cars', params: { propertyId } },
+    { skip: !propertyId },
+  );
+  const { data: carStats = {} } = useGetQuery(
+    { path: '/cars/stats', params: { propertyId } },
     { skip: !propertyId },
   );
 
@@ -90,13 +93,13 @@ export default function CarsPage() {
   const [localImages, setLocalImages] = useState({});
   const fileRefs = useRef({});
 
-  // Per-car expense/fuel totals now come from the API (attached by the list endpoint).
-  // Summing across all cars in the fleet for the stat cards.
-  const monthlyFuel    = cars.reduce((s, c) => s + (c.thisMonthFuel     ?? 0), 0);
-  const monthlyExp     = cars.reduce((s, c) => s + (c.thisMonthExpenses ?? 0), 0);
-  const totalFuelAll   = cars.reduce((s, c) => s + (c.totalFuel         ?? 0), 0);
-  const totalExpAll    = cars.reduce((s, c) => s + (c.totalExpenses     ?? 0), 0);
-  const alertCount     = cars.filter((c) => getDays(c.registrationExpiry) <= 30).length;
+  // Prefer stats endpoint (loads fast as a separate aggregate), fall back to car list totals.
+  const totalVehicles = carStats.total          ?? cars.length;
+  const alertCount    = carStats.regAlerts      ?? cars.filter((c) => getDays(c.registrationExpiry) <= 30).length;
+  const monthlyFuel   = carStats.monthlyFuel    ?? cars.reduce((s, c) => s + (c.thisMonthFuel      ?? 0), 0);
+  const monthlyExp    = carStats.monthlyExpenses ?? cars.reduce((s, c) => s + (c.thisMonthExpenses  ?? 0), 0);
+  const totalFuelAll  = carStats.totalFuel      ?? cars.reduce((s, c) => s + (c.totalFuel           ?? 0), 0);
+  const totalExpAll   = carStats.totalExpenses   ?? cars.reduce((s, c) => s + (c.totalExpenses      ?? 0), 0);
 
   const filtered = cars.filter((c) => {
     const q     = search.toLowerCase();
@@ -251,8 +254,24 @@ export default function CarsPage() {
   };
 
   // ── Global loader while initial fetch ───────────────────────────────────────
-  if (isFetching && cars.length === 0) {
-    return <PageLoader icon={Car} text="Loading fleet data…" />;
+  if (isCarsLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="h-8 w-48 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="h-4 w-56 bg-slate-100 rounded mt-2 animate-pulse" />
+          </div>
+          <div className="h-9 w-32 bg-slate-200 rounded-xl animate-pulse" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <div key={i} className="h-28 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {[1,2,3].map(i => <div key={i} className="h-64 bg-slate-100 rounded-3xl animate-pulse" />)}
+        </div>
+      </div>
+    );
   }
 
   if (isError) {
@@ -323,7 +342,7 @@ export default function CarsPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Vehicles',     value: cars.length,  icon: Car,          color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', sub: `${cars.filter(c => c.status === 'active').length} active` },
+            { label: 'Total Vehicles',     value: totalVehicles, icon: Car,          color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', sub: `${carStats.active ?? cars.filter(c => c.status === 'active').length} active` },
             { label: 'Reg. Alerts',        value: alertCount,   icon: AlertTriangle, color: '#dc2626', bg: '#fef2f2', border: '#fecaca', sub: 'Expiring within 30 days' },
             { label: 'Total Fuel Cost',    value: `AED ${totalFuelAll.toLocaleString('en-AE', { maximumFractionDigits: 0 })}`, icon: Fuel,  color: '#d97706', bg: '#fffbeb', border: '#fde68a', sub: `AED ${monthlyFuel.toFixed(0)} this month` },
             { label: 'Total Expenses',     value: `AED ${totalExpAll.toLocaleString('en-AE',  { maximumFractionDigits: 0 })}`, icon: Gauge, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', sub: `AED ${monthlyExp.toLocaleString()} this month` },
