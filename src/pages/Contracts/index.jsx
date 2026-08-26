@@ -99,7 +99,7 @@ export default function ContractsPage() {
 
   useEffect(() => { setPage(1); }, [filter]);
 
-  const { data: contractData, isFetching: isContractFetching } = useGetQuery(
+  const { data: contractData, isLoading: isContractLoading, isFetching: isContractFetching } = useGetQuery(
     {
       path: '/contracts',
       params: {
@@ -116,7 +116,7 @@ export default function ContractsPage() {
     { skip: !propertyId },
   );
   const { data: companies  = [] } = useGetQuery({ path: '/companies' });
-  const { data: allTasks   = [] } = useGetQuery({ path: '/tasks',  params: { propertyId } }, { skip: !propertyId });
+  const { data: allTasks   = [] } = useGetQuery({ path: '/tasks',  params: { propertyId, limit: 200 } }, { skip: !propertyId });
   const { data: walletData, refetch: refetchWallet } = useGetQuery({ path: '/wallet', params: { propertyId } }, { skip: !propertyId });
 
   const homeWallet    = { balance: walletData?.home?.balance    ?? 0 };
@@ -160,6 +160,26 @@ export default function ContractsPage() {
       setRenewTarget(null);
     } catch (err) { toast.error(err.data?.error || 'Renewal failed'); }
   };
+
+  if (isContractLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <div className="h-7 w-40 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="h-4 w-56 bg-slate-100 rounded mt-2 animate-pulse" />
+          </div>
+          <div className="h-9 w-36 bg-slate-200 rounded-xl animate-pulse" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1,2,3,4,5,6].map(i => <div key={i} className="h-52 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.3 }} className="space-y-6">

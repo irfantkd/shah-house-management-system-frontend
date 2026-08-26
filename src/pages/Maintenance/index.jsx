@@ -311,11 +311,6 @@ function MobileTaskRow({ task, allCats, onClick }) {
 export default function MaintenancePage() {
   const propertyId = useSelector(selectCurrentPropertyId);
 
-  // All tasks for category tab counts (no filters)
-  const { data: allItems = [] } = useGetQuery(
-    { path: "/tasks", params: { propertyId } },
-    { skip: !propertyId },
-  );
   const { data: rawCats = [] } = useGetQuery(
     { path: "/task-categories", params: { propertyId } },
     { skip: !propertyId },
@@ -370,12 +365,13 @@ export default function MaintenancePage() {
   const [newCatInput, setNewCatInput] = useState(false);
   const [newCatName, setNewCatName] = useState("");
 
-  // Category-filtered tasks — calendar view (backend filters by category)
+  // Category-filtered tasks — calendar view only (capped at 200 to avoid unbounded fetch)
   const { data: catItems = [] } = useGetQuery(
     {
       path: "/tasks",
       params: {
         propertyId,
+        limit: 200,
         ...(catTab !== "all" && { category: catTab }),
       },
     },
@@ -401,12 +397,13 @@ export default function MaintenancePage() {
     overdue:    taskStatsRaw.byStatus?.overdue           ?? 0,
     completed:  taskStatsRaw.byStatus?.completed         ?? 0,
     cancelled:  taskStatsRaw.byStatus?.cancelled         ?? 0,
+    byCategory: taskStatsRaw.byCategory                  ?? {},
   };
 
   useEffect(() => { setPage(1); }, [catTab, statusFilter]);
 
   // Fully filtered tasks for grid / list — paginated
-  const { data: filteredRaw, isFetching: isFilteredFetching } = useGetQuery(
+  const { data: filteredRaw, isLoading: isListLoading, isFetching: isFilteredFetching } = useGetQuery(
     {
       path: "/tasks",
       params: {
@@ -529,6 +526,29 @@ export default function MaintenancePage() {
           ? "Repairs"
           : catTab;
 
+  if (isListLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <div className="h-7 w-52 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="h-4 w-64 bg-slate-100 rounded mt-2 animate-pulse" />
+          </div>
+          <div className="h-9 w-28 bg-slate-200 rounded-xl animate-pulse" />
+        </div>
+        <div className="flex gap-2">
+          {[1,2,3,4].map(i => <div key={i} className="h-9 w-24 bg-slate-100 rounded-xl animate-pulse" />)}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[1,2,3,4,5,6].map(i => <div key={i} className="h-20 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {[1,2,3,4,5,6].map(i => <div key={i} className="h-48 bg-slate-100 rounded-2xl animate-pulse" />)}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -590,14 +610,14 @@ export default function MaintenancePage() {
                 : "bg-slate-100 text-slate-500",
             )}
           >
-            {allItems.length}
+            {stats.total}
           </span>
         </button>
 
         {/* Built-in + custom category tabs */}
         {categories.map((cat) => {
           const cfg = getCatCfg(cat, categories);
-          const count = allItems.filter((t) => t.category === cat).length;
+          const count = stats.byCategory[cat] ?? 0;
           const active = catTab === cat;
           return (
             <button
