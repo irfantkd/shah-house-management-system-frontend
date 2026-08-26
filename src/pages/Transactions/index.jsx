@@ -9,6 +9,7 @@ import {
   RiReceiptLine, RiFileTextLine, RiTeamLine,
   RiArrowLeftLine, RiArrowRightLine, RiAlertLine, RiAddLine,
   RiArrowDownCircleLine, RiStore2Line, RiCheckboxCircleLine, RiCalendar2Line,
+  RiBriefcase2Line,
 } from 'react-icons/ri';
 import DatePicker from '../../components/ui/DatePicker';
 import { useGetQuery, usePostMutation } from '../../api/apiSlice';
@@ -28,10 +29,11 @@ const fmtDate = (d) => d
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 const WALLET_CFG = {
-  vehicle:  { label: 'Vehicle Wallet', short: 'Vehicle',  Icon: RiCarLine,      color: '#0b1d3a', bg: '#eef2fb', grad: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
-  home:     { label: 'Home Wallet',    short: 'Home',     Icon: RiHome4Line,    color: '#16a34a', bg: '#f0fdf4', grad: 'linear-gradient(135deg,#14532d,#16a34a)' },
-  property: { label: 'Property Wallet',short: 'Property', Icon: RiBuildingLine, color: '#0891b2', bg: '#ecfeff', grad: 'linear-gradient(135deg,#0e7490,#0891b2)' },
-  salary:   { label: 'Salary Wallet',  short: 'Salary',   Icon: RiBankCardLine, color: '#7c3aed', bg: '#f5f3ff', grad: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+  vehicle:  { label: 'Vehicle Wallet', short: 'Vehicle',  Icon: RiCarLine,        color: '#0b1d3a', bg: '#eef2fb', grad: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' },
+  home:     { label: 'Home Wallet',    short: 'Home',     Icon: RiHome4Line,      color: '#16a34a', bg: '#f0fdf4', grad: 'linear-gradient(135deg,#14532d,#16a34a)' },
+  property: { label: 'Property Wallet',short: 'Property', Icon: RiBuildingLine,   color: '#0891b2', bg: '#ecfeff', grad: 'linear-gradient(135deg,#0e7490,#0891b2)' },
+  salary:   { label: 'Salary Wallet',  short: 'Salary',   Icon: RiBankCardLine,   color: '#7c3aed', bg: '#f5f3ff', grad: 'linear-gradient(135deg,#4c1d95,#7c3aed)' },
+  amaraa:   { label: 'Amaraa Wallet',  short: 'Amaraa',   Icon: RiBriefcase2Line, color: '#831843', bg: '#fdf2f8', grad: 'linear-gradient(135deg,#831843,#db2777)' },
 };
 
 const TABS = [
@@ -407,12 +409,12 @@ function AllMoneyTab({ propertyId, txnVersion }) {
         />
         <div className="flex flex-wrap gap-2 items-center">
           {/* Wallet filter */}
-          <div className="flex bg-slate-50 border border-slate-100 rounded-xl p-1 gap-0.5">
-            {['all', 'vehicle', 'home', 'property', 'salary'].map((k) => (
+          <div className="flex bg-slate-50 border border-slate-100 rounded-xl p-1 gap-0.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            {['all', 'vehicle', 'home', 'property', 'salary', 'amaraa'].map((k) => (
               <button key={k} onClick={() => setWalletF(k)}
-                className={cn('px-2.5 py-1 rounded-lg text-[11px] font-bold capitalize transition-all',
+                className={cn('shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold capitalize transition-all',
                   walletF === k ? 'text-white' : 'text-slate-500 hover:text-slate-700')}
-                style={walletF === k ? { background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' } : {}}>
+                style={walletF === k ? { background: WALLET_CFG[k]?.grad ?? 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' } : {}}>
                 {k === 'all' ? 'All' : WALLET_CFG[k].short}
               </button>
             ))}
@@ -480,7 +482,7 @@ function AllMoneyTab({ propertyId, txnVersion }) {
                             : <RiArrowUpLine   className="w-4 h-4 text-red-500" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-800 truncate leading-tight">
+                          <p className="text-[13px] font-semibold text-slate-800 leading-snug">
                             {isIn
                               ? (txn.note || txn.description || 'Deposit')
                               : (txn.description || txn.category || 'Expense')}
@@ -756,7 +758,7 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
                           <RiReceiptLine className="w-4 h-4" style={{ color: cfg.color }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-800 truncate leading-tight">
+                          <p className="text-[13px] font-semibold text-slate-800 leading-snug">
                             {exp.description}
                           </p>
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -808,8 +810,8 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
           {/* Wallet selector */}
           <div>
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Deduct from Wallet</p>
-            <div className="grid grid-cols-3 gap-2">
-              {['home', 'property', 'vehicle'].map((k) => {
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {['home', 'property', 'vehicle', 'amaraa'].map((k) => {
                 const cfg = WALLET_CFG[k];
                 const bal = walletMap[k]?.balance ?? 0;
                 const sel = addForm.walletType === k;
@@ -890,7 +892,7 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
 // TAB 3 — Contracts
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ContractsTab({ contracts }) {
+function ContractsTab({ contracts, isLoading }) {
   const [period,    setPeriod]    = useState('all');
   const [customFrom,setCustomFrom]= useState('');
   const [customTo,  setCustomTo]  = useState('');
@@ -932,6 +934,20 @@ function ContractsTab({ contracts }) {
 
   const totalPaid = filtered.reduce((s, p) => s + (p.amount ?? 0), 0);
   const groups    = useMemo(() => groupByMonth(filtered), [filtered]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1,2,3].map((i) => <div key={i} className="h-16 bg-slate-100 rounded-2xl" />)}
+        </div>
+        <div className="h-10 bg-slate-100 rounded-2xl" />
+        <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-50">
+          {[1,2,3,4,5].map((i) => <TxnRowSkeleton key={i} />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -988,7 +1004,7 @@ function ContractsTab({ contracts }) {
                         <RiFileTextLine className="w-4 h-4 text-violet-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-800 truncate leading-tight">{p.contractTitle}</p>
+                        <p className="text-[13px] font-semibold text-slate-800 leading-snug">{p.contractTitle}</p>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           {p.contractCategory && (
                             <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-600">
@@ -1001,7 +1017,7 @@ function ContractsTab({ contracts }) {
                               {WALLET_CFG[p.walletType].short}
                             </span>
                           )}
-                          {p.note && <span className="text-[10px] text-slate-400 truncate max-w-35">{p.note}</span>}
+                          {p.note && <span className="text-[10px] text-slate-400">{p.note}</span>}
                           <span className="text-slate-200">·</span>
                           <span className="text-[10px] text-slate-400">{fmtDate(p.date)}</span>
                         </div>
@@ -1029,7 +1045,7 @@ function ContractsTab({ contracts }) {
                   className="bg-white rounded-2xl border border-slate-100 p-4 hover:border-slate-200 hover:shadow-sm transition-all group"
                   style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="text-[13px] font-bold text-slate-800 truncate group-hover:text-blue-700 transition-colors">
+                    <p className="text-[13px] font-bold text-slate-800 leading-snug group-hover:text-blue-700 transition-colors">
                       {c.title ?? c.name}
                     </p>
                     {c.status && (
@@ -1057,7 +1073,7 @@ function ContractsTab({ contracts }) {
 // TAB 4 — Salaries
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SalariesTab({ employees }) {
+function SalariesTab({ employees, isLoading }) {
   const [period,    setPeriod]    = useState('month');
   const [customFrom,setCustomFrom]= useState('');
   const [customTo,  setCustomTo]  = useState('');
@@ -1099,6 +1115,20 @@ function SalariesTab({ employees }) {
 
   const totalPaid = filtered.reduce((s, p) => s + (p.amount ?? 0), 0);
   const groups    = useMemo(() => groupByMonth(filtered, 'paidOnKey'), [filtered]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1,2,3].map((i) => <div key={i} className="h-16 bg-slate-100 rounded-2xl" />)}
+        </div>
+        <div className="h-10 bg-slate-100 rounded-2xl" />
+        <div className="bg-white rounded-2xl border border-slate-100 divide-y divide-slate-50">
+          {[1,2,3,4,5].map((i) => <TxnRowSkeleton key={i} />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -1160,7 +1190,7 @@ function SalariesTab({ employees }) {
                             isBonus ? 'text-emerald-600' : isDeduction ? 'text-red-500' : 'text-violet-600')} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-slate-800 truncate leading-tight">{s.employeeName}</p>
+                          <p className="text-[13px] font-semibold text-slate-800 leading-snug">{s.employeeName}</p>
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             {s.employeeRole && <span className="text-[10px] text-slate-400">{s.employeeRole}</span>}
                             <span className={cn('inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full capitalize',
@@ -1207,7 +1237,7 @@ function SalariesTab({ employees }) {
                       <RiTeamLine className="w-4 h-4 text-violet-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-bold text-slate-800 truncate group-hover:text-violet-700 transition-colors">{emp.name}</p>
+                      <p className="text-[13px] font-bold text-slate-800 leading-snug group-hover:text-violet-700 transition-colors">{emp.name}</p>
                       {(emp.role ?? emp.position) && <p className="text-[11px] text-slate-400">{emp.role ?? emp.position}</p>}
                     </div>
                     {emp.salary && (
@@ -1252,9 +1282,18 @@ export default function TransactionsPage() {
   );
   const monthStats = monthResult?.stats ?? { totalIn: 0, totalOut: 0, net: 0 };
 
-  // Contracts & employees — small lists, fetched for the tab data
-  const { data: contracts = [] } = useGetQuery({ path: '/contracts',  params: { propertyId } }, { skip: !propertyId });
-  const { data: employees = [] } = useGetQuery({ path: '/employees',  params: { propertyId } }, { skip: !propertyId });
+  // Tab state must be declared before the lazy queries so their skip can reference it
+  const [tab, setTab] = useState('money');
+
+  // Contracts & employees — lazy: only fetch when that tab is first opened (RTK Query caches)
+  const { data: contracts = [], isLoading: contractsLoading } = useGetQuery(
+    { path: '/contracts', params: { propertyId } },
+    { skip: !propertyId || tab !== 'contracts' },
+  );
+  const { data: employees = [], isLoading: employeesLoading } = useGetQuery(
+    { path: '/employees', params: { propertyId } },
+    { skip: !propertyId || tab !== 'salaries' },
+  );
 
   const EMPTY_W   = { balance: 0, totalDeposited: 0 };
   const walletMap = {
@@ -1262,9 +1301,8 @@ export default function TransactionsPage() {
     home:     { ...EMPTY_W, ...walletData?.home     },
     property: { ...EMPTY_W, ...walletData?.property },
     salary:   { ...EMPTY_W, ...walletData?.salary   },
+    amaraa:   { ...EMPTY_W, ...walletData?.amaraa   },
   };
-
-  const [tab,     setTab]     = useState('money');
   const [showDep, setShowDep] = useState(false);
   const [depForm, setDepForm] = useState(BLANK_DEP);
   const [depositing, setDepositing] = useState(false);
@@ -1347,7 +1385,7 @@ export default function TransactionsPage() {
             </div>
 
             {/* Wallet balance chips */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {Object.entries(WALLET_CFG).map(([key, cfg]) => {
                 const w   = walletMap[key];
                 const bal = w.balance ?? 0;
@@ -1413,8 +1451,8 @@ export default function TransactionsPage() {
         <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
           {tab === 'money'     && <AllMoneyTab     propertyId={propertyId} txnVersion={txnVersion} />}
           {tab === 'expenses'  && <HouseExpensesTab propertyId={propertyId} walletMap={walletMap} refetchWallet={refetchWallet} txnVersion={txnVersion} onMutated={handleExpenseMutated} />}
-          {tab === 'contracts' && <ContractsTab    contracts={contracts} />}
-          {tab === 'salaries'  && <SalariesTab     employees={employees} />}
+          {tab === 'contracts' && <ContractsTab    contracts={contracts} isLoading={contractsLoading} />}
+          {tab === 'salaries'  && <SalariesTab     employees={employees} isLoading={employeesLoading} />}
         </motion.div>
       </AnimatePresence>
 
@@ -1424,7 +1462,7 @@ export default function TransactionsPage() {
           <div>
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Select Wallet</p>
             <div className="grid grid-cols-2 gap-2">
-              {['vehicle', 'home', 'property'].map((k) => {
+              {['vehicle', 'home', 'property', 'amaraa'].map((k) => {
                 const cfg = WALLET_CFG[k];
                 const { Icon } = cfg;
                 const bal = walletMap[k]?.balance ?? 0;

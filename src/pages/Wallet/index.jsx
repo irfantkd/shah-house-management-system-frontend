@@ -851,7 +851,7 @@ export default function WalletPage() {
 
                       {/* Details */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-800 truncate leading-tight">
+                        <p className="text-[13px] font-semibold text-slate-800 leading-snug break-words">
                           {isCredit ? (txn.note || txn.description || 'Deposit received') : (txn.description || 'Expense deducted')}
                         </p>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -863,7 +863,7 @@ export default function WalletPage() {
                           {txn.category && txn.category !== 'Deposit' && (
                             <>
                               <span className="text-[9px] text-slate-300">·</span>
-                              <span className="text-[10px] text-slate-400 capitalize truncate max-w-20">{txn.category}</span>
+                              <span className="text-[10px] text-slate-400 capitalize">{txn.category}</span>
                             </>
                           )}
                           <span className="text-[9px] text-slate-300">·</span>

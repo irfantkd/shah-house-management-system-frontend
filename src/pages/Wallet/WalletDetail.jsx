@@ -600,7 +600,7 @@ export default function WalletDetail() {
                           : <ArrowUpRight  className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-slate-800 truncate">
+                        <p className="text-[13px] font-semibold text-slate-800 leading-snug">
                           {isDepo ? (txn.note || 'Deposit received') : (txn.description || 'Expense deducted')}
                         </p>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
