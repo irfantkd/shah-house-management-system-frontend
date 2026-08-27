@@ -432,14 +432,11 @@ export default function TaskDetail() {
           try {
             const walletType = expense.walletType ?? 'home';
             const desc = `${task.title} — ${expense.description || expense.category}`;
-            const ops = [addExpenseMut({ path: `/tasks/${id}/expenses`, body: { ...expense, propertyId } }).unwrap()];
+            await addExpenseMut({ path: `/tasks/${id}/expenses`, body: { ...expense, propertyId } }).unwrap();
             if (expense.amount > 0) {
-              ops.push(
-                deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType, amount: expense.amount, description: desc, category: task.category, date: expense.date } }).unwrap(),
-                createExpenseMut({ path: '/expenses', body: { propertyId, walletType, category: task.category, description: desc, amount: expense.amount, date: expense.date, segment: 'property' } }).unwrap(),
-              );
+              const expResult = await createExpenseMut({ path: '/expenses', body: { propertyId, walletType, category: task.category, description: desc, amount: expense.amount, date: expense.date, segment: 'property' } }).unwrap();
+              await deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType, amount: expense.amount, description: desc, category: task.category, date: expense.date, sourceId: expResult?.data?.id ?? '', sourceModel: 'Expense' } }).unwrap();
             }
-            await Promise.all(ops);
             await refetchWallet();
             toast.success(`Expense AED ${expense.amount.toLocaleString()} added`);
             setShowExpense(false);

@@ -227,10 +227,8 @@ export default function RepairsPage() {
       await patchRepairMut({ path: `/tasks/${repair.id}`, body: { status, ...(status === 'completed' && cost > 0 ? { actualCost: cost } : {}) } }).unwrap();
       if (status === 'completed' && cost > 0) {
         const today = new Date().toISOString().split('T')[0];
-        await Promise.all([
-          deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType, amount: cost, description: `Repair: ${repair.title}`, category: 'Repairs', date: today } }).unwrap(),
-          createExpenseMut({ path: '/expenses', body: { propertyId, walletType, category: 'Repairs', description: `Repair: ${repair.title}`, amount: cost, date: today, segment: 'property' } }).unwrap(),
-        ]);
+        const expResult = await createExpenseMut({ path: '/expenses', body: { propertyId, walletType, category: 'Repairs', description: `Repair: ${repair.title}`, amount: cost, date: today, segment: 'property' } }).unwrap();
+        await deductWalletMut({ path: '/wallet/deduct', body: { propertyId, walletType, amount: cost, description: `Repair: ${repair.title}`, category: 'Repairs', date: today, sourceId: expResult?.data?.id ?? '', sourceModel: 'Expense' } }).unwrap();
         await refetchWallet();
         toast.success(`Completed — AED ${cost.toLocaleString()} deducted from ${walletLabel} Wallet`);
       } else {

@@ -479,16 +479,14 @@ export default function MaintenancePage() {
       if (expense.amount > 0) {
         const walletType = expense.walletType ?? "home";
         const desc = `${task.title} — ${expense.description || expense.category}`;
-        await Promise.all([
-          deductWalletMut({
-            path: "/wallet/deduct",
-            body: { propertyId, walletType, amount: expense.amount, description: desc, category: task.category, date: expense.date },
-          }).unwrap(),
-          createExpenseMut({
-            path: '/expenses',
-            body: { propertyId, walletType, category: task.category, description: desc, amount: expense.amount, date: expense.date, segment: 'property' },
-          }).unwrap(),
-        ]);
+        const expResult = await createExpenseMut({
+          path: '/expenses',
+          body: { propertyId, walletType, category: task.category, description: desc, amount: expense.amount, date: expense.date, segment: 'property' },
+        }).unwrap();
+        await deductWalletMut({
+          path: "/wallet/deduct",
+          body: { propertyId, walletType, amount: expense.amount, description: desc, category: task.category, date: expense.date, sourceId: expResult?.data?.id ?? '', sourceModel: 'Expense' },
+        }).unwrap();
         await refetchWallet();
       }
       toast.success(

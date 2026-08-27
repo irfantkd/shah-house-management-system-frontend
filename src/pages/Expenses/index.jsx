@@ -267,7 +267,7 @@ export default function ExpensesPage() {
       } else {
         // Create expense first to get its id, then link the wallet transaction via sourceId
         const result = await addMut({ path: '/expenses', body: { ...data, propertyId } }).unwrap();
-        const sourceId = result.id ?? '';
+        const sourceId = result?.data?.id ?? '';
         if (Number(data.amount) > 0) {
           await deductMut({
             path: '/wallet/deduct',

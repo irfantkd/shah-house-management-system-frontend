@@ -640,7 +640,7 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
           segment,
         },
       }).unwrap();
-      const sourceId = result.id ?? '';
+      const sourceId = result?.data?.id ?? '';
       await deductMut({
         path: '/wallet/deduct',
         body: {
