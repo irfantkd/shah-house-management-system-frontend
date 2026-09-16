@@ -6,7 +6,7 @@ import {
   Users, UserPlus, Wallet, Cake, Phone, CalendarDays, BadgeCheck,
   ChevronDown, ChevronUp, Pencil, Banknote, Clock, CheckCircle2,
   AlertCircle, Trash2, ArrowDownLeft, ArrowRight, X, FileText, AlertTriangle,
-  Loader2, Search, ChevronLeft, ChevronRight, Printer, Building2,
+  Loader2, Search, ChevronLeft, ChevronRight, Printer, Building2, ShieldAlert,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, useDownloadChallanMutation } from '../../api/apiSlice';
 import DatePicker from '../../components/ui/DatePicker';
@@ -50,7 +50,13 @@ const calcAge     = (dob) => {
 const ROLES   = ['Driver','Housemaid','Cook','Gardener','Security Guard','Nanny','Cleaner','Butler','Handyman','Other'];
 const INP = 'w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-[14px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all';
 const SEL = `${INP} cursor-pointer`;
-const EMP_BLANK  = { name:'', role:'Driver', phone:'', nationality:'', dateOfBirth:'', joinDate:new Date().toISOString().split('T')[0], monthlySalary:'', status:'active', notes:'' };
+const EMP_BLANK  = { name:'', role:'Driver', phone:'', nationality:'', dateOfBirth:'', joinDate:new Date().toISOString().split('T')[0], monthlySalary:'', status:'active', notes:'', visaStartDate:'', visaExpiryDate:'' };
+
+const visaDaysUntil = (dateStr) => {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.ceil((new Date(dateStr) - today) / 86400000);
+};
 const PAY_BLANK  = { month:CUR_MON, amount:'', notes:'' };
 const PHONE_RE   = /^[+\d][\d\s\-().]{5,19}$/;
 const TODAY_STR  = new Date().toISOString().split('T')[0];
@@ -257,6 +263,8 @@ function EmployeeCard({ emp, bdayInfo, onEdit, onDelete, onPay, isHistOpen, onTo
   const isActive      = emp.status === 'active';
   const paidThisMonth = (emp.salaryHistory ?? []).some((p) => p.type === 'salary' && p.month === CUR_MON);
   const outAdv        = (emp.salaryHistory ?? []).filter((p) => p.type === 'advance' && !p.recovered).reduce((s, p) => s + p.amount, 0);
+  const visaDays      = visaDaysUntil(emp.visaExpiryDate);
+  const visaUrgent    = visaDays !== null && visaDays <= 30;
 
   return (
     <motion.div layout initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }} transition={{ duration:0.3 }}
@@ -273,13 +281,25 @@ function EmployeeCard({ emp, bdayInfo, onEdit, onDelete, onPay, isHistOpen, onTo
           {initials(emp.name)}
         </div>
 
-        {bdayInfo && (
-          <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
-            style={{ background:'#f59e0b', boxShadow:'0 2px 8px rgba(245,158,11,0.5)', zIndex:10 }}>
-            <Cake className="w-3 h-3" />
-            {bdayInfo.daysUntilBirthday === 0 ? 'Today!' : `${bdayInfo.daysUntilBirthday}d`}
-          </div>
-        )}
+        <div className="absolute top-4 right-4 flex flex-col items-end gap-1.5" style={{ zIndex:10 }}>
+          {bdayInfo && (
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
+              style={{ background:'#f59e0b', boxShadow:'0 2px 8px rgba(245,158,11,0.5)' }}>
+              <Cake className="w-3 h-3" />
+              {bdayInfo.daysUntilBirthday === 0 ? 'Today!' : `${bdayInfo.daysUntilBirthday}d`}
+            </div>
+          )}
+          {visaUrgent && (
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
+              style={{
+                background: visaDays !== null && visaDays <= 0 ? '#7f1d1d' : visaDays !== null && visaDays <= 7 ? '#dc2626' : '#d97706',
+                boxShadow: visaDays !== null && visaDays <= 7 ? '0 2px 8px rgba(220,38,38,0.5)' : '0 2px 8px rgba(217,119,6,0.5)',
+              }}>
+              <ShieldAlert className="w-3 h-3" />
+              {visaDays !== null && visaDays <= 0 ? 'Visa Expired' : `Visa ${visaDays}d`}
+            </div>
+          )}
+        </div>
 
         <div className="relative flex items-center gap-4 mt-1" style={{ zIndex:5 }}>
           <div className="w-14 h-14 rounded-2xl shrink-0 flex items-center justify-center text-white text-[20px] font-black select-none"
@@ -354,6 +374,23 @@ function EmployeeCard({ emp, bdayInfo, onEdit, onDelete, onPay, isHistOpen, onTo
             </div>
             <p className="text-[13px] text-slate-600 font-medium">Joined {fmtDate(emp.joinDate)}</p>
           </div>
+          {emp.visaExpiryDate && (
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: visaUrgent ? (visaDays !== null && visaDays <= 7 ? 'rgba(220,38,38,0.1)' : 'rgba(217,119,6,0.1)') : `${color}18` }}>
+                <ShieldAlert className="w-3.5 h-3.5"
+                  style={{ color: visaUrgent ? (visaDays !== null && visaDays <= 7 ? '#dc2626' : '#d97706') : color }} />
+              </div>
+              <p className={`text-[13px] font-medium ${visaUrgent ? (visaDays !== null && visaDays <= 7 ? 'text-red-600 font-bold' : 'text-amber-600 font-bold') : 'text-slate-600'}`}>
+                Visa expires {fmtDate(emp.visaExpiryDate)}
+                {visaUrgent && visaDays !== null && (
+                  <span className="ml-1 text-[11px]">
+                    {visaDays <= 0 ? '(Expired)' : `(${visaDays}d left)`}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
 
         {outAdv > 0 && (
@@ -423,6 +460,8 @@ function EmployeeListRow({ emp, bdayInfo, onEdit, onDelete, onPay }) {
   const paidThisMonth = (emp.salaryHistory ?? []).some((p) => p.type === 'salary' && p.month === CUR_MON);
   const outAdv        = (emp.salaryHistory ?? []).filter((p) => p.type === 'advance' && !p.recovered).reduce((s, p) => s + p.amount, 0);
   const empId         = emp.id ?? emp._id;
+  const visaDays      = visaDaysUntil(emp.visaExpiryDate);
+  const visaUrgent    = visaDays !== null && visaDays <= 30;
 
   return (
     <MotionSwipeableRow
@@ -446,16 +485,22 @@ function EmployeeListRow({ emp, bdayInfo, onEdit, onDelete, onPay }) {
         className="flex items-center gap-3.5 px-4 py-4 bg-white hover:bg-slate-50/60 active:bg-slate-50 transition-colors cursor-pointer"
         onClick={() => navigate(`/employees/${empId}`)}>
 
-        {/* Avatar with optional birthday dot */}
+        {/* Avatar with optional birthday/visa dot */}
         <div className="relative shrink-0">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-[13px] font-black"
             style={{ background: grad }}>
             {initials(emp.name)}
           </div>
-          {bdayInfo && (
+          {bdayInfo && !visaUrgent && (
             <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
               style={{ background: '#f59e0b' }}>
               <Cake className="w-2.5 h-2.5 text-white" />
+            </div>
+          )}
+          {visaUrgent && (
+            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+              style={{ background: visaDays !== null && visaDays <= 7 ? '#dc2626' : '#d97706' }}>
+              <ShieldAlert className="w-2.5 h-2.5 text-white" />
             </div>
           )}
         </div>
@@ -476,6 +521,11 @@ function EmployeeListRow({ emp, bdayInfo, onEdit, onDelete, onPay }) {
           </p>
           {outAdv > 0 && (
             <p className="text-[10px] text-amber-600 font-bold mt-0.5">Adv: AED {fmtAmt(outAdv)}</p>
+          )}
+          {visaUrgent && (
+            <p className={`text-[10px] font-bold mt-0.5 ${visaDays !== null && visaDays <= 7 ? 'text-red-600' : 'text-amber-600'}`}>
+              🪪 Visa {visaDays !== null && visaDays <= 0 ? 'expired' : `exp. ${visaDays}d`}
+            </p>
           )}
         </div>
 
@@ -554,7 +604,8 @@ export default function EmployeesPage() {
     paidThisMonth: empStats.paidThisMonth ?? 0,
     unpaidThisMonth: empStats.unpaidThisMonth ?? 0,
   };
-  const upcomingBirthdays = empStats.upcomingBirthdays ?? [];
+  const upcomingBirthdays    = empStats.upcomingBirthdays    ?? [];
+  const upcomingVisaExpiries = empStats.upcomingVisaExpiries ?? [];
 
   const setEF = (k, v) => {
     setEmpForm((f) => ({ ...f, [k]: v }));
@@ -712,6 +763,40 @@ export default function EmployeesPage() {
                       <span className="text-[14px] font-bold text-amber-950">{emp.name}</span>
                       <span className="text-[12px] text-amber-600">
                         {emp.daysUntilBirthday === 0 ? '— Today! 🎉' : emp.daysUntilBirthday === 1 ? '— Tomorrow' : `— in ${emp.daysUntilBirthday} days`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Visa expiry banner ── */}
+        <AnimatePresence>
+          {upcomingVisaExpiries.length > 0 && (
+            <motion.div key="visa" initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}>
+              <div className="flex items-start gap-4 px-5 py-4 rounded-3xl"
+                style={{ background:'linear-gradient(135deg,#fff1f2,#fef2f2)', border:'1px solid #fecaca', boxShadow:'0 2px 16px rgba(220,38,38,0.1)' }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: upcomingVisaExpiries.some((e) => e.daysUntil <= 7) ? '#dc2626' : '#f59e0b', boxShadow:'0 4px 12px rgba(220,38,38,0.35)' }}>
+                  <ShieldAlert className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <p className="text-[11px] font-black text-red-900 uppercase tracking-wider">🪪 Visa Expiry Alert</p>
+                  {upcomingVisaExpiries.map((emp) => (
+                    <div key={emp.id} className="flex items-center gap-2.5 flex-wrap">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[9px] font-black shrink-0"
+                        style={{ background: avatarGrad(emp.name) }}>
+                        {initials(emp.name)}
+                      </div>
+                      <span className="text-[14px] font-bold text-red-950">{emp.name}</span>
+                      <span className={`text-[12px] font-semibold ${emp.daysUntil <= 0 ? 'text-red-700' : emp.daysUntil <= 7 ? 'text-red-600' : 'text-amber-600'}`}>
+                        {emp.daysUntil <= 0
+                          ? `— Expired ${Math.abs(emp.daysUntil)}d ago — Renew Now!`
+                          : emp.daysUntil === 1
+                            ? '— Expires Tomorrow!'
+                            : `— Expires in ${emp.daysUntil} days (${fmtDate(emp.visaExpiryDate)})`}
                       </span>
                     </div>
                   ))}
@@ -1054,11 +1139,60 @@ export default function EmployeesPage() {
                   {/* Divider */}
                   <div className="flex items-center gap-3">
                     <div className="flex-1 h-px bg-slate-100" />
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Visa</span>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+
+                  {/* ── Section 3: Visa Information ── */}
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background:'linear-gradient(135deg,#dc2626,#b91c1c)' }}>
+                        <ShieldAlert className="w-3 h-3 text-white" />
+                      </div>
+                      <p className="text-[11px] font-black text-slate-700 uppercase tracking-[0.12em]">Visa Information</p>
+                      <span className="text-[10px] text-slate-300 font-medium">optional</span>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Visa Start Date</label>
+                        <DatePicker
+                          value={empForm.visaStartDate}
+                          onChange={(v) => setEF('visaStartDate', v)}
+                          className={INP}
+                          minYear={2000}
+                          maxYear={new Date().getFullYear() + 5}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Visa Expiry Date</label>
+                        <DatePicker
+                          value={empForm.visaExpiryDate}
+                          onChange={(v) => setEF('visaExpiryDate', v)}
+                          className={INP}
+                          minYear={2000}
+                          maxYear={new Date().getFullYear() + 10}
+                        />
+                        {empForm.visaExpiryDate && (() => {
+                          const d = visaDaysUntil(empForm.visaExpiryDate);
+                          if (d === null) return null;
+                          if (d <= 0)  return <p className="text-[11px] text-red-600 mt-1.5 ml-1 font-bold flex items-center gap-1"><span>⚠</span>Visa expired {Math.abs(d)}d ago — renew immediately</p>;
+                          if (d <= 30) return <p className="text-[11px] text-amber-600 mt-1.5 ml-1 font-bold flex items-center gap-1"><span>⚠</span>Expires in {d} days</p>;
+                          return <p className="text-[11px] text-emerald-600 mt-1.5 ml-1 font-semibold flex items-center gap-1"><span className="w-3.5 h-3.5 inline-flex items-center justify-center rounded-full bg-emerald-100 text-[8px]">✓</span>Valid · {d} days remaining</p>;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-slate-100" />
                     <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Notes</span>
                     <div className="flex-1 h-px bg-slate-100" />
                   </div>
 
-                  {/* ── Section 3: Notes ── */}
+                  {/* ── Section 4: Notes ── */}
                   <div>
                     <div className="flex items-center gap-2.5 mb-3">
                       <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"

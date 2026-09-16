@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, Pencil, Banknote, Wallet, Phone, CalendarDays, Cake,
   BadgeCheck, Trash2, Car, Home, AlertCircle, CheckCircle2, Clock,
   Globe, FileText, TrendingUp, ArrowDownLeft, RotateCcw, Users, X, AlertTriangle,
-  Save, Loader2,
+  Save, Loader2, ShieldAlert,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, usePatchMutation } from '../../api/apiSlice';
 import DatePicker from '../../components/ui/DatePicker';
@@ -59,6 +59,11 @@ const daysUntilBirthday = (dob) => {
   let next = new Date(yr, d.getMonth(), d.getDate());
   if (next < today) next = new Date(yr + 1, d.getMonth(), d.getDate());
   return Math.round((next - today) / 86_400_000);
+};
+const visaDaysUntil = (dateStr) => {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.ceil((new Date(dateStr) - today) / 86400000);
 };
 
 const ROLES   = ['Driver', 'Housemaid', 'Cook', 'Gardener', 'Security Guard', 'Nanny', 'Cleaner', 'Butler', 'Handyman', 'Other'];
@@ -408,6 +413,24 @@ export default function EmployeeDetail() {
               <InfoRow icon={BadgeCheck} label="Status" color={color}
                 value={emp.status === 'active' ? 'Active employee' : 'Inactive'}
                 valueColor={emp.status === 'active' ? '#16a34a' : '#94a3b8'} />
+              {emp.visaExpiryDate && (() => {
+                const d = visaDaysUntil(emp.visaExpiryDate);
+                const expired = d !== null && d <= 0;
+                const urgent  = d !== null && d <= 30;
+                const label   = expired
+                  ? `Expired ${Math.abs(d)}d ago — Renew Now!`
+                  : urgent
+                    ? `${fmtDate(emp.visaExpiryDate)} — Expires in ${d}d`
+                    : `${fmtDate(emp.visaExpiryDate)} (${d}d remaining)`;
+                return (
+                  <InfoRow icon={ShieldAlert} label="Visa Expiry" color={expired ? '#dc2626' : urgent ? '#d97706' : color}
+                    value={label}
+                    valueColor={expired ? '#dc2626' : urgent ? '#d97706' : '#1e293b'} />
+                );
+              })()}
+              {emp.visaStartDate && (
+                <InfoRow icon={ShieldAlert} label="Visa Start" color={color} value={fmtDate(emp.visaStartDate)} />
+              )}
               {emp.notes && (
                 <div className="flex items-start gap-4 py-4">
                   <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ background:`${color}15` }}>
@@ -641,6 +664,28 @@ export default function EmployeeDetail() {
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Notes</label>
                   <textarea value={editForm.notes ?? ''} onChange={(e) => setEF('notes', e.target.value)} rows={3} className={`${INP} h-auto py-3 resize-none`} />
+                </div>
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <ShieldAlert className="w-3.5 h-3.5 text-red-400" /> Visa Information
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Visa Start Date</label>
+                      <DatePicker value={editForm.visaStartDate ?? ''} onChange={(v) => setEF('visaStartDate', v)} className={INP} minYear={2000} maxYear={new Date().getFullYear() + 5} />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Visa Expiry Date</label>
+                      <DatePicker value={editForm.visaExpiryDate ?? ''} onChange={(v) => setEF('visaExpiryDate', v)} className={INP} minYear={2000} maxYear={new Date().getFullYear() + 10} />
+                      {editForm.visaExpiryDate && (() => {
+                        const d = visaDaysUntil(editForm.visaExpiryDate);
+                        if (d === null) return null;
+                        if (d <= 0)  return <p className="text-[11px] text-red-600 mt-1 font-bold">Expired {Math.abs(d)}d ago</p>;
+                        if (d <= 30) return <p className="text-[11px] text-amber-600 mt-1 font-bold">Expires in {d} days</p>;
+                        return <p className="text-[11px] text-emerald-600 mt-1">Valid · {d} days left</p>;
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </form>
 
