@@ -89,6 +89,13 @@ function fmtDate(s) {
   if (!s) return '—';
   return new Date(s + 'T00:00:00').toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+function apiErrorMsg(err) {
+  if (!err) return 'Something went wrong';
+  if (err.status === 'FETCH_ERROR')   return 'Network error — check your connection and try again';
+  if (err.status === 'TIMEOUT_ERROR') return 'Request timed out — the server is slow. Try again.';
+  if (err.status === 'PARSING_ERROR') return 'Server returned unexpected data. Try again.';
+  return err?.data?.error ?? err?.data?.message ?? 'Something went wrong';
+}
 
 const PAGE_SIZE = 10;
 
@@ -214,7 +221,10 @@ export default function ExpensesPage() {
     limit: PAGE_SIZE,
   };
 
-  const { data: listResult = {}, isLoading: listLoading, isFetching: listFetching, refetch: refetchList } = useGetQuery(
+  const {
+    data: listResult = {}, isLoading: listLoading, isFetching: listFetching,
+    isError: listError, error: listErr, refetch: refetchList,
+  } = useGetQuery(
     { path: '/expenses', params: listParams },
     { skip: !propertyId },
   );
@@ -265,23 +275,40 @@ export default function ExpensesPage() {
         await Promise.all([refetchStats(), refetchList()]);
         toast.success('Expense updated');
       } else {
-        // Create expense first to get its id, then link the wallet transaction via sourceId
-        const result = await addMut({ path: '/expenses', body: { ...data, propertyId } }).unwrap();
+        // Step 1: create the expense record to get its id for linking
+        let result;
+        try {
+          result = await addMut({ path: '/expenses', body: { ...data, propertyId } }).unwrap();
+        } catch (err) {
+          toast.error(apiErrorMsg(err));
+          return;
+        }
         const sourceId = result?.data?.id ?? '';
+
+        // Step 2: deduct from wallet and link via sourceId
         if (Number(data.amount) > 0) {
-          await deductMut({
-            path: '/wallet/deduct',
-            body: {
-              propertyId,
-              walletType: data.walletType ?? 'home',
-              amount: Number(data.amount),
-              description: data.description,
-              date: data.date,
-              category: data.category,
-              sourceId,
-              sourceModel: 'Expense',
-            },
-          }).unwrap();
+          try {
+            await deductMut({
+              path: '/wallet/deduct',
+              body: {
+                propertyId,
+                walletType: data.walletType ?? 'home',
+                amount: Number(data.amount),
+                description: data.description,
+                date: data.date,
+                category: data.category,
+                sourceId,
+                sourceModel: 'Expense',
+              },
+            }).unwrap();
+          } catch (err) {
+            // Expense created but wallet deduction failed — tell the user clearly
+            toast.error('Expense saved but wallet update failed — check your transactions');
+            setModal(null);
+            setPage(1);
+            await Promise.all([refetchStats(), refetchList()]);
+            return;
+          }
           setPage(1);
           await Promise.all([refetchStats(), refetchList()]);
         }
@@ -289,7 +316,7 @@ export default function ExpensesPage() {
       }
       setModal(null);
     } catch (err) {
-      toast.error(err?.data?.error ?? 'Failed to save expense');
+      toast.error(apiErrorMsg(err));
     }
   };
 
@@ -300,8 +327,8 @@ export default function ExpensesPage() {
       await Promise.all([refetchStats(), refetchList()]);
       toast.success('Expense deleted');
       setDelTarget(null);
-    } catch {
-      toast.error('Failed to delete');
+    } catch (err) {
+      toast.error(apiErrorMsg(err));
     } finally {
       setDeleting(false);
     }
@@ -339,8 +366,8 @@ export default function ExpensesPage() {
   if (statsLoading || !propertyId) return <ExpensesSkeleton />;
   if (statsError) return (
     <ExpensesError
-      message={statsErr?.data?.message ?? 'Something went wrong. Please try again.'}
-      onRetry={refetchStats}
+      message={apiErrorMsg(statsErr)}
+      onRetry={() => { refetchStats(); refetchList(); }}
     />
   );
 
@@ -823,6 +850,19 @@ export default function ExpensesPage() {
                 ))}
               </div>
             </>
+          ) : listError ? (
+            <div className="py-14 text-center px-6">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-3">
+                <RiAlertLine className="w-6 h-6 text-red-400" />
+              </div>
+              <p className="font-bold text-slate-700 text-[14px] mb-1">Failed to load expenses</p>
+              <p className="text-slate-400 text-[12px] mb-4">{apiErrorMsg(listErr)}</p>
+              <button onClick={refetchList}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                Try Again
+              </button>
+            </div>
           ) : expenses.length === 0 ? (
             <div className="py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">

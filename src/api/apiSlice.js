@@ -47,6 +47,8 @@ const downloadBlob = (blob, filename) => {
   window.URL.revokeObjectURL(url);
 };
 
+const FETCH_TIMEOUT_MS = 20000; // 20s — covers Atlas cold starts on mobile
+
 const baseQuery = fetchBaseQuery({
   baseUrl: API_URL,
   prepareHeaders: (headers, { getState }) => {
@@ -59,7 +61,27 @@ const baseQuery = fetchBaseQuery({
 let handlingLogout = false;
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
-  const result = await baseQuery(args, api, extraOptions);
+  // Attach a timeout so mobile network hangs don't block the UI forever
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  const argsWithSignal = typeof args === "string"
+    ? { url: args, signal: controller.signal }
+    : { ...args, signal: controller.signal };
+
+  let result;
+  try {
+    result = await baseQuery(argsWithSignal, api, extraOptions);
+  } catch {
+    clearTimeout(timer);
+    return { error: { status: "TIMEOUT_ERROR", error: "Request timed out. Please check your connection." } };
+  }
+  clearTimeout(timer);
+
+  // Handle abort as timeout
+  if (result.error?.name === "AbortError" || controller.signal.aborted) {
+    return { error: { status: "TIMEOUT_ERROR", error: "Request timed out. Please check your connection." } };
+  }
 
   const is401 =
     result.error?.status === 401 || result.meta?.response?.status === 401;
@@ -93,8 +115,8 @@ function buildInvalidationTags(path) {
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  keepUnusedDataFor: 60,          // drop unused cache after 1 min (was 5 min)
-  refetchOnMountOrArgChange: 30,  // background-refetch if data is >30s old on mount
+  keepUnusedDataFor: 300,         // keep cache 5 min — reduces refetches on Android tab-switching
+  refetchOnMountOrArgChange: 120, // only background-refetch if data is >2 min old on mount
   refetchOnFocus: false,
   refetchOnReconnect: true,
   tagTypes: TAG_TYPES,

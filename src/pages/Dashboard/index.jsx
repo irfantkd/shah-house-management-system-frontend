@@ -104,9 +104,9 @@ export default function Dashboard() {
   const [homeExpenseOpen, setHomeExpenseOpen] = useState(false);
   const [fabOpen,         setFabOpen]         = useState(false);
 
-  const { data: dash = EMPTY_DASH, isLoading, isFetching, isError, error } = useGetQuery(
+  const { data: dash = EMPTY_DASH, isLoading, isFetching, isError, error, refetch } = useGetQuery(
     { path: '/dashboard', params: { propertyId } },
-    { skip: !propertyId, refetchOnMountOrArgChange: 60 },
+    { skip: !propertyId, refetchOnMountOrArgChange: 300, keepUnusedDataFor: 300 },
   );
 
   const loading = isLoading || !propertyId;
@@ -150,7 +150,7 @@ export default function Dashboard() {
   ];
 
   if (loading) return <DashboardSkeleton />;
-  if (isError)  return <DashboardError message={error?.data?.message ?? error?.message ?? 'Failed to load dashboard'} />;
+  if (isError)  return <DashboardError error={error} onRetry={refetch} />;
 
   const alertCount = (stats.openRepairs ?? 0) + (allExpiryAlerts?.length ?? 0) + (stats.carAlerts ?? 0);
   const unread = dash.unreadNotifications ?? 0;
@@ -820,7 +820,16 @@ function HealthDonut({ score }) {
   );
 }
 
-function DashboardError({ message }) {
+function dashboardErrorMsg(err) {
+  if (!err) return 'Something went wrong';
+  if (err.status === 'FETCH_ERROR')   return 'Network error — check your connection and try again';
+  if (err.status === 'TIMEOUT_ERROR') return 'Request timed out — the server is slow. Try again.';
+  if (err.status === 'PARSING_ERROR') return 'Server returned unexpected data. Try again.';
+  return err?.data?.error ?? err?.data?.message ?? err?.message ?? 'Failed to load dashboard';
+}
+
+function DashboardError({ error, onRetry }) {
+  const message = dashboardErrorMsg(error);
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-4">
       <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
@@ -832,10 +841,10 @@ function DashboardError({ message }) {
         <p className="text-sm text-slate-500 max-w-sm">{message}</p>
       </div>
       <button
-        onClick={() => window.location.reload()}
+        onClick={onRetry ?? (() => window.location.reload())}
         className="mt-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
         style={{ background: '#0b1d3a' }}>
-        Retry
+        Try Again
       </button>
     </div>
   );
