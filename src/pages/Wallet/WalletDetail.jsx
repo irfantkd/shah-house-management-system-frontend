@@ -228,6 +228,16 @@ export default function WalletDetail() {
   const listTotal = listResult?.total  ?? 0;
   const listPages = listResult?.pages  ?? 1;
 
+  // ── Cars lookup (vehicle wallet only) ───────────────────────────────────────
+  const { data: carsData = [] } = useGetQuery(
+    { path: '/cars', params: { propertyId } },
+    { skip: !propertyId || type !== 'vehicle' },
+  );
+  const carMap = useMemo(() => {
+    const cars = Array.isArray(carsData) ? carsData : (carsData?.cars ?? carsData?.data ?? []);
+    return Object.fromEntries(cars.map(c => [c.id ?? c._id, c]));
+  }, [carsData]);
+
   // Derive aggregated values from backend summary
   const balance        = summary?.balance               ?? 0;
   const totalDeposited = summary?.totalDeposited        ?? 0;
@@ -603,6 +613,19 @@ export default function WalletDetail() {
                         <p className="text-[13px] font-semibold text-slate-800 leading-snug">
                           {isDepo ? (txn.note || 'Deposit received') : (txn.description || 'Expense deducted')}
                         </p>
+                        {(() => {
+                          const car = !isDepo && txn.carId ? carMap[txn.carId] : null;
+                          if (!car) return null;
+                          const carName = car.nickname || `${car.make} ${car.model}`;
+                          return (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <Car className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="text-[11px] text-slate-500 font-medium truncate">
+                                {carName}{car.plateNumber ? ` · ${car.plateNumber}` : ''}
+                              </span>
+                            </div>
+                          );
+                        })()}
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full',
                             isDepo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600')}>

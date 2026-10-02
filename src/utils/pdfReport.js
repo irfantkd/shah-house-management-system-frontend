@@ -818,13 +818,6 @@ export function downloadSalaryPDF({
 // ─────────────────────────────────────────────────────────────────────────────
 //  VEHICLE FLEET REPORT PDF
 // ─────────────────────────────────────────────────────────────────────────────
-// Sections:
-//   1. Header band (navy)
-//   2. Fleet totals stat row
-//   3. Per-vehicle summary table (sorted by total spend)
-//   4. Monthly trend table (12 months)
-//   5. Per-vehicle detail (expenses + fuel + maintenance rows)
-// ─────────────────────────────────────────────────────────────────────────────
 export function downloadFleetReportPDF({
   report,
   periodLabel,
@@ -833,18 +826,16 @@ export function downloadFleetReportPDF({
   vehicleFilter = "all",
   typeFilter    = "all",
 }) {
-  const BLUE   = [37, 99, 235];
-  const AMBER  = [180, 83, 9];
+  const BLUE   = [37,  99, 235];
+  const AMBER  = [180, 83,   9];
   const PURP   = [109, 40, 217];
 
   const { perCar, fleetTotals, monthlyTrend } = report;
 
-  // Apply vehicle filter
   const cars = vehicleFilter === "all"
     ? [...perCar].sort((a, b) => b.totals.combined - a.totals.combined)
     : perCar.filter((c) => c.carId === vehicleFilter);
 
-  // Recompute totals if filtered
   const totals = vehicleFilter === "all" ? fleetTotals : cars.reduce(
     (acc, c) => ({
       expenses:    acc.expenses    + c.totals.expenses,
@@ -866,73 +857,74 @@ export function downloadFleetReportPDF({
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  // ── Header ──────────────────────────────────────────────────────────────────
+  // ── Cover header band ────────────────────────────────────────────────────────
   doc.setFillColor(...NAVY);
-  doc.rect(0, 0, PW, 34, "F");
+  doc.rect(0, 0, PW, 38, "F");
+  // Thin accent strip
+  doc.setFillColor(255, 200, 0);
+  doc.rect(0, 0, 3, 38, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
+  doc.setFontSize(16);
   doc.setTextColor(...WHITE);
-  doc.text(propertyName ?? "Property Management", ML, 12);
+  doc.text(propertyName ?? "Property Management", ML + 4, 13);
 
-  if (propertyType) {
-    doc.setFontSize(6.5);
-    doc.setTextColor(185, 210, 235);
-    doc.text(
-      `${propertyType.toUpperCase()}  ·  Dubai, United Arab Emirates  ·  Fleet Management System`,
-      ML, 18.5,
-    );
-  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(185, 210, 235);
+  const subtitle = propertyType
+    ? `${propertyType.toUpperCase()}  ·  Dubai, UAE  ·  Fleet Management System`
+    : "Dubai, UAE  ·  Fleet Management System";
+  doc.text(subtitle, ML + 4, 20);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setTextColor(...WHITE);
-  doc.text(reportTitle, PW - ML, 11.5, { align: "right" });
+  doc.text(reportTitle, PW - ML, 13, { align: "right" });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(185, 210, 235);
-  doc.text(`Period: ${periodLabel}`, PW - ML, 17.5, { align: "right" });
-  doc.text(`Generated: ${tod()}`, PW - ML, 24.5, { align: "right" });
+  doc.text(`Period: ${periodLabel}`, PW - ML, 20, { align: "right" });
+  doc.text(`Generated: ${tod()}`, PW - ML, 27, { align: "right" });
 
-  let y = 38;
+  let y = 43;
 
-  // ── Stat row ─────────────────────────────────────────────────────────────
+  // ── Fleet totals stat row ────────────────────────────────────────────────────
   const statItems = [];
-  if (showExp)  statItems.push({ label: "Fleet Expenses",   value: `AED ${fm(totals.expenses)}`,    sub: `${cars.reduce((s,c) => s + c.totals.expenseCount, 0)} records`,     vc: BLUE  });
-  if (showFuel) statItems.push({ label: "Fleet Fuel",       value: `AED ${fm(totals.fuel)}`,        sub: `${fm(totals.liters)} litres`,                                        vc: AMBER });
-  if (showMnt)  statItems.push({ label: "Maintenance",      value: `AED ${fm(totals.maintenance)}`, sub: `${cars.reduce((s,c) => s + c.totals.maintenanceCount, 0)} records`, vc: PURP  });
-  statItems.push({ label: "Total Fleet Cost",  value: `AED ${fm(totals.combined)}`,  sub: periodLabel });
-
+  if (showExp)  statItems.push({ label: "Fleet Expenses",   value: `AED ${fm(totals.expenses)}`,    sub: `${cars.reduce((s,c) => s + c.totals.expenseCount,     0)} records`,  vc: BLUE  });
+  if (showFuel) statItems.push({ label: "Fleet Fuel",       value: `AED ${fm(totals.fuel)}`,        sub: `${fm(totals.liters)} litres · ${cars.reduce((s,c) => s + c.totals.fuelCount, 0)} fills`, vc: AMBER });
+  if (showMnt)  statItems.push({ label: "Maintenance",      value: `AED ${fm(totals.maintenance)}`, sub: `${cars.reduce((s,c) => s + c.totals.maintenanceCount, 0)} records`,  vc: PURP  });
+  statItems.push({ label: "Total Fleet Cost", value: `AED ${fm(totals.combined)}`, sub: `${cars.length} vehicle${cars.length !== 1 ? "s" : ""}  ·  ${periodLabel}` });
   y = drawStatRow(doc, y, statItems);
 
-  // ── Per-vehicle summary table ─────────────────────────────────────────────
-  y = sectionLabel(doc, y, `Vehicle Breakdown  ·  ${cars.length} Vehicle${cars.length !== 1 ? "s" : ""}  ·  Sorted by Spend`);
+  // ── Vehicle summary table ────────────────────────────────────────────────────
+  y = sectionLabel(doc, y, `Vehicle Breakdown  ·  ${cars.length} Vehicle${cars.length !== 1 ? "s" : ""}  ·  Sorted by Total Spend`);
 
-  const summaryHead = ["Vehicle", "Plate", "Driver"];
+  const summaryHead = ["#", "Vehicle", "Plate No.", "Driver"];
   if (showExp)  summaryHead.push("Expenses");
-  if (showFuel) summaryHead.push("Fuel");
+  if (showFuel) summaryHead.push("Fuel Cost");
   if (showMnt)  summaryHead.push("Maintenance");
-  summaryHead.push("Total");
+  summaryHead.push("Total Cost");
   if (vehicleFilter === "all") summaryHead.push("% Fleet");
 
-  const summaryBody = cars.map((c) => {
+  const summaryBody = cars.map((c, idx) => {
     const pct = totals.combined > 0 ? ((c.totals.combined / totals.combined) * 100).toFixed(1) + "%" : "—";
     const row = [
-      c.nickname || `${c.make} ${c.model}`,
+      String(idx + 1),
+      c.nickname || `${c.make} ${c.model}${c.year ? ` ${c.year}` : ""}`,
       c.plateNumber || "—",
-      c.driverName || "—",
+      c.driverName  || "—",
     ];
-    if (showExp)  row.push(`AED ${fm(c.totals.expenses)}`);
-    if (showFuel) row.push(`AED ${fm(c.totals.fuel)}`);
-    if (showMnt)  row.push(`AED ${fm(c.totals.maintenance)}`);
+    if (showExp)  row.push(c.totals.expenses    > 0 ? `AED ${fm(c.totals.expenses)}`    : "—");
+    if (showFuel) row.push(c.totals.fuel        > 0 ? `AED ${fm(c.totals.fuel)}`        : "—");
+    if (showMnt)  row.push(c.totals.maintenance > 0 ? `AED ${fm(c.totals.maintenance)}` : "—");
     row.push(`AED ${fm(c.totals.combined)}`);
     if (vehicleFilter === "all") row.push(pct);
     return row;
   });
-
-  // Totals footer row
-  const totalRow = ["", "TOTAL", ""];
+  // Fleet total footer
+  const totalRow = ["", "FLEET TOTAL", "", ""];
   if (showExp)  totalRow.push(`AED ${fm(totals.expenses)}`);
   if (showFuel) totalRow.push(`AED ${fm(totals.fuel)}`);
   if (showMnt)  totalRow.push(`AED ${fm(totals.maintenance)}`);
@@ -940,22 +932,22 @@ export function downloadFleetReportPDF({
   if (vehicleFilter === "all") totalRow.push("100%");
   summaryBody.push(totalRow);
 
-  // Dynamic column widths
-  const colCount = summaryHead.length;
-  const fixedW   = vehicleFilter === "all" ? 42 + 22 + 28 : 50 + 28 + 32; // vehicle + plate + driver
-  const dataW    = (UW - fixedW) / (colCount - 3);
+  const fixedW = 8 + (vehicleFilter === "all" ? 40 : 48) + 22 + 24;
+  const dataCount = [showExp, showFuel, showMnt].filter(Boolean).length + 1 + (vehicleFilter === "all" ? 1 : 0);
+  const dataW  = (UW - fixedW) / dataCount;
 
-  const summaryColStyles = {
-    0: { cellWidth: vehicleFilter === "all" ? 42 : 50, fontStyle: "bold" },
-    1: { cellWidth: vehicleFilter === "all" ? 22 : 28 },
-    2: { cellWidth: vehicleFilter === "all" ? 28 : 32 },
+  const sColStyles = {
+    0: { cellWidth: 8,  halign: "center", textColor: SL5 },
+    1: { cellWidth: vehicleFilter === "all" ? 40 : 48, fontStyle: "bold" },
+    2: { cellWidth: 22 },
+    3: { cellWidth: 24 },
   };
-  let ci = 3;
-  if (showExp)  { summaryColStyles[ci] = { cellWidth: dataW, halign: "right", textColor: BLUE  }; ci++; }
-  if (showFuel) { summaryColStyles[ci] = { cellWidth: dataW, halign: "right", textColor: AMBER }; ci++; }
-  if (showMnt)  { summaryColStyles[ci] = { cellWidth: dataW, halign: "right", textColor: PURP  }; ci++; }
-  summaryColStyles[ci] = { cellWidth: dataW, halign: "right", fontStyle: "bold" }; ci++;
-  if (vehicleFilter === "all") summaryColStyles[ci] = { cellWidth: 14, halign: "right" };
+  let ci = 4;
+  if (showExp)  { sColStyles[ci] = { cellWidth: dataW, halign: "right", textColor: BLUE  }; ci++; }
+  if (showFuel) { sColStyles[ci] = { cellWidth: dataW, halign: "right", textColor: AMBER }; ci++; }
+  if (showMnt)  { sColStyles[ci] = { cellWidth: dataW, halign: "right", textColor: PURP  }; ci++; }
+  sColStyles[ci] = { cellWidth: dataW, halign: "right", fontStyle: "bold" }; ci++;
+  if (vehicleFilter === "all") sColStyles[ci] = { cellWidth: dataW * 0.7, halign: "right", textColor: SL5 };
 
   autoTable(doc, {
     startY: y,
@@ -964,27 +956,25 @@ export function downloadFleetReportPDF({
     styles: TABLE_STYLES,
     headStyles: HEAD_STYLES,
     alternateRowStyles: ALT_ROW,
-    columnStyles: summaryColStyles,
+    columnStyles: sColStyles,
     didParseCell: (d) => {
-      const isLastRow = d.row.index === summaryBody.length - 1;
-      if (d.section === "body" && isLastRow) {
-        d.cell.styles.fontStyle  = "bold";
-        d.cell.styles.fillColor  = GY200;
-        d.cell.styles.textColor  = SL;
+      if (d.section === "body" && d.row.index === summaryBody.length - 1) {
+        d.cell.styles.fontStyle = "bold";
+        d.cell.styles.fillColor = NAVY;
+        d.cell.styles.textColor = WHITE;
       }
     },
     rowPageBreak: "avoid",
     didDrawPage: ({ pageNumber }) => pageFooter(doc, pageNumber, propertyName),
     margin: { left: ML, right: ML },
   });
+  y = doc.lastAutoTable.finalY + 7;
 
-  y = doc.lastAutoTable.finalY + 6;
-
-  // ── Monthly trend table ───────────────────────────────────────────────────
+  // ── Monthly trend table ──────────────────────────────────────────────────────
   if (vehicleFilter === "all" && typeFilter === "all") {
-    y = sectionLabel(doc, y, "Monthly Trend — Full Year");
+    if (y > PH - 80) { doc.addPage(); y = 15; }
+    y = sectionLabel(doc, y, `Monthly Cost Trend — ${report.year ?? ""}`);
 
-    const trendHead = ["Month", "Expenses", "Fuel", "Maintenance", "Total"];
     const trendBody = [...monthlyTrend].reverse().map((m) => {
       const total = m.expenses + m.fuel + m.maintenance;
       return [
@@ -992,12 +982,11 @@ export function downloadFleetReportPDF({
         m.expenses    > 0 ? `AED ${fm(m.expenses)}`    : "—",
         m.fuel        > 0 ? `AED ${fm(m.fuel)}`        : "—",
         m.maintenance > 0 ? `AED ${fm(m.maintenance)}` : "—",
-        total         > 0 ? `AED ${fm(total)}`          : "—",
+        total > 0 ? `AED ${fm(total)}` : "—",
       ];
     });
-    // Year total row
     trendBody.push([
-      "Year Total",
+      `Year ${report.year ?? ""} Total`,
       `AED ${fm(fleetTotals.expenses)}`,
       `AED ${fm(fleetTotals.fuel)}`,
       `AED ${fm(fleetTotals.maintenance)}`,
@@ -1006,50 +995,134 @@ export function downloadFleetReportPDF({
 
     autoTable(doc, {
       startY: y,
-      head: [trendHead],
+      head: [["Month", "Expenses (AED)", "Fuel Cost (AED)", "Maintenance (AED)", "Total (AED)"]],
       body: trendBody,
       styles: { ...TABLE_STYLES, fontSize: 8 },
       headStyles: HEAD_STYLES,
       alternateRowStyles: ALT_ROW,
       columnStyles: {
-        0: { cellWidth: 34 },
-        1: { cellWidth: 37, halign: "right", textColor: BLUE  },
-        2: { cellWidth: 37, halign: "right", textColor: AMBER },
-        3: { cellWidth: 37, halign: "right", textColor: PURP  },
-        4: { cellWidth: 37, halign: "right", fontStyle: "bold" },
+        0: { cellWidth: 36 },
+        1: { cellWidth: 36.5, halign: "right", textColor: BLUE  },
+        2: { cellWidth: 36.5, halign: "right", textColor: AMBER },
+        3: { cellWidth: 36.5, halign: "right", textColor: PURP  },
+        4: { cellWidth: 36.5, halign: "right", fontStyle: "bold" },
       },
       didParseCell: (d) => {
-        const isLastRow = d.row.index === trendBody.length - 1;
-        if (d.section === "body" && isLastRow) {
+        if (d.section === "body" && d.row.index === trendBody.length - 1) {
           d.cell.styles.fontStyle = "bold";
-          d.cell.styles.fillColor = GY200;
+          d.cell.styles.fillColor = NAVY;
+          d.cell.styles.textColor = WHITE;
         }
       },
       rowPageBreak: "avoid",
       didDrawPage: ({ pageNumber }) => pageFooter(doc, pageNumber, propertyName),
       margin: { left: ML, right: ML },
     });
-
-    y = doc.lastAutoTable.finalY + 6;
+    y = doc.lastAutoTable.finalY + 7;
   }
 
-  // ── Per-vehicle detail records ────────────────────────────────────────────
+  // ── Per-vehicle detail records ────────────────────────────────────────────────
+  y = sectionLabel(doc, y, "Detailed Records by Vehicle");
+
   for (const car of cars) {
-    const carLabel = car.nickname || `${car.make} ${car.model}`;
+    const carLabel = car.nickname || `${car.make} ${car.model}${car.year ? ` ${car.year}` : ""}`;
 
-    if (y > PH - 60) { doc.addPage(); y = 15; }
-    y = sectionLabel(doc, y, `${carLabel}  ·  ${car.plateNumber || "No Plate"}  ·  ${car.driverName || "No Driver"}`);
+    if (y > PH - 70) { doc.addPage(); y = 15; }
 
-    // Expenses detail
+    // Vehicle info box
+    const boxH = 18;
+    doc.setFillColor(11, 29, 58);
+    doc.roundedRect(ML, y, UW, boxH, 2, 2, "F");
+
+    // Rank circle
+    const pctFleet = totals.combined > 0 ? ((car.totals.combined / totals.combined) * 100).toFixed(1) : "0.0";
+    doc.setFillColor(255, 255, 255, 0.12);
+    doc.circle(ML + 8, y + boxH / 2, 5, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...WHITE);
+    const rank = String(cars.indexOf(car) + 1);
+    doc.text(`#${rank}`, ML + 8, y + boxH / 2 + 2.5, { align: "center" });
+
+    // Car name + plate
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...WHITE);
+    doc.text(carLabel, ML + 16, y + 7);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(185, 210, 235);
+    const sub2 = [car.plateNumber, car.driverName ? `Driver: ${car.driverName}` : null].filter(Boolean).join("   ·   ");
+    doc.text(sub2, ML + 16, y + 13);
+
+    // Right side — totals summary
+    const rightX = PW - ML - 2;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...WHITE);
+    doc.text(`AED ${fm(car.totals.combined)}`, rightX, y + 8, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(185, 210, 235);
+    doc.text(`${pctFleet}% of fleet   ·   ${periodLabel}`, rightX, y + 14, { align: "right" });
+
+    y += boxH + 3;
+
+    // Mini cost summary row
+    const miniItems = [];
+    if (showExp && car.totals.expenses > 0)
+      miniItems.push(`Expenses: AED ${fm(car.totals.expenses)}  (${car.totals.expenseCount} records)`);
+    if (showFuel && car.totals.fuel > 0)
+      miniItems.push(`Fuel: AED ${fm(car.totals.fuel)}  (${Number(car.totals.liters ?? 0).toFixed(0)} L)`);
+    if (showMnt && car.totals.maintenance > 0)
+      miniItems.push(`Maintenance: AED ${fm(car.totals.maintenance)}  (${car.totals.maintenanceCount} records)`);
+
+    if (miniItems.length > 0) {
+      doc.setFillColor(...GY50);
+      doc.setDrawColor(...GY200);
+      doc.setLineWidth(0.3);
+      doc.rect(ML, y, UW, 8, "FD");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...SL5);
+      doc.text(miniItems.join("    ·    "), ML + 4, y + 5.5);
+      y += 11;
+    }
+
+    const hasAny = (showExp && car.expenses.length > 0)
+      || (showFuel && car.fuelLogs.length > 0)
+      || (showMnt && car.maintenance.length > 0);
+
+    if (!hasAny) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(...SL4);
+      doc.text("No records for this period.", ML + 4, y + 5);
+      y += 12;
+      continue;
+    }
+
+    // ── Expenses table ─────────────────────────────────────────────────────────
     if (showExp && car.expenses.length > 0) {
+      // Sub-section label
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...BLUE);
+      doc.text("EXPENSES", ML, y + 4);
+      doc.setDrawColor(...BLUE);
+      doc.setLineWidth(0.3);
+      doc.line(ML + 20, y + 3, ML + UW, y + 3);
+      y += 6;
+
       autoTable(doc, {
         startY: y,
-        head: [["Date", "Type", "Description", "Vendor", "Amount (AED)"]],
+        head: [["Date", "Type", "Description", "Vendor", "Vehicle", "Amount (AED)"]],
         body: car.expenses.map((e) => [
           fd(e.date),
-          e.type ? e.type.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "—",
+          e.type ? e.type.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "—",
           e.description || "—",
           e.vendor      || "—",
+          `${carLabel}  ·  ${car.plateNumber || ""}`,
           `AED ${fm(e.amount)}`,
         ]),
         styles: { ...TABLE_STYLES, fontSize: 7.5 },
@@ -1057,11 +1130,15 @@ export function downloadFleetReportPDF({
         alternateRowStyles: ALT_ROW,
         columnStyles: {
           0: { cellWidth: 22, textColor: SL5 },
-          1: { cellWidth: 28 },
-          2: { cellWidth: 68 },
-          3: { cellWidth: 32 },
-          4: { cellWidth: 32, halign: "right", fontStyle: "bold", textColor: BLUE },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 50 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 33, textColor: SL4, fontStyle: "italic" },
+          5: { cellWidth: 24, halign: "right", fontStyle: "bold", textColor: BLUE },
         },
+        // Subtotal row
+        foot: [["", "", "", "", "Subtotal", `AED ${fm(car.totals.expenses)}`]],
+        footStyles: { fillColor: [235, 245, 255], textColor: BLUE, fontStyle: "bold", fontSize: 7.5 },
         rowPageBreak: "avoid",
         didDrawPage: ({ pageNumber }) => pageFooter(doc, pageNumber, propertyName),
         margin: { left: ML, right: ML },
@@ -1069,17 +1146,27 @@ export function downloadFleetReportPDF({
       y = doc.lastAutoTable.finalY + 4;
     }
 
-    // Fuel detail
+    // ── Fuel table ──────────────────────────────────────────────────────────────
     if (showFuel && car.fuelLogs.length > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...AMBER);
+      doc.text("FUEL FILL-UPS", ML, y + 4);
+      doc.setDrawColor(...AMBER);
+      doc.setLineWidth(0.3);
+      doc.line(ML + 27, y + 3, ML + UW, y + 3);
+      y += 6;
+
       autoTable(doc, {
         startY: y,
-        head: [["Date", "Station", "Litres", "Price/Litre", "Mileage (km)", "Total (AED)"]],
+        head: [["Date", "Vehicle", "Station", "Litres", "Price/L", "Mileage (km)", "Total (AED)"]],
         body: car.fuelLogs.map((f) => [
           fd(f.date),
-          f.station    || "—",
-          f.liters     ? `${Number(f.liters).toFixed(1)} L` : "—",
+          `${carLabel}  ·  ${car.plateNumber || ""}`,
+          f.station || "—",
+          f.liters  ? `${Number(f.liters).toFixed(1)} L` : "—",
           f.pricePerLiter ? `AED ${Number(f.pricePerLiter).toFixed(3)}` : "—",
-          f.mileage    ? Number(f.mileage).toLocaleString() : "—",
+          f.mileage ? Number(f.mileage).toLocaleString() : "—",
           `AED ${fm(f.totalPrice)}`,
         ]),
         styles: { ...TABLE_STYLES, fontSize: 7.5 },
@@ -1087,12 +1174,15 @@ export function downloadFleetReportPDF({
         alternateRowStyles: ALT_ROW,
         columnStyles: {
           0: { cellWidth: 22, textColor: SL5 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 24, halign: "right" },
-          3: { cellWidth: 30, halign: "right" },
-          4: { cellWidth: 32, halign: "right" },
-          5: { cellWidth: 44, halign: "right", fontStyle: "bold", textColor: AMBER },
+          1: { cellWidth: 36, textColor: SL4, fontStyle: "italic" },
+          2: { cellWidth: 24 },
+          3: { cellWidth: 16, halign: "right" },
+          4: { cellWidth: 22, halign: "right" },
+          5: { cellWidth: 24, halign: "right" },
+          6: { cellWidth: 38, halign: "right", fontStyle: "bold", textColor: AMBER },
         },
+        foot: [["", "", "", "", "", "Subtotal", `AED ${fm(car.totals.fuel)}`]],
+        footStyles: { fillColor: [255, 251, 235], textColor: AMBER, fontStyle: "bold", fontSize: 7.5 },
         rowPageBreak: "avoid",
         didDrawPage: ({ pageNumber }) => pageFooter(doc, pageNumber, propertyName),
         margin: { left: ML, right: ML },
@@ -1100,13 +1190,23 @@ export function downloadFleetReportPDF({
       y = doc.lastAutoTable.finalY + 4;
     }
 
-    // Maintenance detail
+    // ── Maintenance table ───────────────────────────────────────────────────────
     if (showMnt && car.maintenance.length > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...PURP);
+      doc.text("MAINTENANCE", ML, y + 4);
+      doc.setDrawColor(...PURP);
+      doc.setLineWidth(0.3);
+      doc.line(ML + 24, y + 3, ML + UW, y + 3);
+      y += 6;
+
       autoTable(doc, {
         startY: y,
-        head: [["Date", "Service Type", "Vendor", "Mileage (km)", "Cost (AED)"]],
+        head: [["Date", "Vehicle", "Service Type", "Vendor", "Mileage (km)", "Cost (AED)"]],
         body: car.maintenance.map((m) => [
           fd(m.date),
+          `${carLabel}  ·  ${car.plateNumber || ""}`,
           m.type   || "—",
           m.vendor || "—",
           m.mileage ? Number(m.mileage).toLocaleString() : "—",
@@ -1117,17 +1217,31 @@ export function downloadFleetReportPDF({
         alternateRowStyles: ALT_ROW,
         columnStyles: {
           0: { cellWidth: 22, textColor: SL5 },
-          1: { cellWidth: 50 },
-          2: { cellWidth: 50 },
-          3: { cellWidth: 30, halign: "right" },
-          4: { cellWidth: 30, halign: "right", fontStyle: "bold", textColor: PURP },
+          1: { cellWidth: 36, textColor: SL4, fontStyle: "italic" },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 36 },
+          4: { cellWidth: 22, halign: "right" },
+          5: { cellWidth: 26, halign: "right", fontStyle: "bold", textColor: PURP },
         },
+        foot: [["", "", "", "", "Subtotal", `AED ${fm(car.totals.maintenance)}`]],
+        footStyles: { fillColor: [245, 243, 255], textColor: PURP, fontStyle: "bold", fontSize: 7.5 },
         rowPageBreak: "avoid",
         didDrawPage: ({ pageNumber }) => pageFooter(doc, pageNumber, propertyName),
         margin: { left: ML, right: ML },
       });
-      y = doc.lastAutoTable.finalY + 6;
+      y = doc.lastAutoTable.finalY + 3;
     }
+
+    // Vehicle grand total strip
+    const gtH = 9;
+    doc.setFillColor(...NAVY);
+    doc.rect(ML, y, UW, gtH, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...WHITE);
+    doc.text(`${carLabel}  ·  Total for ${periodLabel}`, ML + 4, y + 6);
+    doc.text(`AED ${fm(car.totals.combined)}`, ML + UW - 3, y + 6, { align: "right" });
+    y += gtH + 8;
   }
 
   const propSlug = (propertyName ?? "Fleet").replace(/\s+/g, "-");
