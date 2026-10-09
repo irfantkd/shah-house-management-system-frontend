@@ -1,8 +1,12 @@
 export const NOTIF_TYPE_CFG = {
-  contract:    { label: 'Contract',    color: 'bg-accent-100 text-accent-700',   dot: 'bg-accent-500'   },
-  maintenance: { label: 'Maintenance', color: 'bg-navy-100 text-navy-700',       dot: 'bg-navy-500'     },
+  contract:    { label: 'Contract',    color: 'bg-amber-100 text-amber-700',     dot: 'bg-amber-500'    },
+  maintenance: { label: 'Maintenance', color: 'bg-blue-100 text-blue-700',       dot: 'bg-blue-500'     },
   warranty:    { label: 'Warranty',    color: 'bg-purple-100 text-purple-700',   dot: 'bg-purple-500'   },
-  repair:      { label: 'Repair',      color: 'bg-warning-100 text-warning-700', dot: 'bg-warning-500'  },
+  repair:      { label: 'Repair',      color: 'bg-orange-100 text-orange-700',   dot: 'bg-orange-500'   },
+  birthday:    { label: 'Birthday',    color: 'bg-pink-100 text-pink-700',       dot: 'bg-pink-500'     },
+  car:         { label: 'Vehicle',     color: 'bg-cyan-100 text-cyan-700',       dot: 'bg-cyan-500'     },
+  passport:    { label: 'Passport',    color: 'bg-sky-100 text-sky-700',         dot: 'bg-sky-500'      },
+  employee:    { label: 'Visa',        color: 'bg-red-100 text-red-700',         dot: 'bg-red-500'      },
   general:     { label: 'General',     color: 'bg-slate-100 text-slate-600',     dot: 'bg-slate-400'    },
 };
 

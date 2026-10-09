@@ -63,27 +63,23 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
   const currentProperty = useSelector(selectCurrentProperty);
   const currentId       = useSelector(selectCurrentPropertyId);
 
-  const { data: notifications = [] } = useGetQuery({ path: '/notifications', params: { propertyId: currentId } }, { skip: !currentId });
-  const { data: employees = [] }     = useGetQuery({ path: '/employees',     params: { propertyId: currentId } }, { skip: !currentId });
-  const { data: owners = [] }        = useGetQuery({ path: '/owners',        params: { propertyId: currentId } }, { skip: !currentId });
+  const { data: notifications = [] }  = useGetQuery({ path: '/notifications',      params: { propertyId: currentId } }, { skip: !currentId });
+  const { data: empStats    = {} }    = useGetQuery({ path: '/employees/stats',     params: { propertyId: currentId } }, { skip: !currentId });
+  const { data: ownerStats  = {} }    = useGetQuery({ path: '/owners/stats',        params: { propertyId: currentId } }, { skip: !currentId });
+  const { data: carStats    = {} }    = useGetQuery({ path: '/cars/stats',           params: { propertyId: currentId } }, { skip: !currentId });
 
   const unread = notifications.filter((n) => !n.read).length;
 
-  const daysUntilBirthday = (dob) => {
-    const now  = new Date();
-    const bd   = new Date(dob);
-    const next = new Date(now.getFullYear(), bd.getMonth(), bd.getDate());
-    if (next < now) next.setFullYear(next.getFullYear() + 1);
-    return Math.round((next - now) / 86400000);
-  };
+  const birthdays             = empStats.upcomingBirthdays        ?? [];
+  const upcomingVisaExpiries  = empStats.upcomingVisaExpiries     ?? [];
+  const empPassportExpiries   = empStats.upcomingPassportExpiries ?? [];
 
-  const birthdays = useMemo(() =>
-    employees.filter((e) => e.dateOfBirth && daysUntilBirthday(e.dateOfBirth) <= 7),
-    [employees]);
+  const ownerBirthdays        = ownerStats.upcomingBirthdays        ?? [];
+  const ownerPassportExpiries = ownerStats.upcomingPassportExpiries ?? [];
 
-  const ownerBirthdays = useMemo(() =>
-    owners.filter((o) => o.dateOfBirth && daysUntilBirthday(o.dateOfBirth) <= 7),
-    [owners]);
+  const carWarrantyExpiries   = carStats.upcomingWarrantyExpiries ?? [];
+  const carRegAlerts          = carStats.regAlerts                ?? 0;
+  const carInsAlerts          = carStats.insAlerts                ?? 0;
 
   const [propMenuOpen,  setPropMenuOpen]  = useState(false);
   const [addPropOpen,   setAddPropOpen]   = useState(false);
@@ -272,12 +268,23 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
                 if (item.path === '/notifications') {
                   const total = unread + birthdays.length + ownerBirthdays.length;
                   if (total > 0) { badge = total; badgeColor = 'bg-red-500'; }
-                } else if (item.path === '/employees' && birthdays.length > 0) {
-                  badge = birthdays.length;
-                  badgeColor = 'bg-amber-500';
-                } else if (item.path === '/owners' && ownerBirthdays.length > 0) {
-                  badge = ownerBirthdays.length;
-                  badgeColor = 'bg-amber-500';
+                } else if (item.path === '/employees') {
+                  const urgentCount = upcomingVisaExpiries.length + empPassportExpiries.length;
+                  const total = urgentCount + birthdays.length;
+                  if (total > 0) {
+                    badge = total;
+                    badgeColor = urgentCount > 0 ? 'bg-red-500' : 'bg-amber-500';
+                  }
+                } else if (item.path === '/owners') {
+                  const urgentCount = ownerPassportExpiries.length;
+                  const total = urgentCount + ownerBirthdays.length;
+                  if (total > 0) {
+                    badge = total;
+                    badgeColor = urgentCount > 0 ? 'bg-red-500' : 'bg-amber-500';
+                  }
+                } else if (item.path === '/cars') {
+                  const urgentCount = carWarrantyExpiries.length + carRegAlerts + carInsAlerts;
+                  if (urgentCount > 0) { badge = urgentCount; badgeColor = 'bg-red-500'; }
                 }
                 return (
                   <NavItem

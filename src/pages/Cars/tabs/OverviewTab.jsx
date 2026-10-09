@@ -49,7 +49,8 @@ export default function OverviewTab({ car }) {
 
   const regDays = daysUntil(car.registrationExpiry);
   const insDays = daysUntil(car.insuranceExpiry);
-  const hasAlert = (regDays !== null && regDays <= 30) || (insDays !== null && insDays <= 30);
+  const warDays = daysUntil(car.warrantyExpiry);
+  const hasAlert = (regDays !== null && regDays <= 30) || (insDays !== null && insDays <= 30) || (warDays !== null && warDays <= 30);
 
   return (
     <div className="space-y-5">
@@ -106,6 +107,7 @@ export default function OverviewTab({ car }) {
         <div className="space-y-2">
           <ExpiryBadge label="Registration" date={car.registrationExpiry} />
           <ExpiryBadge label="Insurance"    date={car.insuranceExpiry} />
+          <ExpiryBadge label="Warranty"     date={car.warrantyExpiry} />
         </div>
       )}
 
@@ -184,6 +186,22 @@ export default function OverviewTab({ car }) {
             </p>
           </div>
         </Card>
+
+        {/* Warranty */}
+        {(car.warrantyProvider || car.warrantyExpiry || car.warrantyNumber) && (
+          <Card title="Warranty" icon={Shield} iconBg="#f5f3ff">
+            <InfoRow label="Provider"       value={car.warrantyProvider} />
+            <InfoRow label="Warranty No."   value={car.warrantyNumber} />
+            <InfoRow label="Expiry Date"    value={fmtDate(car.warrantyExpiry)} />
+            {car.warrantyNotes && (
+              <div className="mt-3 p-3 rounded-xl bg-purple-50 border border-purple-100">
+                <p className="text-[11px] font-bold text-purple-600 uppercase tracking-wide mb-1">Coverage Notes</p>
+                <p className="text-[12px] text-slate-700 leading-relaxed">{car.warrantyNotes}</p>
+              </div>
+            )}
+            <ExpiryBadge label="Warranty" date={car.warrantyExpiry} />
+          </Card>
+        )}
 
       </div>
     </div>

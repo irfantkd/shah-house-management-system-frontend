@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Edit, AlertCircle, Fuel, Gauge,
-  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, BarChart2, Loader2,
+  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, BarChart2, Loader2, Shield,
 } from 'lucide-react';
 import PageLoader from '../../components/ui/PageLoader';
 import { useGetQuery, usePutMutation } from '../../api/apiSlice';
@@ -82,6 +82,7 @@ export default function CarDetail() {
   const reg     = regStatus(car.registrationExpiry);
   const ins     = regStatus(car.insuranceExpiry);
   const regDays = getDays(car.registrationExpiry);
+  const warDays = car.warrantyExpiry ? getDays(car.warrantyExpiry) : null;
   const backendImages = car.images ?? [];
   const images  = [...backendImages, ...localImages];
   const activeIdx = Math.min(imgIdx, Math.max(images.length - 1, 0));
@@ -130,6 +131,10 @@ export default function CarDetail() {
       insuranceCompany:   car.insuranceCompany   ?? '',
       insurancePolicy:    car.insurancePolicy    ?? '',
       insuranceExpiry:    car.insuranceExpiry    ?? '',
+      warrantyProvider:   car.warrantyProvider   ?? '',
+      warrantyNumber:     car.warrantyNumber     ?? '',
+      warrantyExpiry:     car.warrantyExpiry     ?? '',
+      warrantyNotes:      car.warrantyNotes      ?? '',
       purchaseDate:       car.purchaseDate       ?? '',
       purchasePrice:      car.purchasePrice      ?? 0,
       notes:              car.notes              ?? '',
@@ -221,6 +226,13 @@ export default function CarDetail() {
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Badge variant={reg.variant} dot>{reg.label}</Badge>
                   <Badge variant={ins.variant}>Insurance {ins.label}</Badge>
+                  {warDays !== null && warDays <= 30 && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1"
+                      style={{ background: 'rgba(124,58,237,0.22)', color: '#c4b5fd', border: '1px solid rgba(124,58,237,0.35)' }}>
+                      <Shield className="w-2.5 h-2.5" />
+                      Warranty {warDays <= 0 ? 'Expired' : `${warDays}d`}
+                    </span>
+                  )}
                   {car.nickname && <Badge variant="navy">{car.nickname}</Badge>}
                   {car.status === 'inactive' && (
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/25 text-slate-200 border border-slate-400/30">
@@ -260,6 +272,17 @@ export default function CarDetail() {
                 <AlertCircle className="w-4 h-4 text-red-300 shrink-0" />
                 <p className="text-red-200 text-[12px] font-semibold">
                   Registration expired — renew immediately at RTA to avoid driving fines
+                </p>
+              </div>
+            )}
+            {warDays !== null && warDays <= 30 && (
+              <div className={`mt-3 flex items-center gap-2.5 px-4 py-3 rounded-2xl w-fit ${warDays <= 0 ? 'bg-purple-700/20 border border-purple-500/30' : 'bg-purple-500/15 border border-purple-400/25'}`}>
+                <Shield className="w-4 h-4 shrink-0" style={{ color: '#c4b5fd' }} />
+                <p className="text-[12px] font-semibold" style={{ color: '#ddd6fe' }}>
+                  {warDays <= 0
+                    ? `Vehicle warranty expired ${Math.abs(warDays)} day${Math.abs(warDays) !== 1 ? 's' : ''} ago`
+                    : `Vehicle warranty expires in ${warDays} day${warDays !== 1 ? 's' : ''}`}
+                  {car.warrantyProvider ? ` — ${car.warrantyProvider}` : ''}
                 </p>
               </div>
             )}
@@ -435,6 +458,31 @@ export default function CarDetail() {
                       <label className={LBL_E}>Insurance Expiry</label>
                       <DatePicker value={editForm.insuranceExpiry} onChange={(v) => setF('insuranceExpiry', v)} className={INP_E} />
                     </div>
+                  </div>
+                </Section>
+
+                {/* Warranty */}
+                <Section>
+                  <p className={LBL_E}>Warranty</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={LBL_E}>Warranty Provider</label>
+                      <input value={editForm.warrantyProvider ?? ''} onChange={(e) => setF('warrantyProvider', e.target.value)} className={INP_E} placeholder="e.g. Toyota UAE" />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Warranty Number</label>
+                      <input value={editForm.warrantyNumber ?? ''} onChange={(e) => setF('warrantyNumber', e.target.value)} className={INP_E} placeholder="Warranty ref. no." />
+                    </div>
+                    <div>
+                      <label className={LBL_E}>Warranty Expiry</label>
+                      <DatePicker value={editForm.warrantyExpiry ?? ''} onChange={(v) => setF('warrantyExpiry', v)} className={INP_E} />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <label className={LBL_E}>Warranty Notes</label>
+                    <textarea value={editForm.warrantyNotes ?? ''} onChange={(e) => setF('warrantyNotes', e.target.value)} rows={2}
+                      placeholder="Coverage details, terms, etc."
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white resize-none" />
                   </div>
                 </Section>
 

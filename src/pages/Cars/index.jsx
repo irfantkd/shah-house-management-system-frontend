@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Car, Fuel, AlertTriangle, Plus, Search, User, ChevronRight, Gauge, Camera, X,
-  Wrench, FileBarChart, Edit2, Trash2, Loader2, Power,
+  Wrench, FileBarChart, Edit2, Trash2, Loader2, Power, Shield,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
@@ -41,6 +41,7 @@ const BLANK = {
   driverName: '', driverPhone: '',
   registrationNumber: '', registrationExpiry: '', registrationFee: '',
   insuranceCompany: '', insurancePolicy: '', insuranceExpiry: '',
+  warrantyProvider: '', warrantyNumber: '', warrantyExpiry: '', warrantyNotes: '',
   odometer: '', purchaseDate: '', purchasePrice: '', notes: '',
   status: 'active',
 };
@@ -94,6 +95,7 @@ export default function CarsPage() {
   const fileRefs = useRef({});
 
   // Prefer stats endpoint (loads fast as a separate aggregate), fall back to car list totals.
+  const warrantyExpiries = carStats.upcomingWarrantyExpiries ?? [];
   const totalVehicles = carStats.total          ?? cars.length;
   const alertCount    = carStats.regAlerts      ?? cars.filter((c) => getDays(c.registrationExpiry) <= 30).length;
   const monthlyFuel   = carStats.monthlyFuel    ?? cars.reduce((s, c) => s + (c.thisMonthFuel      ?? 0), 0);
@@ -189,6 +191,10 @@ export default function CarsPage() {
       insuranceCompany: car.insuranceCompany ?? '',
       insurancePolicy: car.insurancePolicy ?? '',
       insuranceExpiry: car.insuranceExpiry ?? '',
+      warrantyProvider: car.warrantyProvider ?? '',
+      warrantyNumber: car.warrantyNumber ?? '',
+      warrantyExpiry: car.warrantyExpiry ?? '',
+      warrantyNotes: car.warrantyNotes ?? '',
       vin: car.vin ?? '', purchaseDate: car.purchaseDate ?? '',
       purchasePrice: car.purchasePrice ?? '', notes: car.notes ?? '',
       status: car.status ?? 'active',
@@ -360,6 +366,36 @@ export default function CarsPage() {
           ))}
         </div>
 
+        {/* Warranty expiry alert banner */}
+        <AnimatePresence>
+          {warrantyExpiries.length > 0 && (
+            <motion.div key="warranty-banner"
+              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              className="rounded-2xl border p-4 flex items-start gap-3"
+              style={{ background: '#f5f3ff', borderColor: '#ddd6fe' }}>
+              <Shield className="w-4 h-4 shrink-0 mt-0.5" style={{ color: '#7c3aed' }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold mb-1.5" style={{ color: '#6d28d9' }}>
+                  {warrantyExpiries.length} vehicle warrant{warrantyExpiries.length > 1 ? 'ies' : 'y'} expiring within 30 days
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {warrantyExpiries.slice(0, 4).map((w) => (
+                    <span key={w.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold"
+                      style={{ background: w.daysUntil <= 0 ? '#ede9fe' : '#ede9fe', color: w.daysUntil <= 0 ? '#7c3aed' : '#7c3aed', border: '1px solid #c4b5fd' }}>
+                      <Shield className="w-2.5 h-2.5" />
+                      {w.nickname || `${w.make} ${w.model}`} — {w.daysUntil <= 0 ? 'Expired' : `${w.daysUntil}d`}
+                    </span>
+                  ))}
+                  {warrantyExpiries.length > 4 && (
+                    <span className="text-[11px] font-semibold" style={{ color: '#7c3aed' }}>+{warrantyExpiries.length - 4} more</span>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Search + Filters */}
         <motion.div {...fade(0.18)} className="flex flex-col gap-3">
           <div className="relative">
@@ -521,6 +557,20 @@ export default function CarsPage() {
             </div>
           </Section>
 
+          <Section label="Warranty">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Warranty Provider" value={form.warrantyProvider} onChange={(v) => set('warrantyProvider', v)} placeholder="e.g. Toyota UAE" />
+              <Field label="Warranty Number" value={form.warrantyNumber} onChange={(v) => set('warrantyNumber', v)} placeholder="Warranty ref. no." />
+              <Field label="Warranty Expiry" value={form.warrantyExpiry} onChange={(v) => set('warrantyExpiry', v)} type="date" />
+            </div>
+            <div className="mt-3">
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Warranty Notes</label>
+              <textarea value={form.warrantyNotes} onChange={(e) => set('warrantyNotes', e.target.value)} rows={2}
+                placeholder="Coverage details, terms, etc."
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
+            </div>
+          </Section>
+
           <div>
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Notes</label>
             <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2}
@@ -612,6 +662,20 @@ export default function CarsPage() {
             </div>
           </Section>
 
+          <Section label="Warranty">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Warranty Provider" value={editForm.warrantyProvider} onChange={(v) => setE('warrantyProvider', v)} placeholder="e.g. Toyota UAE" />
+              <Field label="Warranty Number" value={editForm.warrantyNumber} onChange={(v) => setE('warrantyNumber', v)} placeholder="Warranty ref. no." />
+              <Field label="Warranty Expiry" value={editForm.warrantyExpiry} onChange={(v) => setE('warrantyExpiry', v)} type="date" />
+            </div>
+            <div className="mt-3">
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Warranty Notes</label>
+              <textarea value={editForm.warrantyNotes} onChange={(e) => setE('warrantyNotes', e.target.value)} rows={2}
+                placeholder="Coverage details, terms, etc."
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
+            </div>
+          </Section>
+
           <Section label="Status">
             <div className="flex gap-2">
               {['active', 'inactive'].map((s) => (
@@ -666,6 +730,8 @@ export default function CarsPage() {
 function CarCard({ car, fileRefs, onImageUpload, onEdit, onDelete, onToggleStatus, canDelete }) {
   const reg  = regStatus(car.registrationExpiry);
   const ins  = regStatus(car.insuranceExpiry);
+  const warDays   = car.warrantyExpiry ? getDays(car.warrantyExpiry) : null;
+  const warUrgent = warDays !== null && warDays <= 30;
   // Use the API-supplied per-car totals (computed on the backend from separate collections)
   const fuel = car.thisMonthFuel     ?? 0;
   const exp  = car.thisMonthExpenses ?? 0;
@@ -705,10 +771,26 @@ function CarCard({ car, fileRefs, onImageUpload, onEdit, onDelete, onToggleStatu
 
           {/* Registration alert badge */}
           {regAlert && (
+            <div className="absolute top-4 right-4 flex flex-col items-end gap-1" style={{ zIndex: 10 }}>
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                style={{ background: 'rgba(220,38,38,0.18)', color: '#fca5a5', border: '1px solid rgba(220,38,38,0.30)' }}>
+                <AlertTriangle className="w-2.5 h-2.5" />
+                {reg.days < 0 ? 'Reg. Expired' : `${reg.days}d left`}
+              </div>
+              {warUrgent && (
+                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                  style={{ background: 'rgba(124,58,237,0.22)', color: '#c4b5fd', border: '1px solid rgba(124,58,237,0.35)' }}>
+                  <Shield className="w-2.5 h-2.5" />
+                  {warDays <= 0 ? 'Warranty Exp.' : `Wty ${warDays}d`}
+                </div>
+              )}
+            </div>
+          )}
+          {!regAlert && warUrgent && (
             <div className="absolute top-4 right-4 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
-              style={{ background: 'rgba(220,38,38,0.18)', color: '#fca5a5', border: '1px solid rgba(220,38,38,0.30)', zIndex: 10 }}>
-              <AlertTriangle className="w-2.5 h-2.5" />
-              {reg.days < 0 ? 'Reg. Expired' : `${reg.days}d left`}
+              style={{ background: 'rgba(124,58,237,0.22)', color: '#c4b5fd', border: '1px solid rgba(124,58,237,0.35)', zIndex: 10 }}>
+              <Shield className="w-2.5 h-2.5" />
+              {warDays <= 0 ? 'Warranty Exp.' : `Wty ${warDays}d`}
             </div>
           )}
 
@@ -771,7 +853,7 @@ function CarCard({ car, fileRefs, onImageUpload, onEdit, onDelete, onToggleStatu
             </div>
           </div>
 
-          {/* Registration + Insurance pills */}
+          {/* Registration + Insurance + Warranty pills */}
           <div className="grid grid-cols-2 gap-2">
             {[{ label: 'Registration', s: reg }, { label: 'Insurance', s: ins }].map(({ label, s }) => (
               <div key={label} className="rounded-xl p-2.5" style={{ background: s.bg }}>
@@ -782,6 +864,17 @@ function CarCard({ car, fileRefs, onImageUpload, onEdit, onDelete, onToggleStatu
               </div>
             ))}
           </div>
+          {warDays !== null && (
+            <div className="rounded-xl p-2.5" style={{ background: warDays < 0 ? '#ede9fe' : warDays <= 7 ? '#ede9fe' : '#f5f3ff', border: `1px solid ${warDays <= 7 ? '#c4b5fd' : '#ddd6fe'}` }}>
+              <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: '#7c3aed' }}>Warranty</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <p className="text-[12px] font-bold" style={{ color: '#7c3aed' }}>
+                  {warDays < 0 ? 'Expired' : warDays === 0 ? 'Expires Today' : `${warDays}d left`}
+                </p>
+                {car.warrantyProvider && <p className="text-[10px] text-slate-500 truncate ml-2">{car.warrantyProvider}</p>}
+              </div>
+            </div>
+          )}
 
           {/* Monthly stats footer */}
           <div className="border-t border-slate-100 pt-2.5 flex items-center justify-between">

@@ -6,7 +6,7 @@ import {
   Users, UserPlus, Wallet, Cake, Phone, CalendarDays, BadgeCheck,
   ChevronDown, ChevronUp, Pencil, Banknote, Clock, CheckCircle2,
   AlertCircle, Trash2, ArrowDownLeft, ArrowRight, X, FileText, AlertTriangle,
-  Loader2, Search, ChevronLeft, ChevronRight, Printer, Building2, ShieldAlert,
+  Loader2, Search, ChevronLeft, ChevronRight, Printer, Building2, ShieldAlert, BookOpen,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, useDownloadChallanMutation } from '../../api/apiSlice';
 import DatePicker from '../../components/ui/DatePicker';
@@ -50,7 +50,7 @@ const calcAge     = (dob) => {
 const ROLES   = ['Driver','Housemaid','Cook','Gardener','Security Guard','Nanny','Cleaner','Butler','Handyman','Other'];
 const INP = 'w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-[14px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all';
 const SEL = `${INP} cursor-pointer`;
-const EMP_BLANK  = { name:'', role:'Driver', phone:'', nationality:'', dateOfBirth:'', joinDate:new Date().toISOString().split('T')[0], monthlySalary:'', status:'active', notes:'', visaStartDate:'', visaExpiryDate:'' };
+const EMP_BLANK  = { name:'', role:'Driver', phone:'', nationality:'', dateOfBirth:'', joinDate:new Date().toISOString().split('T')[0], monthlySalary:'', status:'active', notes:'', visaStartDate:'', visaExpiryDate:'', passportNumber:'', passportExpiry:'' };
 
 const visaDaysUntil = (dateStr) => {
   if (!dateStr) return null;
@@ -258,13 +258,15 @@ function PayrollReportModal({ open, onClose, propertyId }) {
 
 // ── Employee Card ─────────────────────────────────────────────────────────────
 function EmployeeCard({ emp, bdayInfo, onEdit, onDelete, onPay, isHistOpen, onToggleHist }) {
-  const color         = avatarColor(emp.name);
-  const grad          = avatarGrad(emp.name);
-  const isActive      = emp.status === 'active';
-  const paidThisMonth = (emp.salaryHistory ?? []).some((p) => p.type === 'salary' && p.month === CUR_MON);
-  const outAdv        = (emp.salaryHistory ?? []).filter((p) => p.type === 'advance' && !p.recovered).reduce((s, p) => s + p.amount, 0);
-  const visaDays      = visaDaysUntil(emp.visaExpiryDate);
-  const visaUrgent    = visaDays !== null && visaDays <= 30;
+  const color           = avatarColor(emp.name);
+  const grad            = avatarGrad(emp.name);
+  const isActive        = emp.status === 'active';
+  const paidThisMonth   = (emp.salaryHistory ?? []).some((p) => p.type === 'salary' && p.month === CUR_MON);
+  const outAdv          = (emp.salaryHistory ?? []).filter((p) => p.type === 'advance' && !p.recovered).reduce((s, p) => s + p.amount, 0);
+  const visaDays        = visaDaysUntil(emp.visaExpiryDate);
+  const visaUrgent      = visaDays !== null && visaDays <= 30;
+  const passportDays    = visaDaysUntil(emp.passportExpiry);
+  const passportUrgent  = passportDays !== null && passportDays <= 30;
 
   return (
     <motion.div layout initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }} transition={{ duration:0.3 }}
@@ -297,6 +299,16 @@ function EmployeeCard({ emp, bdayInfo, onEdit, onDelete, onPay, isHistOpen, onTo
               }}>
               <ShieldAlert className="w-3 h-3" />
               {visaDays !== null && visaDays <= 0 ? 'Visa Expired' : `Visa ${visaDays}d`}
+            </div>
+          )}
+          {passportUrgent && (
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white"
+              style={{
+                background: passportDays !== null && passportDays <= 0 ? '#7f1d1d' : passportDays !== null && passportDays <= 7 ? '#dc2626' : '#0891b2',
+                boxShadow: passportDays !== null && passportDays <= 7 ? '0 2px 8px rgba(220,38,38,0.5)' : '0 2px 8px rgba(8,145,178,0.5)',
+              }}>
+              <BookOpen className="w-3 h-3" />
+              {passportDays !== null && passportDays <= 0 ? 'PP Expired' : `PP ${passportDays}d`}
             </div>
           )}
         </div>
@@ -391,6 +403,23 @@ function EmployeeCard({ emp, bdayInfo, onEdit, onDelete, onPay, isHistOpen, onTo
               </p>
             </div>
           )}
+          {emp.passportExpiry && (
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: passportUrgent ? (passportDays !== null && passportDays <= 7 ? 'rgba(220,38,38,0.1)' : 'rgba(8,145,178,0.1)') : `${color}18` }}>
+                <BookOpen className="w-3.5 h-3.5"
+                  style={{ color: passportUrgent ? (passportDays !== null && passportDays <= 7 ? '#dc2626' : '#0891b2') : color }} />
+              </div>
+              <p className={`text-[13px] font-medium ${passportUrgent ? (passportDays !== null && passportDays <= 7 ? 'text-red-600 font-bold' : 'text-cyan-600 font-bold') : 'text-slate-600'}`}>
+                Passport expires {fmtDate(emp.passportExpiry)}
+                {passportUrgent && passportDays !== null && (
+                  <span className="ml-1 text-[11px]">
+                    {passportDays <= 0 ? '(Expired)' : `(${passportDays}d left)`}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
         </div>
 
         {outAdv > 0 && (
@@ -453,15 +482,17 @@ function EmployeeCard({ emp, bdayInfo, onEdit, onDelete, onPay, isHistOpen, onTo
 
 // ── Employee List Row (mobile swipe) ─────────────────────────────────────────
 function EmployeeListRow({ emp, bdayInfo, onEdit, onDelete, onPay }) {
-  const navigate      = useNavigate();
-  const color         = avatarColor(emp.name);
-  const grad          = avatarGrad(emp.name);
-  const isActive      = emp.status === 'active';
-  const paidThisMonth = (emp.salaryHistory ?? []).some((p) => p.type === 'salary' && p.month === CUR_MON);
-  const outAdv        = (emp.salaryHistory ?? []).filter((p) => p.type === 'advance' && !p.recovered).reduce((s, p) => s + p.amount, 0);
-  const empId         = emp.id ?? emp._id;
-  const visaDays      = visaDaysUntil(emp.visaExpiryDate);
-  const visaUrgent    = visaDays !== null && visaDays <= 30;
+  const navigate        = useNavigate();
+  const color           = avatarColor(emp.name);
+  const grad            = avatarGrad(emp.name);
+  const isActive        = emp.status === 'active';
+  const paidThisMonth   = (emp.salaryHistory ?? []).some((p) => p.type === 'salary' && p.month === CUR_MON);
+  const outAdv          = (emp.salaryHistory ?? []).filter((p) => p.type === 'advance' && !p.recovered).reduce((s, p) => s + p.amount, 0);
+  const empId           = emp.id ?? emp._id;
+  const visaDays        = visaDaysUntil(emp.visaExpiryDate);
+  const visaUrgent      = visaDays !== null && visaDays <= 30;
+  const passportDays    = visaDaysUntil(emp.passportExpiry);
+  const passportUrgent  = passportDays !== null && passportDays <= 30;
 
   return (
     <MotionSwipeableRow
@@ -491,7 +522,7 @@ function EmployeeListRow({ emp, bdayInfo, onEdit, onDelete, onPay }) {
             style={{ background: grad }}>
             {initials(emp.name)}
           </div>
-          {bdayInfo && !visaUrgent && (
+          {bdayInfo && !visaUrgent && !passportUrgent && (
             <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
               style={{ background: '#f59e0b' }}>
               <Cake className="w-2.5 h-2.5 text-white" />
@@ -501,6 +532,12 @@ function EmployeeListRow({ emp, bdayInfo, onEdit, onDelete, onPay }) {
             <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
               style={{ background: visaDays !== null && visaDays <= 7 ? '#dc2626' : '#d97706' }}>
               <ShieldAlert className="w-2.5 h-2.5 text-white" />
+            </div>
+          )}
+          {passportUrgent && !visaUrgent && (
+            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+              style={{ background: passportDays !== null && passportDays <= 7 ? '#dc2626' : '#0891b2' }}>
+              <BookOpen className="w-2.5 h-2.5 text-white" />
             </div>
           )}
         </div>
@@ -524,7 +561,12 @@ function EmployeeListRow({ emp, bdayInfo, onEdit, onDelete, onPay }) {
           )}
           {visaUrgent && (
             <p className={`text-[10px] font-bold mt-0.5 ${visaDays !== null && visaDays <= 7 ? 'text-red-600' : 'text-amber-600'}`}>
-              🪪 Visa {visaDays !== null && visaDays <= 0 ? 'expired' : `exp. ${visaDays}d`}
+              Visa {visaDays !== null && visaDays <= 0 ? 'expired' : `exp. ${visaDays}d`}
+            </p>
+          )}
+          {passportUrgent && (
+            <p className={`text-[10px] font-bold mt-0.5 ${passportDays !== null && passportDays <= 7 ? 'text-red-600' : 'text-cyan-600'}`}>
+              PP {passportDays !== null && passportDays <= 0 ? 'expired' : `exp. ${passportDays}d`}
             </p>
           )}
         </div>
@@ -604,8 +646,9 @@ export default function EmployeesPage() {
     paidThisMonth: empStats.paidThisMonth ?? 0,
     unpaidThisMonth: empStats.unpaidThisMonth ?? 0,
   };
-  const upcomingBirthdays    = empStats.upcomingBirthdays    ?? [];
-  const upcomingVisaExpiries = empStats.upcomingVisaExpiries ?? [];
+  const upcomingBirthdays        = empStats.upcomingBirthdays        ?? [];
+  const upcomingVisaExpiries     = empStats.upcomingVisaExpiries     ?? [];
+  const upcomingPassportExpiries = empStats.upcomingPassportExpiries ?? [];
 
   const setEF = (k, v) => {
     setEmpForm((f) => ({ ...f, [k]: v }));
@@ -797,6 +840,40 @@ export default function EmployeesPage() {
                           : emp.daysUntil === 1
                             ? '— Expires Tomorrow!'
                             : `— Expires in ${emp.daysUntil} days (${fmtDate(emp.visaExpiryDate)})`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Passport expiry banner ── */}
+        <AnimatePresence>
+          {upcomingPassportExpiries.length > 0 && (
+            <motion.div key="passport" initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}>
+              <div className="flex items-start gap-4 px-5 py-4 rounded-3xl"
+                style={{ background:'linear-gradient(135deg,#f0f9ff,#e0f2fe)', border:'1px solid #bae6fd', boxShadow:'0 2px 16px rgba(8,145,178,0.1)' }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: upcomingPassportExpiries.some((e) => e.daysUntil <= 7) ? '#dc2626' : '#0891b2', boxShadow:'0 4px 12px rgba(8,145,178,0.35)' }}>
+                  <BookOpen className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 space-y-1.5">
+                  <p className="text-[11px] font-black text-cyan-900 uppercase tracking-wider">Passport Expiry Alert</p>
+                  {upcomingPassportExpiries.map((emp) => (
+                    <div key={emp.id} className="flex items-center gap-2.5 flex-wrap">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[9px] font-black shrink-0"
+                        style={{ background: avatarGrad(emp.name) }}>
+                        {initials(emp.name)}
+                      </div>
+                      <span className="text-[14px] font-bold text-cyan-950">{emp.name}</span>
+                      <span className={`text-[12px] font-semibold ${emp.daysUntil <= 0 ? 'text-red-700' : emp.daysUntil <= 7 ? 'text-red-600' : 'text-cyan-600'}`}>
+                        {emp.daysUntil <= 0
+                          ? `— Expired ${Math.abs(emp.daysUntil)}d ago — Renew Now!`
+                          : emp.daysUntil === 1
+                            ? '— Expires Tomorrow!'
+                            : `— Expires in ${emp.daysUntil} days (${fmtDate(emp.passportExpiry)})`}
                       </span>
                     </div>
                   ))}
@@ -1178,6 +1255,52 @@ export default function EmployeesPage() {
                           const d = visaDaysUntil(empForm.visaExpiryDate);
                           if (d === null) return null;
                           if (d <= 0)  return <p className="text-[11px] text-red-600 mt-1.5 ml-1 font-bold flex items-center gap-1"><span>⚠</span>Visa expired {Math.abs(d)}d ago — renew immediately</p>;
+                          if (d <= 30) return <p className="text-[11px] text-amber-600 mt-1.5 ml-1 font-bold flex items-center gap-1"><span>⚠</span>Expires in {d} days</p>;
+                          return <p className="text-[11px] text-emerald-600 mt-1.5 ml-1 font-semibold flex items-center gap-1"><span className="w-3.5 h-3.5 inline-flex items-center justify-center rounded-full bg-emerald-100 text-[8px]">✓</span>Valid · {d} days remaining</p>;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-slate-100" />
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Passport</span>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+
+                  {/* ── Section 3b: Passport Information ── */}
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background:'linear-gradient(135deg,#0891b2,#0e7490)' }}>
+                        <BookOpen className="w-3 h-3 text-white" />
+                      </div>
+                      <p className="text-[11px] font-black text-slate-700 uppercase tracking-[0.12em]">Passport Information</p>
+                      <span className="text-[10px] text-slate-300 font-medium">optional</span>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Passport Number</label>
+                        <input value={empForm.passportNumber}
+                          onChange={(e) => setEF('passportNumber', e.target.value)}
+                          placeholder="e.g. A12345678"
+                          className={INP}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Passport Expiry Date</label>
+                        <DatePicker
+                          value={empForm.passportExpiry}
+                          onChange={(v) => setEF('passportExpiry', v)}
+                          className={INP}
+                          minYear={2000}
+                          maxYear={new Date().getFullYear() + 15}
+                        />
+                        {empForm.passportExpiry && (() => {
+                          const d = visaDaysUntil(empForm.passportExpiry);
+                          if (d === null) return null;
+                          if (d <= 0)  return <p className="text-[11px] text-red-600 mt-1.5 ml-1 font-bold flex items-center gap-1"><span>⚠</span>Passport expired {Math.abs(d)}d ago — renew immediately</p>;
                           if (d <= 30) return <p className="text-[11px] text-amber-600 mt-1.5 ml-1 font-bold flex items-center gap-1"><span>⚠</span>Expires in {d} days</p>;
                           return <p className="text-[11px] text-emerald-600 mt-1.5 ml-1 font-semibold flex items-center gap-1"><span className="w-3.5 h-3.5 inline-flex items-center justify-center rounded-full bg-emerald-100 text-[8px]">✓</span>Valid · {d} days remaining</p>;
                         })()}

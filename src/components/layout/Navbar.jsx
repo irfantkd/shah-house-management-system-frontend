@@ -9,7 +9,7 @@ import {
   RiCheckDoubleLine, RiDeleteBin2Line, RiRefreshLine,
   RiCalendarLine, RiToolsLine, RiShieldLine, RiAlertLine,
   RiCarLine, RiCakeLine, RiFileList3Line, RiCheckboxCircleLine,
-  RiNotificationLine,
+  RiNotificationLine, RiPassportLine,
 } from 'react-icons/ri';
 import { selectAuthUser, logoutUser } from '../../store/slices/authSlice';
 import { useGetQuery, usePatchMutation, useDeleteMutation, usePostMutation } from '../../api/apiSlice';
@@ -28,6 +28,8 @@ const NOTIF_CFG = {
   warranty:    { icon: RiShieldLine,         dot: '#7c3aed', bg: '#f5f3ff', color: '#6d28d9', label: 'Warranty'    },
   birthday:    { icon: RiCakeLine,           dot: '#ec4899', bg: '#fdf2f8', color: '#be185d', label: 'Birthday'    },
   car:         { icon: RiCarLine,            dot: '#0891b2', bg: '#ecfeff', color: '#0e7490', label: 'Vehicle'     },
+  passport:    { icon: RiPassportLine,       dot: '#0891b2', bg: '#f0f9ff', color: '#0e7490', label: 'Passport'    },
+  employee:    { icon: RiShieldLine,         dot: '#dc2626', bg: '#fff1f2', color: '#b91c1c', label: 'Visa'        },
   general:     { icon: RiNotificationLine,   dot: '#64748b', bg: '#f8fafc', color: '#475569', label: 'General'     },
 };
 
@@ -62,71 +64,73 @@ function NotifRow({ n, onRead, onDelete }) {
   const cfg  = NOTIF_CFG[n.type] ?? NOTIF_CFG.general;
   const Icon = cfg.icon;
   const dateLabel = fmtDate(n.date);
-  const isUrgent  = n.priority === 'high' && !n.read;
 
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: -6 }}
+      initial={{ opacity: 0, y: -4 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: 20, height: 0, marginBottom: 0 }}
-      transition={{ duration: 0.18 }}
+      exit={{ opacity: 0, x: 24, height: 0, marginBottom: 0 }}
+      transition={{ duration: 0.16 }}
     >
       <Link
         to={n.link || '/notifications'}
         onClick={() => !n.read && onRead(n.id)}
         className={cn(
-          'flex gap-3 px-4 py-3.5 border-b border-slate-50 transition-colors group relative',
-          n.read ? 'hover:bg-slate-50' : 'bg-blue-50/40 hover:bg-blue-50/70',
+          'flex gap-3 px-4 py-3.5 border-b border-slate-50/80 transition-colors group relative',
+          n.read ? 'hover:bg-slate-50/70' : 'bg-slate-50/50 hover:bg-slate-50',
         )}
       >
-        {/* Unread indicator bar */}
+        {/* Priority left stripe */}
         {!n.read && (
-          <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-r-full"
+          <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
             style={{ background: PRIORITY_DOT[n.priority] ?? '#3b82f6' }} />
         )}
 
-        {/* Type icon */}
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-          style={{ background: cfg.bg }}>
-          <Icon className="w-4 h-4" style={{ color: cfg.dot }} />
+        {/* Type icon circle */}
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 shadow-sm"
+          style={{ background: cfg.bg, border: `1px solid ${cfg.dot}22` }}>
+          <Icon className="w-[17px] h-[17px]" style={{ color: cfg.dot }} />
         </div>
 
         <div className="flex-1 min-w-0">
+          {/* Title + dismiss */}
           <div className="flex items-start justify-between gap-1">
-            <p className={cn('text-[12.5px] leading-snug line-clamp-2', n.read ? 'font-medium text-slate-600' : 'font-bold text-slate-800')}>
-              {n.icon && <span className="mr-1">{n.icon}</span>}
+            <p className={cn('text-[12.5px] leading-snug line-clamp-2 pr-1',
+              n.read ? 'font-medium text-slate-500' : 'font-bold text-slate-800')}>
               {n.title}
             </p>
             <button
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(n.id); }}
-              className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded-md flex items-center justify-center text-slate-300 hover:text-danger-500 hover:bg-danger-50 transition-all shrink-0 ml-1 mt-0.5"
+              className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded-md flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all shrink-0 mt-0.5"
             >
               <RiCloseLine className="w-3.5 h-3.5" />
             </button>
           </div>
 
+          {/* Message body */}
           {n.message && (
-            <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{n.message}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1 leading-relaxed">{n.message}</p>
           )}
 
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+          {/* Meta row */}
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
               style={{ background: cfg.bg, color: cfg.color }}>
               {cfg.label}
             </span>
             {n.priority === 'high' && !n.read && (
-              <span className="text-[10px] font-black text-danger-600 bg-danger-50 px-1.5 py-0.5 rounded-md">
-                Urgent
-              </span>
+              <span className="text-[10px] font-black text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Urgent</span>
             )}
             {dateLabel && (
-              <span className={cn('text-[10px] font-semibold', dateLabel.includes('overdue') ? 'text-danger-500' : dateLabel === 'Today' ? 'text-amber-600' : 'text-slate-400')}>
+              <span className={cn('text-[10px] font-semibold',
+                dateLabel.includes('overdue') ? 'text-red-500' :
+                dateLabel === 'Today' || dateLabel === 'Tomorrow' ? 'text-amber-600' : 'text-slate-400')}>
                 {dateLabel}
               </span>
             )}
-            <span className="text-[10px] text-slate-300 ml-auto">{fmtAgo(n.createdAt)}</span>
+            <span className="text-[10px] text-slate-300 ml-auto shrink-0">{fmtAgo(n.createdAt)}</span>
           </div>
         </div>
       </Link>
@@ -241,7 +245,7 @@ export default function Navbar({ onMenuClick }) {
   };
 
   /* Filtered notification list */
-  const TYPES_ORDER = ['contract', 'maintenance', 'repair', 'warranty', 'birthday', 'car', 'general'];
+  const TYPES_ORDER = ['contract', 'maintenance', 'repair', 'warranty', 'birthday', 'car', 'passport', 'employee', 'general'];
   const filtered = notifications.filter((n) => notifFilter === 'all' ? true : n.type === notifFilter).slice(0, 30);
   const typeCounts = {};
   notifications.forEach((n) => { if (!n.read) typeCounts[n.type] = (typeCounts[n.type] ?? 0) + 1; });
@@ -315,131 +319,161 @@ export default function Navbar({ onMenuClick }) {
         {/* ── Notification dropdown ── */}
         <AnimatePresence>
           {notifOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.96 }}
-              transition={{ duration: 0.16, ease: 'easeOut' }}
-              className="absolute right-0 top-12 w-96 bg-white rounded-2xl border border-slate-100 z-50 flex flex-col overflow-hidden"
-              style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.18)', maxHeight: '80vh' }}
-            >
-              {/* Header */}
-              <div className="px-4 py-3.5 border-b border-slate-100 shrink-0">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <RiBellLine className="w-4 h-4 text-navy-700" />
-                    <span className="text-[14px] font-black text-navy-900">Notifications</span>
-                    {unread > 0 && (
-                      <span className={cn(
-                        'text-[10px] font-black px-2 py-0.5 rounded-full',
-                        highCount > 0 ? 'bg-danger-50 text-danger-600' : 'bg-accent-50 text-accent-600',
-                      )}>
-                        {unread} unread
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {/* Refresh alerts */}
-                    <button
-                      onClick={handleGenerate}
-                      title="Refresh alerts from your data"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
-                    >
-                      <RiRefreshLine className={cn('w-3.5 h-3.5', isGenerating && 'animate-spin')} />
-                    </button>
-                    {/* Mark all read */}
-                    {unread > 0 && (
-                      <button
-                        onClick={handleMarkAllRead}
-                        title="Mark all as read"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-accent-50 hover:text-accent-600 transition-all"
-                      >
-                        <RiCheckDoubleLine className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+            <>
+              {/* Mobile backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/20 z-40 sm:hidden"
+                onClick={() => setNotifOpen(false)}
+              />
 
-                {/* Type filter tabs */}
-                <div className="flex gap-1 overflow-x-auto no-scrollbar">
-                  <button
-                    onClick={() => setNotifFilter('all')}
-                    className={cn('px-2.5 h-6 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all shrink-0',
-                      notifFilter === 'all' ? 'bg-navy-900 text-white' : 'text-slate-500 hover:bg-slate-100')}
-                  >
-                    All {unread > 0 && `(${unread})`}
-                  </button>
-                  {TYPES_ORDER.filter((t) => typeCounts[t] > 0).map((type) => {
-                    const cfg = NOTIF_CFG[type];
-                    const Icon = cfg.icon;
-                    return (
-                      <button key={type}
-                        onClick={() => setNotifFilter(notifFilter === type ? 'all' : type)}
-                        className={cn('flex items-center gap-1 px-2.5 h-6 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all shrink-0')}
-                        style={notifFilter === type
-                          ? { background: cfg.dot, color: '#fff' }
-                          : { color: cfg.color, background: cfg.bg }}
-                      >
-                        <Icon className="w-3 h-3 shrink-0" />
-                        {cfg.label}
-                        <span className="font-black">{typeCounts[type]}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Notification list */}
-              <div className="flex-1 overflow-y-auto">
-                <AnimatePresence mode="popLayout" initial={false}>
-                  {filtered.length === 0 ? (
-                    <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="py-12 text-center px-4">
-                      <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                        <RiBellLine className="w-6 h-6 text-slate-200" />
-                      </div>
-                      <p className="text-[13px] font-semibold text-slate-400">All caught up!</p>
-                      <p className="text-[11px] text-slate-300 mt-1">
-                        {notifFilter !== 'all' ? 'No unread in this category' : 'No notifications yet'}
-                      </p>
-                      <button onClick={handleGenerate}
-                        className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-accent-600 hover:text-accent-700 mx-auto">
-                        <RiRefreshLine className={cn('w-3 h-3', isGenerating && 'animate-spin')} />
-                        Refresh alerts
-                      </button>
-                    </motion.div>
-                  ) : (
-                    filtered.map((n) => (
-                      <NotifRow key={n.id} n={n}
-                        onRead={handleMarkRead}
-                        onDelete={handleDelete}
-                      />
-                    ))
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Footer */}
-              <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 shrink-0 flex items-center justify-between">
-                <Link to="/notifications" onClick={() => setNotifOpen(false)}
-                  className="flex items-center gap-1.5 text-[12px] font-bold text-accent-600 hover:text-accent-700 transition-colors">
-                  View all notifications
-                  <RiArrowRightLine className="w-3.5 h-3.5" />
-                </Link>
-                {notifications.filter((n) => n.read).length > 5 && (
-                  <button
-                    onClick={async () => {
-                      try { await deleteMut({ path: `/notifications?propertyId=${propertyId}` }).unwrap(); toast.success('Read notifications cleared'); }
-                      catch { /* silent */ }
-                    }}
-                    className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-danger-500 transition-colors"
-                  >
-                    <RiDeleteBin2Line className="w-3 h-3" />
-                    Clear read
-                  </button>
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                className={cn(
+                  'bg-white border border-slate-100/80 z-50 flex flex-col overflow-hidden',
+                  /* mobile: fixed full-width panel below navbar */
+                  'fixed left-3 right-3 top-[4.25rem] rounded-2xl',
+                  /* desktop: absolute dropdown anchored to bell */
+                  'sm:absolute sm:inset-auto sm:right-0 sm:top-12 sm:w-[22rem]',
                 )}
-              </div>
-            </motion.div>
+                style={{
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)',
+                  maxHeight: 'calc(100vh - 5.5rem)',
+                }}
+              >
+                {/* ── Panel header ── */}
+                <div className="px-4 pt-4 pb-3 border-b border-slate-100 shrink-0">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                        style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)' }}>
+                        <RiBellLine className="w-3.5 h-3.5 text-white" />
+                      </div>
+                      <span className="text-[14px] font-black text-navy-900 tracking-tight">Notifications</span>
+                      {unread > 0 && (
+                        <span className={cn(
+                          'text-[10px] font-black px-2 py-0.5 rounded-full leading-none',
+                          highCount > 0 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600',
+                        )}>
+                          {unread} new
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-0.5">
+                      <button onClick={handleGenerate} title="Refresh alerts"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
+                        <RiRefreshLine className={cn('w-3.5 h-3.5', isGenerating && 'animate-spin')} />
+                      </button>
+                      {unread > 0 && (
+                        <button onClick={handleMarkAllRead} title="Mark all as read"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all">
+                          <RiCheckDoubleLine className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {/* Close — always visible on mobile */}
+                      <button onClick={() => setNotifOpen(false)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all sm:hidden">
+                        <RiCloseLine className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Type filter tabs */}
+                  <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-0.5 px-0.5">
+                    <button
+                      onClick={() => setNotifFilter('all')}
+                      className={cn(
+                        'flex items-center gap-1 px-2.5 h-6 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all shrink-0',
+                        notifFilter === 'all' ? 'bg-navy-900 text-white' : 'text-slate-500 hover:bg-slate-100',
+                      )}
+                    >
+                      All
+                      {unread > 0 && (
+                        <span className={cn('text-[9px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 leading-none',
+                          notifFilter === 'all' ? 'bg-white/20 text-white' : 'bg-red-500 text-white')}>
+                          {unread > 9 ? '9+' : unread}
+                        </span>
+                      )}
+                    </button>
+                    {TYPES_ORDER.filter((t) => typeCounts[t] > 0).map((type) => {
+                      const cfg = NOTIF_CFG[type];
+                      const TIcon = cfg.icon;
+                      const active = notifFilter === type;
+                      return (
+                        <button key={type}
+                          onClick={() => setNotifFilter(active ? 'all' : type)}
+                          className="flex items-center gap-1 px-2 h-6 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all shrink-0"
+                          style={active
+                            ? { background: cfg.dot, color: '#fff' }
+                            : { color: cfg.color, background: cfg.bg }}
+                        >
+                          <TIcon className="w-3 h-3 shrink-0" />
+                          {cfg.label}
+                          <span className="font-black text-[9px]">{typeCounts[type]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ── Notification list ── */}
+                <div className="flex-1 overflow-y-auto overscroll-contain">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    {filtered.length === 0 ? (
+                      <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="py-10 text-center px-4">
+                        <div className="w-11 h-11 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                          <RiBellLine className="w-5 h-5 text-slate-200" />
+                        </div>
+                        <p className="text-[13px] font-semibold text-slate-400">
+                          {notifFilter !== 'all' ? `No ${NOTIF_CFG[notifFilter]?.label} alerts` : 'All caught up!'}
+                        </p>
+                        <p className="text-[11px] text-slate-300 mt-1">
+                          {notifFilter !== 'all' ? 'Switch to All to see everything' : 'No notifications yet'}
+                        </p>
+                        <button onClick={handleGenerate}
+                          className="mt-3 flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-700 mx-auto transition-colors">
+                          <RiRefreshLine className={cn('w-3 h-3', isGenerating && 'animate-spin')} />
+                          Refresh alerts
+                        </button>
+                      </motion.div>
+                    ) : (
+                      filtered.map((n) => (
+                        <NotifRow key={n.id} n={n}
+                          onRead={handleMarkRead}
+                          onDelete={handleDelete}
+                        />
+                      ))
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* ── Panel footer ── */}
+                <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/80 shrink-0 flex items-center justify-between">
+                  <Link to="/notifications" onClick={() => setNotifOpen(false)}
+                    className="flex items-center gap-1.5 text-[12px] font-bold text-blue-600 hover:text-blue-700 transition-colors">
+                    View all
+                    <RiArrowRightLine className="w-3.5 h-3.5" />
+                  </Link>
+                  {notifications.filter((n) => n.read).length > 5 && (
+                    <button
+                      onClick={async () => {
+                        try { await deleteMut({ path: `/notifications?propertyId=${propertyId}` }).unwrap(); toast.success('Cleared'); }
+                        catch { /* silent */ }
+                      }}
+                      className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <RiDeleteBin2Line className="w-3 h-3" />
+                      Clear read
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
       </div>
