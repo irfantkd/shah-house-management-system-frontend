@@ -996,20 +996,20 @@ export default function EmployeesPage() {
             <motion.div key="emp-panel"
               initial={{ x:'100%' }} animate={{ x:0 }} exit={{ x:'100%' }}
               transition={{ type:'spring', damping:28, stiffness:280 }}
-              className="fixed right-0 top-0 h-full w-full max-w-md bg-white z-50 flex flex-col"
+              className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 flex flex-col"
               style={{ boxShadow:'-8px 0 40px rgba(0,0,0,0.2)' }}>
 
               {/* ─ Header with live preview ─ */}
               <div className="relative overflow-hidden shrink-0"
                 style={{ background:'linear-gradient(150deg,#060e1e,#0a172e,#0c2145)' }}>
-                {/* Decorative rings */}
-                <div style={{ position:'absolute', top:-50, right:-50, width:200, height:200, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.04)', pointerEvents:'none' }} />
-                <div style={{ position:'absolute', top:-25, right:-25, width:120, height:120, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.07)', pointerEvents:'none' }} />
-                <div style={{ position:'absolute', bottom:-20, left:-20, width:100, height:100, borderRadius:'50%', background:'rgba(30,58,110,0.4)', pointerEvents:'none' }} />
+                {/* Decorative rings — hidden on mobile to save space */}
+                <div className="hidden sm:block" style={{ position:'absolute', top:-50, right:-50, width:200, height:200, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.04)', pointerEvents:'none' }} />
+                <div className="hidden sm:block" style={{ position:'absolute', top:-25, right:-25, width:120, height:120, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.07)', pointerEvents:'none' }} />
+                <div className="hidden sm:block" style={{ position:'absolute', bottom:-20, left:-20, width:100, height:100, borderRadius:'50%', background:'rgba(30,58,110,0.4)', pointerEvents:'none' }} />
 
-                <div className="relative px-6 pt-5 pb-6" style={{ zIndex:5 }}>
+                <div className="relative px-5 pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-6" style={{ zIndex:5 }}>
                   {/* Top bar */}
-                  <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center justify-between mb-3 sm:mb-5">
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color:'rgba(255,255,255,0.35)' }}>
                         {empDrawer === 'add' ? 'New Staff Member' : 'Edit Staff Member'}
@@ -1024,8 +1024,8 @@ export default function EmployeesPage() {
                     </button>
                   </div>
 
-                  {/* Live preview card */}
-                  <div className="flex items-center gap-4 p-4 rounded-2xl"
+                  {/* Live preview card — hidden on small screens to save vertical space */}
+                  <div className="hidden sm:flex items-center gap-4 p-4 rounded-2xl"
                     style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.09)' }}>
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-[18px] font-black shrink-0"
                       style={{
@@ -1059,7 +1059,7 @@ export default function EmployeesPage() {
               </div>
 
               {/* ─ Scrollable form body ─ */}
-              <form onSubmit={handleSaveEmp} className="flex-1 overflow-y-auto" style={{ scrollbarWidth:'thin' }}>
+              <form onSubmit={handleSaveEmp} className="flex-1 overflow-y-auto overscroll-contain" style={{ scrollbarWidth:'thin', WebkitOverflowScrolling:'touch' }}>
                 <div className="px-6 py-5 space-y-6">
 
                   {/* ── Section 1: Personal Information ── */}
@@ -1111,7 +1111,7 @@ export default function EmployeesPage() {
                       </div>
 
                       {/* Nationality + Phone */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-[11px] font-bold text-slate-500 mb-1.5">Nationality</label>
                           <input value={empForm.nationality}
@@ -1153,7 +1153,7 @@ export default function EmployeesPage() {
 
                     <div className="space-y-4">
                       {/* Role + Status */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-[11px] font-bold text-slate-500 mb-1.5">
                             Role <span className="text-red-500">*</span>
