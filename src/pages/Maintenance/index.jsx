@@ -22,6 +22,7 @@ import {
   RiPlayLine,
   RiArrowRightSLine,
   RiArrowLeftSLine,
+  RiArrowDownSLine,
   RiCheckboxCircleLine,
   RiPauseCircleLine,
   RiCloseCircleLine,
@@ -253,6 +254,116 @@ function fmtDate(s) {
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   return Math.ceil((new Date(dateStr + "T00:00:00") - new Date()) / 86400000);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MobileSelect — custom animated dropdown for mobile filters
+// ─────────────────────────────────────────────────────────────────────────────
+function MobileSelect({ value, onChange, options, onAddNew }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value) ?? options[0];
+  return (
+    <div className="relative">
+      <motion.button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        whileTap={{ scale: 0.98 }}
+        className="w-full h-12 flex items-center gap-2.5 px-4 rounded-2xl border bg-white text-left transition-all"
+        style={{
+          borderColor: open ? '#0b1d3a' : '#e2e8f0',
+          boxShadow: open
+            ? '0 0 0 3px rgba(11,29,58,0.08), 0 1px 3px rgba(0,0,0,0.05)'
+            : '0 1px 3px rgba(0,0,0,0.05)',
+        }}
+      >
+        {selected.hex && (
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: selected.hex }} />
+        )}
+        {selected.Icon && (
+          <selected.Icon className="w-4 h-4 shrink-0" style={{ color: selected.hex }} strokeWidth={1.5} />
+        )}
+        <span className="flex-1 text-[15px] font-semibold text-slate-800 truncate">{selected.label}</span>
+        {selected.count != null && (
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
+            {selected.count}
+          </span>
+        )}
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }} className="shrink-0">
+          <RiArrowDownSLine className="w-5 h-5 text-slate-400" />
+        </motion.span>
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-40"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              className="absolute left-0 right-0 mt-2 z-50 bg-white rounded-2xl border border-slate-100 overflow-hidden"
+              style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)' }}
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+            >
+              <div className="max-h-72 overflow-y-auto overscroll-contain">
+                {options.map((opt, i) => {
+                  const isActive = opt.value === value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { onChange(opt.value); setOpen(false); }}
+                      className={cn(
+                        'w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors',
+                        i < options.length - 1 && 'border-b border-slate-50',
+                        isActive ? 'bg-navy-900' : 'hover:bg-slate-50 active:bg-slate-100',
+                      )}
+                    >
+                      {opt.hex && (
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ background: isActive ? 'rgba(255,255,255,0.55)' : opt.hex }} />
+                      )}
+                      {opt.Icon && (
+                        <opt.Icon className="w-4 h-4 shrink-0"
+                          style={{ color: isActive ? 'rgba(255,255,255,0.75)' : opt.hex }} strokeWidth={1.5} />
+                      )}
+                      <span className={cn('flex-1 text-[14px] font-semibold truncate',
+                        isActive ? 'text-white' : 'text-slate-700')}>
+                        {opt.label}
+                      </span>
+                      {opt.count != null && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                          style={isActive
+                            ? { background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)' }
+                            : { background: '#f1f5f9', color: '#64748b' }}>
+                          {opt.count}
+                        </span>
+                      )}
+                      {isActive && <RiCheckLine className="w-4 h-4 text-white shrink-0 ml-1" />}
+                    </button>
+                  );
+                })}
+                {onAddNew && (
+                  <button
+                    type="button"
+                    onClick={() => { onAddNew(); setOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left border-t border-slate-100 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                  >
+                    <RiAddCircleLine className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="text-[14px] font-semibold text-slate-500">Add Category</span>
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -585,13 +696,45 @@ export default function MaintenancePage() {
       </div>
 
       {/* ── Category tabs ── */}
-      <div className="flex items-center gap-2 flex-wrap">
+
+      {/* Mobile: custom dropdown */}
+      <div className="sm:hidden space-y-2">
+        <MobileSelect
+          value={catTab}
+          onChange={(v) => { setCatTab(v); setStatusFilter("all"); }}
+          onAddNew={() => setNewCatInput(true)}
+          options={[
+            { value: 'all', label: 'All Tasks', count: stats.total, hex: '#0b1d3a', Icon: ClipboardList },
+            ...categories.map((cat) => {
+              const cfg = getCatCfg(cat, categories);
+              return { value: cat, label: cat, count: stats.byCategory[cat] ?? 0, hex: cfg.hex, Icon: cfg.Icon };
+            }),
+          ]}
+        />
+        {newCatInput && (
+          <div className="flex items-center gap-2 p-3 bg-white rounded-2xl border border-slate-200 shadow-sm">
+            <input
+              autoFocus
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAddCat();
+                if (e.key === 'Escape') { setNewCatInput(false); setNewCatName(''); }
+              }}
+              placeholder="Category name…"
+              className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-[16px] focus:outline-none focus:border-navy-400"
+            />
+            <button onClick={handleAddCat} className="h-10 px-4 rounded-xl bg-navy-900 text-white text-[13px] font-bold">Add</button>
+            <button onClick={() => { setNewCatInput(false); setNewCatName(''); }} className="h-10 w-10 rounded-xl border border-slate-200 text-slate-400 flex items-center justify-center text-[16px]">✕</button>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: tab buttons */}
+      <div className="hidden sm:flex items-center gap-2 flex-wrap">
         {/* All */}
         <button
-          onClick={() => {
-            setCatTab("all");
-            setStatusFilter("all");
-          }}
+          onClick={() => { setCatTab("all"); setStatusFilter("all"); }}
           className={cn(
             "flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold border transition-all",
             catTab === "all"
@@ -600,14 +743,10 @@ export default function MaintenancePage() {
           )}
         >
           All Tasks
-          <span
-            className={cn(
-              "text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center",
-              catTab === "all"
-                ? "bg-white/20 text-white"
-                : "bg-slate-100 text-slate-500",
-            )}
-          >
+          <span className={cn(
+            "text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center",
+            catTab === "all" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500",
+          )}>
             {stats.total}
           </span>
         </button>
@@ -620,30 +759,19 @@ export default function MaintenancePage() {
           return (
             <button
               key={cat}
-              onClick={() => {
-                setCatTab(cat);
-                setStatusFilter("all");
-              }}
+              onClick={() => { setCatTab(cat); setStatusFilter("all"); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold border transition-all"
-              style={
-                active
-                  ? { background: cfg.hex, color: "#fff", borderColor: cfg.hex }
-                  : {
-                      background: "#fff",
-                      color: "#64748b",
-                      borderColor: "#e2e8f0",
-                    }
-              }
+              style={active
+                ? { background: cfg.hex, color: "#fff", borderColor: cfg.hex }
+                : { background: "#fff", color: "#64748b", borderColor: "#e2e8f0" }}
             >
               <cfg.Icon className="w-4 h-4" strokeWidth={1.5} />
               {cat}
               <span
                 className="text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center"
-                style={
-                  active
-                    ? { background: "rgba(255,255,255,0.25)", color: "#fff" }
-                    : { background: "#f1f5f9", color: "#64748b" }
-                }
+                style={active
+                  ? { background: "rgba(255,255,255,0.25)", color: "#fff" }
+                  : { background: "#f1f5f9", color: "#64748b" }}
               >
                 {count}
               </span>
@@ -667,29 +795,13 @@ export default function MaintenancePage() {
               onChange={(e) => setNewCatName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleAddCat();
-                if (e.key === "Escape") {
-                  setNewCatInput(false);
-                  setNewCatName("");
-                }
+                if (e.key === "Escape") { setNewCatInput(false); setNewCatName(""); }
               }}
               placeholder="Category name…"
               className="h-9 w-36 px-3 rounded-xl border border-slate-300 text-[13px] focus:outline-none focus:border-navy-400"
             />
-            <button
-              onClick={handleAddCat}
-              className="h-9 px-3 rounded-xl bg-navy-900 text-white text-[12px] font-bold hover:bg-navy-800 transition-colors"
-            >
-              Add
-            </button>
-            <button
-              onClick={() => {
-                setNewCatInput(false);
-                setNewCatName("");
-              }}
-              className="h-9 px-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-600 text-[12px] transition-colors"
-            >
-              ✕
-            </button>
+            <button onClick={handleAddCat} className="h-9 px-3 rounded-xl bg-navy-900 text-white text-[12px] font-bold hover:bg-navy-800 transition-colors">Add</button>
+            <button onClick={() => { setNewCatInput(false); setNewCatName(""); }} className="h-9 px-2.5 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-600 text-[12px] transition-colors">✕</button>
           </div>
         )}
       </div>
@@ -775,7 +887,24 @@ export default function MaintenancePage() {
 
       {/* ── Toolbar ── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex gap-2 overflow-x-auto pb-0.5 w-full sm:w-auto">
+        {/* Mobile: status dropdown */}
+        <div className="sm:hidden w-full">
+          <MobileSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: 'all',         label: 'All',         count: stats.total,      hex: '#64748b' },
+              { value: 'scheduled',   label: 'Scheduled',   count: stats.scheduled,  hex: '#0b1d3a' },
+              { value: 'in-progress', label: 'In Progress', count: stats.inProgress, hex: '#d97706' },
+              { value: 'on-hold',     label: 'On Hold',     count: stats.onHold,     hex: '#9333ea' },
+              { value: 'overdue',     label: 'Overdue',     count: stats.overdue,    hex: '#dc2626' },
+              { value: 'completed',   label: 'Completed',   count: stats.completed,  hex: '#16a34a' },
+            ]}
+          />
+        </div>
+
+        {/* Desktop: status tab buttons */}
+        <div className="hidden sm:flex gap-2 overflow-x-auto pb-0.5 w-full sm:w-auto">
           {[
             ["all", "All", stats.total],
             ["scheduled", "Scheduled", stats.scheduled],
@@ -795,14 +924,10 @@ export default function MaintenancePage() {
               )}
             >
               {l}
-              <span
-                className={cn(
-                  "text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1",
-                  statusFilter === v
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-100 text-slate-500",
-                )}
-              >
+              <span className={cn(
+                "text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1",
+                statusFilter === v ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500",
+              )}>
                 {count}
               </span>
             </button>

@@ -97,6 +97,99 @@ function PaginationBar({ page, pages, onPage }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MobileSelect — custom animated dropdown for mobile filters
+// ─────────────────────────────────────────────────────────────────────────────
+function MobileSelect({ value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value) ?? options[0];
+  return (
+    <div className="relative">
+      <motion.button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        whileTap={{ scale: 0.98 }}
+        className="w-full h-11 flex items-center gap-2.5 px-3.5 rounded-2xl border bg-white text-left transition-all"
+        style={{
+          borderColor: open ? '#0b1d3a' : '#e2e8f0',
+          boxShadow: open
+            ? '0 0 0 3px rgba(11,29,58,0.08), 0 1px 3px rgba(0,0,0,0.05)'
+            : '0 1px 3px rgba(0,0,0,0.05)',
+        }}
+      >
+        {selected.hex && (
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: selected.hex }} />
+        )}
+        <span className="flex-1 text-[14px] font-semibold text-slate-800 truncate">{selected.label}</span>
+        {selected.count != null && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 shrink-0">
+            {selected.count}
+          </span>
+        )}
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }} className="shrink-0">
+          <RiArrowDownSLine className="w-4 h-4 text-slate-400" />
+        </motion.span>
+      </motion.button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-40"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              className="absolute left-0 right-0 mt-2 z-50 bg-white rounded-2xl border border-slate-100 overflow-hidden"
+              style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06)' }}
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+            >
+              <div className="max-h-64 overflow-y-auto overscroll-contain">
+                {options.map((opt, i) => {
+                  const isActive = opt.value === value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { onChange(opt.value); setOpen(false); }}
+                      className={cn(
+                        'w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors',
+                        i < options.length - 1 && 'border-b border-slate-50',
+                        isActive ? 'bg-navy-900' : 'hover:bg-slate-50 active:bg-slate-100',
+                      )}
+                    >
+                      {opt.hex && (
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ background: isActive ? 'rgba(255,255,255,0.55)' : opt.hex }} />
+                      )}
+                      <span className={cn('flex-1 text-[14px] font-semibold truncate',
+                        isActive ? 'text-white' : 'text-slate-700')}>
+                        {opt.label}
+                      </span>
+                      {opt.count != null && (
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                          style={isActive
+                            ? { background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)' }
+                            : { background: '#f1f5f9', color: '#64748b' }}>
+                          {opt.count}
+                        </span>
+                      )}
+                      {isActive && <RiCheckLine className="w-4 h-4 text-white shrink-0 ml-1" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function MobileRepairRow({ repair: r, onClick }) {
   const accent  = PRIORITY_HEX[r.priority]  ?? '#c88000';
   const pBadge  = PRIORITY_BADGE[r.priority] ?? PRIORITY_BADGE.medium;
@@ -290,7 +383,39 @@ export default function RepairsPage() {
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+
+        {/* Mobile: status + priority custom dropdowns */}
+        <div className="sm:hidden flex gap-2 w-full">
+          <div className="flex-1">
+            <MobileSelect
+              value={tab}
+              onChange={setTab}
+              options={[
+                { value: 'all',              label: 'All',            count: stats.total,      hex: '#64748b' },
+                { value: 'reported',         label: 'Reported',       count: stats.reported,   hex: '#d97706' },
+                { value: 'in-progress',      label: 'In Progress',    count: stats.inProgress, hex: '#0b1d3a' },
+                { value: 'awaiting-parts',   label: 'Awaiting Parts', count: stats.awaiting,   hex: '#9333ea' },
+                { value: 'completed',        label: 'Completed',      count: stats.completed,  hex: '#16a34a' },
+              ]}
+            />
+          </div>
+          <div className="flex-1">
+            <MobileSelect
+              value={pri}
+              onChange={setPri}
+              options={[
+                { value: 'all',      label: 'All Priority', hex: '#64748b' },
+                { value: 'critical', label: 'Critical',     hex: '#dc2626' },
+                { value: 'high',     label: 'High',         hex: '#ea580c' },
+                { value: 'medium',   label: 'Medium',       hex: '#c88000' },
+                { value: 'low',      label: 'Low',          hex: '#64748b' },
+              ]}
+            />
+          </div>
+        </div>
+
+        {/* Desktop: tab buttons */}
+        <div className="hidden sm:flex gap-2 overflow-x-auto pb-1">
           {[['all','All'], ['reported','Reported'], ['in-progress','In Progress'], ['awaiting-parts','Awaiting Parts'], ['completed','Completed']].map(([v, l]) => {
             const count = statusTabCounts[v] ?? 0;
             return (
@@ -304,8 +429,10 @@ export default function RepairsPage() {
             );
           })}
         </div>
+
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex gap-1.5 overflow-x-auto">
+          {/* Desktop: priority buttons */}
+          <div className="hidden sm:flex gap-1.5 overflow-x-auto">
             {['all', ...PRIORITIES].map((p) => (
               <button key={p} onClick={() => setPri(p)}
                 className={cn('px-3 py-1.5 rounded-lg text-[11px] font-bold border capitalize transition-all whitespace-nowrap',
