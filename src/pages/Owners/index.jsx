@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,7 +21,7 @@ const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
-  '#2563eb','#7c3aed','#059669','#dc2626',
+  '#0b1d3a','#7c3aed','#059669','#dc2626',
   '#d97706','#0891b2','#db2777','#16a34a',
 ];
 const avatarColor = (name = '') => {
@@ -109,7 +109,7 @@ function OwnerCard({ own, bday, onEdit, onDelete }) {
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ duration: 0.3 }}
       className="group rounded-3xl overflow-hidden bg-white flex flex-col"
-      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)' }}>
+      style={{ boxShadow: 'var(--shadow-modal)' }}>
 
       <div className="relative px-5 pt-4 pb-4 overflow-hidden"
         style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
@@ -257,10 +257,10 @@ function OwnerListRow({ own, bday, onEdit, onDelete }) {
       transition={{ duration: 0.22 }}
       onSwipeRight={onEdit}
       onSwipeLeft={onDelete}
-      leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
+      leftIcon={<Pencil style={{ color: '#9a6500', width: 20, height: 20 }} />}
       leftLabel="Edit"
-      leftBg="#eff6ff"
-      leftColor="#2563eb"
+      leftBg="#fffdf0"
+      leftColor="#9a6500"
       rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
       rightLabel="Delete"
       rightBg="#fef2f2"
@@ -499,7 +499,7 @@ export default function OwnersPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name…"
-            className="w-full h-10 pl-10 pr-4 rounded-2xl border border-slate-200 bg-white text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all" />
+            className="w-full h-10 pl-10 pr-4 rounded-2xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all" />
           {search && (
             <button onClick={() => setSearch('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -518,7 +518,7 @@ export default function OwnersPage() {
                   <span>← Swipe to edit or delete →</span>
                 </p>
                 <div className="rounded-2xl border border-slate-100 overflow-hidden bg-white divide-y divide-slate-50"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <AnimatePresence>
                     {owners.map((own) => (
                       <OwnerListRow
@@ -585,7 +585,7 @@ export default function OwnersPage() {
               initial={{ x:'100%' }} animate={{ x:0 }} exit={{ x:'100%' }}
               transition={{ type:'spring', damping:28, stiffness:280 }}
               className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 flex flex-col"
-              style={{ boxShadow:'-8px 0 40px rgba(0,0,0,0.2)' }}>
+              style={{ boxShadow:'-8px 0 40px rgba(11,29,58,0.20)' }}>
 
               {/* ─ Rich gradient header with live preview ─ */}
               <div className="relative overflow-hidden shrink-0"
@@ -870,7 +870,7 @@ export default function OwnersPage() {
               transition={{ type:'spring', damping:26, stiffness:320 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl p-7 w-full max-w-xs pointer-events-auto text-center"
-                style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
                 <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
                   <Trash2 className="w-7 h-7 text-red-500" />
                 </div>

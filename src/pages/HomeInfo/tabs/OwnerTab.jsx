@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Phone, Mail, MessageCircle, Pencil, Copy, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -7,7 +7,7 @@ import { selectCurrentPropertyId } from '../../../store/slices/propertiesSlice';
 import Card, { CardHeader } from '../../../components/ui/Card';
 import Badge from '../../../components/ui/Badge';
 
-const INP = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-navy-400 focus:ring-2 focus:ring-navy-100 outline-none transition-all bg-white';
+const INP = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[16px] sm:text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-navy-400 focus:ring-2 focus:ring-navy-100 outline-none transition-all bg-white';
 const LBL = 'block text-[10.5px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider';
 
 const TITLES = ['Mr', 'Mrs', 'Ms', 'Dr', 'Eng', 'H.H.', 'Sheikh'];

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -26,7 +26,7 @@ import { cn } from '../../utils/cn';
 
 // ── Constants (shared config) ────────────────────────────────────────────────
 const STATUS_CFG = {
-  scheduled:     { label: 'Scheduled',   hex: '#2563eb', bg: 'rgba(37,99,235,0.12)',   color: '#1d4ed8',  border: '1px solid rgba(37,99,235,0.22)'  },
+  scheduled:     { label: 'Scheduled',   hex: '#0b1d3a', bg: 'rgba(11,29,58,0.10)',   color: '#6b95d4',  border: '1px solid rgba(11,29,58,0.20)'   },
   'in-progress': { label: 'In Progress', hex: '#d97706', bg: 'rgba(234,88,12,0.13)',   color: '#c2410c',  border: '1px solid rgba(234,88,12,0.24)'   },
   'on-hold':     { label: 'On Hold',     hex: '#9333ea', bg: 'rgba(147,51,234,0.12)',  color: '#7e22ce',  border: '1px solid rgba(147,51,234,0.22)'  },
   overdue:       { label: 'Overdue',     hex: '#dc2626', bg: 'rgba(220,38,38,0.14)',   color: '#b91c1c',  border: '1px solid rgba(220,38,38,0.26)'   },
@@ -36,7 +36,7 @@ const STATUS_CFG = {
 const PRIORITY_CFG = {
   critical: { label: 'Critical', hex: '#dc2626' },
   high:     { label: 'High',     hex: '#ea580c' },
-  medium:   { label: 'Medium',   hex: '#2563eb' },
+  medium:   { label: 'Medium',   hex: '#c88000' },
   low:      { label: 'Low',      hex: '#64748b' },
 };
 const NEXT_STATUSES = {
@@ -355,7 +355,7 @@ export default function TaskDetail() {
 
       {/* Notes */}
       {task.notes && (
-        <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: 'var(--shadow-card)' }}>
           <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase mb-2">Notes</p>
           <p className="text-[13px] text-slate-700 leading-relaxed whitespace-pre-wrap">{task.notes}</p>
         </div>
@@ -370,7 +370,7 @@ export default function TaskDetail() {
       )}
 
       {/* ── Expenses ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <p className="text-[14px] font-bold text-slate-900">Expenses</p>
@@ -455,7 +455,7 @@ export default function TaskDetail() {
 // ── Small re-usable info card ────────────────────────────────────────────────
 function InfoCard({ icon: Icon, label, children }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+    <div className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
       <div className="flex items-center gap-2 mb-2">
         <Icon className="w-3.5 h-3.5 text-slate-300" />
         <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">{label}</p>
@@ -465,7 +465,7 @@ function InfoCard({ icon: Icon, label, children }) {
   );
 }
 
-const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 
 // ── Complete Modal ────────────────────────────────────────────────────────────
 function CompleteModal({ open, task, onClose, onConfirm }) {
@@ -559,7 +559,7 @@ function ExpenseModal({ open, task, homeWallet, vehicleWallet, onClose, onSave }
         <FormGrid>
           <Field label="Category">
             <select {...register('category')}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-navy-400 bg-white">
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-navy-400 bg-white">
               {EXPENSE_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>

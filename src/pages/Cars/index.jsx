@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -321,7 +321,7 @@ export default function CarsPage() {
       {/* ── View toggle ── */}
       <motion.div {...fade(0.03)}>
         <div className="inline-flex gap-1 bg-white border border-slate-200 rounded-xl p-1"
-          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          style={{ boxShadow: 'var(--shadow-card)' }}>
           <button onClick={() => setView('fleet')}
             className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all',
               view === 'fleet' ? 'bg-navy-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800')}>
@@ -348,13 +348,13 @@ export default function CarsPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'Total Vehicles',     value: totalVehicles, icon: Car,          color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', sub: `${carStats.active ?? cars.filter(c => c.status === 'active').length} active` },
+            { label: 'Total Vehicles',     value: totalVehicles, icon: Car,          color: '#c88000', bg: '#fffdf0', border: '#fde68a', sub: `${carStats.active ?? cars.filter(c => c.status === 'active').length} active` },
             { label: 'Reg. Alerts',        value: alertCount,   icon: AlertTriangle, color: '#dc2626', bg: '#fef2f2', border: '#fecaca', sub: 'Expiring within 30 days' },
             { label: 'Total Fuel Cost',    value: `AED ${totalFuelAll.toLocaleString('en-AE', { maximumFractionDigits: 0 })}`, icon: Fuel,  color: '#d97706', bg: '#fffbeb', border: '#fde68a', sub: `AED ${monthlyFuel.toFixed(0)} this month` },
             { label: 'Total Expenses',     value: `AED ${totalExpAll.toLocaleString('en-AE',  { maximumFractionDigits: 0 })}`, icon: Gauge, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', sub: `AED ${monthlyExp.toLocaleString()} this month` },
           ].map((s, i) => (
             <motion.div key={s.label} {...fade(0.05 + i * 0.05)}>
-              <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: s.border, boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+              <div className="bg-white rounded-2xl p-5 border" style={{ borderColor: s.border, boxShadow: 'var(--shadow-card)' }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
                   <s.icon className="w-5 h-5" style={{ color: s.color }} />
                 </div>
@@ -402,7 +402,7 @@ export default function CarsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by make, model, plate or driver…"
-              className="w-full pl-9 pr-9 h-10 rounded-xl border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500" />
+              className="w-full pl-9 pr-9 h-10 rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500" />
             {search && (
               <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                 <X className="w-3.5 h-3.5" />
@@ -455,14 +455,14 @@ export default function CarsPage() {
                     key={car.id}
                     {...fade(0.05 + i * 0.04)}
                     className="rounded-3xl overflow-hidden"
-                    style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.10)' }}
+                    style={{ boxShadow: 'var(--shadow-modal)' }}
                     onSwipeRight={() => openEdit(car)}
                     onSwipeLeft={() => canDelete
                       ? setDeleteCar(car)
                       : toast('Remove all expense, fuel & maintenance records first', { icon: '⚠️' })
                     }
-                    leftIcon={<Edit2  style={{ color: '#2563eb', width: 20, height: 20 }} />}
-                    leftLabel="Edit"   leftBg="#eff6ff"  leftColor="#2563eb"
+                    leftIcon={<Edit2  style={{ color: '#9a6500', width: 20, height: 20 }} />}
+                    leftLabel="Edit"   leftBg="#fffdf0"  leftColor="#9a6500"
                     rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
                     rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                   >
@@ -567,7 +567,7 @@ export default function CarsPage() {
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Warranty Notes</label>
               <textarea value={form.warrantyNotes} onChange={(e) => set('warrantyNotes', e.target.value)} rows={2}
                 placeholder="Coverage details, terms, etc."
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
             </div>
           </Section>
 
@@ -575,7 +575,7 @@ export default function CarsPage() {
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Notes</label>
             <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2}
               placeholder="Any additional notes…"
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
           </div>
 
           <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
@@ -672,7 +672,7 @@ export default function CarsPage() {
               <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Warranty Notes</label>
               <textarea value={editForm.warrantyNotes} onChange={(e) => setE('warrantyNotes', e.target.value)} rows={2}
                 placeholder="Coverage details, terms, etc."
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
             </div>
           </Section>
 
@@ -694,7 +694,7 @@ export default function CarsPage() {
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Notes</label>
             <textarea value={editForm.notes} onChange={(e) => setE('notes', e.target.value)} rows={2}
               placeholder="Any additional notes…"
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
           </div>
 
           <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
@@ -736,7 +736,7 @@ function CarCard({ car, fileRefs, onImageUpload, onEdit, onDelete, onToggleStatu
   const fuel = car.thisMonthFuel     ?? 0;
   const exp  = car.thisMonthExpenses ?? 0;
   const hasImg   = car.images?.[0];
-  const accent   = car.color || '#2563eb';
+  const accent   = car.color || '#1e3a6e';
   const makeInits = car.make.substring(0, 2).toUpperCase();
   const regAlert  = reg.days < 0 || reg.days <= 30;
   const isActive  = car.status !== 'inactive';
@@ -951,7 +951,7 @@ function Section({ label, children }) {
 }
 
 function Field({ label, value, onChange, type = 'text', placeholder, required, options, span2, error, onClearError }) {
-  const base = 'w-full h-10 px-3 rounded-xl border text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 transition-colors';
+  const base = 'w-full h-10 px-3 rounded-xl border text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 transition-colors';
   const cls  = error
     ? `${base} border-red-400 focus:ring-red-400/30 focus:border-red-400`
     : `${base} border-slate-200 focus:ring-accent-500/30 focus:border-accent-500`;

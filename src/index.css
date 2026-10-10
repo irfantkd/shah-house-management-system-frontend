@@ -4,7 +4,7 @@
   /* Font */
   --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
-  /* Navy palette */
+  /* Navy palette — sidebar, headers, primary CTAs */
   --color-navy-950: #040e1d;
   --color-navy-900: #0b1d3a;
   --color-navy-800: #0f2648;
@@ -15,20 +15,74 @@
   --color-navy-300: #6b95d4;
   --color-navy-200: #a8c2e8;
   --color-navy-100: #dce8f5;
-  --color-navy-50: #f0f5fb;
+  --color-navy-50:  #f0f5fb;
 
-  /* Cream */
-  --color-cream-50: #fafaf7;
+  /* Cream — page background */
+  --color-cream-50:  #fafaf7;
   --color-cream-100: #f4f4ee;
   --color-cream-200: #e8e8de;
 
-  /* Accent blue */
-  --color-accent-50:  #eff6ff;
-  --color-accent-100: #dbeafe;
-  --color-accent-200: #bfdbfe;
-  --color-accent-500: #3b82f6;
-  --color-accent-600: #2563eb;
-  --color-accent-700: #1d4ed8;
+  /* ══ GOLD ACCENT — change only these values to retheme the entire accent ══
+     accent-600 is used for: active nav items, primary CTA buttons, selected states
+     accent-500 is used for: focus ring borders on form inputs
+     accent-100 is used for: focus ring glow, selected bg tints              */
+  --color-accent-50:  #fffdf0;
+  --color-accent-100: #fef5c8;
+  --color-accent-200: #fdde70;
+  --color-accent-300: #f5c842;
+  --color-accent-400: #e5a800;
+  --color-accent-500: #c88000;
+  --color-accent-600: #9a6500;
+  --color-accent-700: #7a5000;
+  --color-accent-800: #5c3c00;
+  --color-accent-900: #412b00;
+
+  /* Override Tailwind's built-in blue-* scale → gold
+     All bg-blue-*, text-blue-*, border-blue-*, focus:ring-blue-*
+     across ALL pages switch to gold automatically with zero JSX changes. */
+  --color-blue-50:  #fffdf0;
+  --color-blue-100: #fef5c8;
+  --color-blue-200: #fdde70;
+  --color-blue-300: #f5c842;
+  --color-blue-400: #e5a800;
+  --color-blue-500: #c88000;
+  --color-blue-600: #9a6500;
+  --color-blue-700: #7a5000;
+  --color-blue-800: #5c3c00;
+  --color-blue-900: #412b00;
+
+  /* Cyan — vehicles, water, passport */
+  --color-cyan-50:  #ecfeff;
+  --color-cyan-100: #cffafe;
+  --color-cyan-500: #06b6d4;
+  --color-cyan-600: #0891b2;
+  --color-cyan-700: #0e7490;
+
+  /* Violet — warranty, office */
+  --color-violet-50:  #f5f3ff;
+  --color-violet-100: #ede9fe;
+  --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed;
+  --color-violet-700: #6d28d9;
+
+  /* Orange — repair, urgent */
+  --color-orange-50:  #fff7ed;
+  --color-orange-100: #ffedd5;
+  --color-orange-500: #f97316;
+  --color-orange-600: #ea580c;
+  --color-orange-700: #c2410c;
+
+  /* Rose — birthday, lease */
+  --color-rose-50:  #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+
+  /* Indigo — office, admin */
+  --color-indigo-50:  #eef2ff;
+  --color-indigo-100: #e0e7ff;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5;
 
   /* Muted */
   --color-muted: #7a8ea8;
@@ -48,20 +102,65 @@
   --color-danger-400:  #f87171;
   --color-danger-500:  #ef4444;
   --color-danger-600:  #dc2626;
+  --color-info-50:     #ecfeff;
+  --color-info-100:    #cffafe;
+  --color-info-500:    #06b6d4;
+  --color-info-600:    #0891b2;
 }
 
-/* ─── CSS custom properties ─────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   BRAND MASTER SWITCHES
+   Change only this :root block to retheme the entire app.
+   ─────────────────────────────────────────────────────────
+   --brand-darkest / --brand-dark  →  sidebar background
+   --brand-mid                     →  section headers, sub-nav
+   --brand-action / -dark          →  focus rings, active items
+   ═══════════════════════════════════════════════════════════ */
 :root {
+  /* ── Brand identity ── */
+  --brand-darkest:    #0b1d3a;
+  --brand-dark:       #0f2648;
+  --brand-mid:        #1e3a6e;
+  --brand-action:     #c88000;
+  --brand-action-dark:#9a6500;
+  --brand-action-ring:rgba(154,101,0,0.15);
+
+  /* ── Page & surface backgrounds ── */
+  --c-page-bg:    #fafaf7;
+  --c-card-bg:    #ffffff;
+  --c-surface:    #f8fafc;
+
+  /* ── Borders ── */
+  --c-border:        rgba(11,29,58,0.11);
+  --c-card-border:   rgba(11,29,58,0.09);
+  --c-border-subtle: rgba(11,29,58,0.06);
+
+  /* ── Typography ── */
   --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --text-base: 14px;
   --text-lh: 1.55;
   --text-letter: -0.005em;
-  --c-navy: #0b1d3a;
+  --c-navy: var(--brand-darkest);
   --c-text-muted: #7a8ea8;
-  --c-cream-bg: #fafaf7;
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
-  --shadow-card-hover: 0 4px 16px 0 rgb(0 0 0 / 0.10), 0 2px 4px -1px rgb(0 0 0 / 0.08);
-  --shadow-sidebar: 2px 0 24px 0 rgb(0 0 0 / 0.18);
+  --c-cream-bg: var(--c-page-bg);
+
+  /* ── Shadows — navy-tinted for on-brand depth ── */
+  --shadow-card:       0 1px 4px rgba(11,29,58,0.08), 0 1px 2px rgba(11,29,58,0.05);
+  --shadow-card-hover: 0 6px 20px rgba(11,29,58,0.12), 0 2px 6px rgba(11,29,58,0.07);
+  --shadow-modal:      0 2px 8px rgba(11,29,58,0.10), 0 8px 32px rgba(11,29,58,0.14);
+  --shadow-overlay:    0 4px 16px rgba(11,29,58,0.12), 0 20px 60px rgba(11,29,58,0.18);
+  --shadow-sidebar:    2px 0 24px 0 rgb(0 0 0 / 0.18);
+
+  /* ── Category accent colors ── */
+  --cat-contract:    #0891b2;
+  --cat-maintenance: #16a34a;
+  --cat-repair:      #ea580c;
+  --cat-warranty:    #7c3aed;
+  --cat-car:         #0891b2;
+  --cat-passport:    #0891b2;
+  --cat-birthday:    #e11d48;
+  --cat-employee:    #9a6500;
+  --cat-general:     #64748b;
 }
 
 /* ─── Global reset / base ───────────────────────── */
@@ -76,7 +175,7 @@ html {
 body {
   font-family: var(--font-sans);
   line-height: var(--text-lh);
-  background-color: var(--c-cream-bg);
+  background-color: var(--c-page-bg);
   color: #1e293b;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -98,8 +197,43 @@ body {
 
 /* ─── Focus ring ────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--brand-action-dark);
   outline-offset: 2px;
+}
+
+/* ─── Navy-tinted border overrides (global card theme) ─── */
+.border-slate-100 { border-color: rgba(11,29,58,0.08) !important; }
+.border-slate-200 { border-color: rgba(11,29,58,0.13) !important; }
+
+/* ─── Stat card left-accent stripe ─────────────── */
+.stat-card-accent {
+  border-left-width: 3px !important;
+  border-left-style: solid !important;
+  padding-left: calc(1.25rem - 2px) !important;
+}
+
+/* ─── Mobile touch improvements ─────────────────── */
+
+/* Remove tap highlight on iOS */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Prevent rubber-band scroll on page root but keep in scrollable containers */
+html { overscroll-behavior-y: none; }
+
+/* Smooth scroll in scrollable containers */
+.overflow-y-auto, .overflow-x-auto { scroll-behavior: smooth; }
+
+/* Better overscroll in modals/panels */
+.overscroll-contain { overscroll-behavior: contain; }
+
+/* Touch-action for draggable handles */
+.touch-none { touch-action: none; }
+
+/* Mobile card rows — slightly taller tap target */
+@media (max-width: 639px) {
+  .mobile-tap-row {
+    min-height: 52px;
+  }
 }
 
 /* ─── Progress bar animation ────────────────────── */

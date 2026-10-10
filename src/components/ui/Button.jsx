@@ -1,5 +1,9 @@
 import { cn } from '../../utils/cn';
 
+const haptic = () => {
+  try { navigator.vibrate?.(6); } catch { /* unsupported */ }
+};
+
 const variants = {
   primary:        'bg-accent-600 text-white hover:bg-accent-700 shadow-sm shadow-accent-600/20 active:scale-[0.98]',
   secondary:      'bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-[0.98]',
@@ -28,11 +32,13 @@ export default function Button({
   loading  = false,
   disabled = false,
   className,
+  onPointerDown,
   ...props
 }) {
   return (
     <button
       disabled={disabled || loading}
+      onPointerDown={(e) => { haptic(); onPointerDown?.(e); }}
       className={cn(
         'inline-flex items-center justify-center font-semibold transition-all duration-150 focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
         variants[variant],

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
@@ -57,9 +57,9 @@ const EVENT_CFG = {
   },
   maintenance: {
     label: "Maintenance",
-    dot: "#3b82f6",
-    bg: "#eff6ff",
-    color: "#1d4ed8",
+    dot: "#c88000",
+    bg: "#fffdf0",
+    color: "#9a6500",
     icon: RiCalendarCheckLine,
   },
   warranty: {
@@ -152,7 +152,7 @@ function daysLabel(days) {
   if (days <= 7)
     return { text: `In ${days}d`, color: "#d97706", bg: "#fffbeb" };
   if (days <= 30)
-    return { text: `In ${days}d`, color: "#3b82f6", bg: "#eff6ff" };
+    return { text: `In ${days}d`, color: "#c88000", bg: "#fffdf0" };
   return { text: `In ${days}d`, color: "#64748b", bg: "#f8fafc" };
 }
 
@@ -195,7 +195,7 @@ function EventCard({ ev, showDate = true, compact = false, idx = 0 }) {
         style={{
           background: "#fff",
           borderColor: "#f1f5f9",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
+          boxShadow: "var(--shadow-card)",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.borderColor = cfg.dot + "40";
@@ -204,7 +204,7 @@ function EventCard({ ev, showDate = true, compact = false, idx = 0 }) {
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.borderColor = "#f1f5f9";
-          e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
+          e.currentTarget.style.boxShadow = "var(--shadow-card)";
           e.currentTarget.style.transform = "translateY(0)";
         }}
       >
@@ -583,7 +583,7 @@ export default function CalendarPageView() {
           <button
             onClick={goToToday}
             className="flex items-center gap-1.5 h-9 px-4 rounded-xl border border-slate-200 bg-white text-[12px] font-bold text-slate-600 hover:border-navy-300 hover:text-navy-800 transition-all"
-            style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
+            style={{ boxShadow: "var(--shadow-card)" }}
           >
             <RiCalendar2Line className="w-3.5 h-3.5" />
             Today
@@ -609,8 +609,8 @@ export default function CalendarPageView() {
           {
             label: "This Week",
             value: weekCount,
-            color: "#1d4ed8",
-            bg: "#eff6ff",
+            color: "#c88000",
+            bg: "#fffdf0",
           },
           {
             label: "Overdue",
@@ -622,7 +622,7 @@ export default function CalendarPageView() {
           <div
             key={s.label}
             className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5 flex items-center gap-3"
-            style={{ boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}
+            style={{ boxShadow: "var(--shadow-card)" }}
           >
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
@@ -712,7 +712,7 @@ export default function CalendarPageView() {
         {/* ── Calendar ── */}
         <div
           className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5"
-          style={{ boxShadow: "0 2px 16px rgba(0,0,0,0.07)" }}
+          style={{ boxShadow: "var(--shadow-card-hover)" }}
         >
           {/* Month navigation */}
           <div className="flex items-center justify-between mb-5">
@@ -789,7 +789,7 @@ export default function CalendarPageView() {
                     isToday && !isSel
                       ? { background: "#0b1d3a", borderRadius: "10px" }
                       : isSel
-                        ? { background: "#eff6ff", borderRadius: "10px" }
+                        ? { background: "#fffdf0", borderRadius: "10px" }
                         : {}
                   }
                 >
@@ -899,7 +899,7 @@ export default function CalendarPageView() {
         <div
           className="bg-white rounded-2xl border border-slate-100 flex flex-col overflow-hidden"
           style={{
-            boxShadow: "0 2px 16px rgba(0,0,0,0.07)",
+            boxShadow: "var(--shadow-card-hover)",
             maxHeight: "80vh",
           }}
         >

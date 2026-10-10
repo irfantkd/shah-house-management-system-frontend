@@ -1,5 +1,5 @@
 export const CAR_EXPENSE_TYPES = {
-  service:      { label: 'Service',       color: '#2563eb', bg: '#eff6ff' },
+  service:      { label: 'Service',       color: '#c88000', bg: '#fffdf0' },
   'oil-change': { label: 'Oil Change',    color: '#0891b2', bg: '#ecfeff' },
   'tire-change':{ label: 'Tire Change',   color: '#7c3aed', bg: '#f5f3ff' },
   tuning:       { label: 'Tuning',        color: '#0b1d3a', bg: '#f0f5ff' },

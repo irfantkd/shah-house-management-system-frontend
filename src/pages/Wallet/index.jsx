@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+﻿import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -63,7 +63,7 @@ const TXN_PERIOD_LABEL = {
 function fmt(n) { return Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 }); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
 
-const INP = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+const INP = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 
 function WalletSkeleton() {
   const p = 'rounded-2xl bg-slate-100 animate-pulse';
@@ -534,7 +534,7 @@ export default function WalletPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 16px rgba(0,0,0,0.06)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
 
           {/* ── Panel header ── */}
           <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-4 border-b border-slate-100 space-y-4">
@@ -626,8 +626,8 @@ export default function WalletPage() {
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
                               <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                                style={{ background: 'linear-gradient(135deg,#eff6ff,#ecfeff)' }}>
-                                <CalendarDays className="w-3.5 h-3.5 text-blue-600" />
+                                style={{ background: 'linear-gradient(135deg,#fffdf0,#fffbeb)' }}>
+                                <CalendarDays className="w-3.5 h-3.5" style={{ color: '#c88000' }} />
                               </div>
                               <div>
                                 <p className="text-[12px] font-bold text-slate-800 leading-none">Custom Date Range</p>
@@ -647,15 +647,15 @@ export default function WalletPage() {
                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Start Date</label>
                               <div className="relative">
                                 <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
-                                  style={{ color: txnCustomFrom ? '#2563eb' : '#94a3b8' }} />
+                                  style={{ color: txnCustomFrom ? '#c88000' : '#94a3b8' }} />
                                 <input type="date" value={txnCustomFrom}
                                   max={txnCustomTo || today}
                                   onChange={(e) => setTxnCustomFrom(e.target.value)}
                                   className="w-full h-10 pl-8 pr-2 rounded-xl border text-[12px] outline-none transition-all"
                                   style={{
-                                    borderColor: txnCustomFrom ? '#93c5fd' : '#e2e8f0',
-                                    background:  txnCustomFrom ? '#eff6ff' : '#fff',
-                                    color:       txnCustomFrom ? '#1d4ed8' : '#374151',
+                                    borderColor: txnCustomFrom ? '#e5a800' : '#e2e8f0',
+                                    background:  txnCustomFrom ? '#fffdf0' : '#fff',
+                                    color:       txnCustomFrom ? '#9a6500' : '#374151',
                                     fontWeight:  txnCustomFrom ? '600' : '400',
                                   }} />
                               </div>
@@ -664,16 +664,16 @@ export default function WalletPage() {
                               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">End Date</label>
                               <div className="relative">
                                 <CalendarDays className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
-                                  style={{ color: txnCustomTo ? '#2563eb' : '#94a3b8' }} />
+                                  style={{ color: txnCustomTo ? '#c88000' : '#94a3b8' }} />
                                 <input type="date" value={txnCustomTo}
                                   min={txnCustomFrom || undefined}
                                   max={today}
                                   onChange={(e) => setTxnCustomTo(e.target.value)}
                                   className="w-full h-10 pl-8 pr-2 rounded-xl border text-[12px] outline-none transition-all"
                                   style={{
-                                    borderColor: txnCustomTo ? '#93c5fd' : '#e2e8f0',
-                                    background:  txnCustomTo ? '#eff6ff' : '#fff',
-                                    color:       txnCustomTo ? '#1d4ed8' : '#374151',
+                                    borderColor: txnCustomTo ? '#e5a800' : '#e2e8f0',
+                                    background:  txnCustomTo ? '#fffdf0' : '#fff',
+                                    color:       txnCustomTo ? '#9a6500' : '#374151',
                                     fontWeight:  txnCustomTo ? '600' : '400',
                                   }} />
                               </div>
@@ -682,16 +682,15 @@ export default function WalletPage() {
 
                           {hasRange ? (
                             <div className="mt-2.5 flex items-center justify-between gap-2 px-3 py-2 rounded-xl"
-                              style={{ background: 'linear-gradient(135deg,#eff6ff,#ecfeff)', border: '1px solid #bfdbfe' }}>
+                              style={{ background: 'linear-gradient(135deg,#fffdf0,#fffbeb)', border: '1px solid #fde68a' }}>
                               <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                                <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#c88000' }} />
                                 <span className="text-[11px] font-semibold text-slate-700 truncate">
                                   {txnCustomFrom ? fmtDate(txnCustomFrom) : 'Any start'} → {txnCustomTo ? fmtDate(txnCustomTo) : 'Today'}
                                 </span>
                               </div>
                               {dayCount !== null && (
-                                <span className="shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black text-blue-700"
-                                  style={{ background: '#dbeafe' }}>
+                                <span className="shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black" style={{ color: '#9a6500', background: '#fef5c8' }}>
                                   {dayCount}d
                                 </span>
                               )}

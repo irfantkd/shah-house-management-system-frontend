@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
@@ -27,7 +27,7 @@ import { cn } from '../../utils/cn';
 // ── Color presets for custom category picker ──────────────────────────────────
 const COLOR_PRESETS = [
   { color: '#9333ea', bg: '#f5f3ff' },
-  { color: '#2563eb', bg: '#eff6ff' },
+  { color: '#c88000', bg: '#fffdf0' },
   { color: '#16a34a', bg: '#f0fdf4' },
   { color: '#0891b2', bg: '#ecfeff' },
   { color: '#dc2626', bg: '#fef2f2' },
@@ -44,7 +44,7 @@ const COLOR_PRESETS = [
 const catCfgFrom = (catMap, name) => catMap[name] ?? { color: '#64748b', bg: '#f1f5f9' };
 
 const SEG_CFG = {
-  property:  { label: 'Property & Services', color: '#2563eb', bg: '#eff6ff', Icon: RiHome4Line },
+  property:  { label: 'Property & Services', color: '#c88000', bg: '#fffdf0', Icon: RiHome4Line },
   household: { label: 'Household & Daily',   color: '#16a34a', bg: '#f0fdf4', Icon: RiShoppingCart2Line },
 };
 
@@ -348,8 +348,8 @@ export default function ExpensesPage() {
       label: 'Property & Services',
       value: fmtAED(stats.property),
       sub: stats.total > 0 ? `${Math.round(((stats.property ?? 0) / stats.total) * 100)}% of total` : '0%',
-      color: '#2563eb',
-      bg: '#eff6ff',
+      color: '#c88000',
+      bg: '#fffdf0',
       light: true,
     },
     {
@@ -485,8 +485,8 @@ export default function ExpensesPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                          style={{ background: 'linear-gradient(135deg, #eff6ff, #ecfeff)' }}>
-                          <RiCalendar2Line className="w-4 h-4 text-blue-600" />
+                          style={{ background: 'linear-gradient(135deg, #fffdf0, #fffbeb)' }}>
+                          <RiCalendar2Line className="w-4 h-4" style={{ color: '#c88000' }} />
                         </div>
                         <div>
                           <p className="text-[13px] font-bold text-slate-800 leading-none">Custom Date Range</p>
@@ -510,7 +510,7 @@ export default function ExpensesPage() {
                         </label>
                         <div className="relative">
                           <RiCalendar2Line className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
-                            style={{ color: customFrom ? '#2563eb' : '#94a3b8' }} />
+                            style={{ color: customFrom ? '#c88000' : '#94a3b8' }} />
                           <input
                             type="date"
                             value={customFrom}
@@ -518,9 +518,9 @@ export default function ExpensesPage() {
                             onChange={(e) => setCustomFrom(e.target.value)}
                             className="w-full h-11 pl-9 pr-3 rounded-xl border text-[13px] outline-none transition-all"
                             style={{
-                              borderColor: customFrom ? '#93c5fd' : '#e2e8f0',
-                              background:  customFrom ? '#eff6ff' : '#fff',
-                              color: customFrom ? '#1d4ed8' : '#374151',
+                              borderColor: customFrom ? '#e5a800' : '#e2e8f0',
+                              background:  customFrom ? '#fffdf0' : '#fff',
+                              color: customFrom ? '#9a6500' : '#374151',
                               fontWeight: customFrom ? '600' : '400',
                             }}
                           />
@@ -532,7 +532,7 @@ export default function ExpensesPage() {
                         </label>
                         <div className="relative">
                           <RiCalendar2Line className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
-                            style={{ color: customTo ? '#2563eb' : '#94a3b8' }} />
+                            style={{ color: customTo ? '#c88000' : '#94a3b8' }} />
                           <input
                             type="date"
                             value={customTo}
@@ -541,9 +541,9 @@ export default function ExpensesPage() {
                             onChange={(e) => setCustomTo(e.target.value)}
                             className="w-full h-11 pl-9 pr-3 rounded-xl border text-[13px] outline-none transition-all"
                             style={{
-                              borderColor: customTo ? '#93c5fd' : '#e2e8f0',
-                              background:  customTo ? '#eff6ff' : '#fff',
-                              color: customTo ? '#1d4ed8' : '#374151',
+                              borderColor: customTo ? '#e5a800' : '#e2e8f0',
+                              background:  customTo ? '#fffdf0' : '#fff',
+                              color: customTo ? '#9a6500' : '#374151',
                               fontWeight: customTo ? '600' : '400',
                             }}
                           />
@@ -554,16 +554,15 @@ export default function ExpensesPage() {
                     {/* Selected range summary */}
                     {hasRange ? (
                       <div className="mt-3 flex items-center justify-between gap-2 px-4 py-3 rounded-xl"
-                        style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #ecfeff 100%)', border: '1px solid #bfdbfe' }}>
+                        style={{ background: 'linear-gradient(135deg, #fffdf0 0%, #fffbeb 100%)', border: '1px solid #fde68a' }}>
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: '#c88000' }} />
                           <span className="text-[12px] font-semibold text-slate-700 truncate">
                             {customFrom ? fmtDate(customFrom) : 'Any start'}&nbsp;&nbsp;→&nbsp;&nbsp;{customTo ? fmtDate(customTo) : 'Today'}
                           </span>
                         </div>
                         {dayCount !== null && (
-                          <span className="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-black text-blue-700"
-                            style={{ background: '#dbeafe' }}>
+                          <span className="shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-black" style={{ color: '#9a6500', background: '#fef5c8' }}>
                             {dayCount} day{dayCount !== 1 ? 's' : ''}
                           </span>
                         )}
@@ -588,9 +587,9 @@ export default function ExpensesPage() {
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
             {s.light ? (
               <div className="bg-white rounded-2xl border border-slate-100 p-5 h-full"
-                style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                style={{ boxShadow: 'var(--shadow-card)' }}>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
-                  {s.color === '#2563eb'
+                  {s.color === '#c88000'
                     ? <RiHome4Line className="w-4 h-4" style={{ color: s.color }} />
                     : <RiShoppingCart2Line className="w-4 h-4" style={{ color: s.color }} />}
                 </div>
@@ -617,7 +616,7 @@ export default function ExpensesPage() {
       {(stats.total ?? 0) > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
           <div className="bg-white rounded-2xl border border-slate-100 p-5"
-            style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            style={{ boxShadow: 'var(--shadow-card)' }}>
             <p className="text-[14px] font-bold text-slate-800 mb-4">
               Breakdown — {period === 'custom' && (customFrom || customTo)
                 ? `${customFrom ? fmtDate(customFrom) : '—'} → ${customTo ? fmtDate(customTo) : 'Today'}`
@@ -627,7 +626,7 @@ export default function ExpensesPage() {
             {/* Stacked bar */}
             <div className="flex rounded-full overflow-hidden h-2.5 mb-5 bg-slate-100">
               {[
-                { key: 'property',  color: '#2563eb', amount: stats.property  ?? 0 },
+                { key: 'property',  color: '#c88000', amount: stats.property  ?? 0 },
                 { key: 'household', color: '#16a34a', amount: stats.household ?? 0 },
               ].filter((s) => s.amount > 0).map((s, idx, arr) => (
                 <div key={s.key}
@@ -693,7 +692,7 @@ export default function ExpensesPage() {
       {/* ── Transaction list ── */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden"
-          style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+          style={{ boxShadow: 'var(--shadow-card)' }}>
 
           {/* List header + filters */}
           <div className="p-4 border-b border-slate-100 space-y-3">
@@ -882,6 +881,9 @@ export default function ExpensesPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
+              <p className="sm:hidden text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center py-2 border-b border-slate-50">
+                ← Swipe row to edit or delete →
+              </p>
               <AnimatePresence mode="popLayout">
                 {expenses.map((item, i) => {
                   const cfg     = catCfgFrom(catMap, item.category);
@@ -895,8 +897,8 @@ export default function ExpensesPage() {
                       transition={{ delay: i * 0.02 }}
                       onSwipeRight={() => setModal(item)}
                       onSwipeLeft={() => setDelTarget(item)}
-                      leftIcon={<RiEditLine style={{ color: '#2563eb', width: 20, height: 20 }} />}
-                      leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                      leftIcon={<RiEditLine style={{ color: '#9a6500', width: 20, height: 20 }} />}
+                      leftLabel="Edit" leftBg="#fffdf0" leftColor="#9a6500"
                       rightIcon={<RiDeleteBinLine style={{ color: '#dc2626', width: 20, height: 20 }} />}
                       rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                     >
@@ -1064,7 +1066,7 @@ export default function ExpensesPage() {
 // ExpenseModal — Add / Edit
 // ─────────────────────────────────────────────────────────────────────────────
 const LOW_THRESHOLD = 5000;
-const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 const CUSTOM_SENTINEL = '__custom__';
 
 function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance, amaraaBalance, onClose, onSave }) {
@@ -1252,7 +1254,7 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance
               <select
                 value={showAddCat ? CUSTOM_SENTINEL : watchedCat}
                 onChange={handleCategoryChange}
-                className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-blue-400 bg-white appearance-none cursor-pointer">
+                className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-blue-400 bg-white appearance-none cursor-pointer">
                 {segCats.map((c) => (
                   <option key={c.id} value={c.name}>{c.isCustom ? `★ ${c.name}` : c.name}</option>
                 ))}
@@ -1284,7 +1286,7 @@ function ExpenseModal({ open, item, homeBalance, vehicleBalance, propertyBalance
                     onChange={(e) => setNewCatName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomCat(); } }}
                     placeholder="e.g. Landscaping, Gym, Car Wash…"
-                    className="w-full h-9 px-3 rounded-lg border border-blue-200 bg-white text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400"
+                    className="w-full h-9 px-3 rounded-lg border border-blue-200 bg-white text-[16px] sm:text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:border-blue-400"
                   />
 
                   {/* Color picker */}

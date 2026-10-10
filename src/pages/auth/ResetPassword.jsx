@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -91,7 +91,7 @@ export default function ResetPassword() {
                   placeholder="••••••••"
                   autoFocus
                   className={cn(
-                    'w-full h-11 pl-10 pr-10 rounded-xl border bg-slate-50 text-[14px] text-slate-800 placeholder-slate-300',
+                    'w-full h-11 pl-10 pr-10 rounded-xl border bg-slate-50 text-[16px] sm:text-[14px] text-slate-800 placeholder-slate-300',
                     'outline-none transition-all duration-150 focus:ring-2 focus:ring-accent-500 focus:border-accent-500 focus:bg-white',
                     errors.password ? 'border-danger-400' : 'border-slate-200 hover:border-slate-300',
                   )}
@@ -147,7 +147,7 @@ export default function ResetPassword() {
                   type={showCfm ? 'text' : 'password'}
                   placeholder="••••••••"
                   className={cn(
-                    'w-full h-11 pl-10 pr-10 rounded-xl border bg-slate-50 text-[14px] text-slate-800 placeholder-slate-300',
+                    'w-full h-11 pl-10 pr-10 rounded-xl border bg-slate-50 text-[16px] sm:text-[14px] text-slate-800 placeholder-slate-300',
                     'outline-none transition-all duration-150 focus:ring-2 focus:ring-accent-500 focus:border-accent-500 focus:bg-white',
                     errors.confirm ? 'border-danger-400' : 'border-slate-200 hover:border-slate-300',
                   )}

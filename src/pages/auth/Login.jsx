@@ -114,7 +114,7 @@ function FloatField({
         onChange={onChange}
         onFocus={() => setFocus(true)}
         onBlur={() => setFocus(false)}
-        className="block w-full outline-none text-[14px] text-white"
+        className="block w-full outline-none text-[16px] sm:text-[14px] text-white"
         style={{
           background: "rgba(255,255,255,0.04)",
           border: "none",

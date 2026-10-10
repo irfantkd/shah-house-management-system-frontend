@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -109,8 +109,8 @@ function PeriodBar({ value, onChange, customFrom = '', customTo = '', onCustomFr
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{ background: 'linear-gradient(135deg,#eff6ff,#ecfeff)' }}>
-                    <RiCalendar2Line className="w-3.5 h-3.5 text-blue-600" />
+                    style={{ background: 'linear-gradient(135deg,#fffdf0,#fffbeb)' }}>
+                    <RiCalendar2Line className="w-3.5 h-3.5" style={{ color: '#c88000' }} />
                   </div>
                   <div>
                     <p className="text-[12px] font-bold text-slate-800 leading-none">Custom Date Range</p>
@@ -129,15 +129,15 @@ function PeriodBar({ value, onChange, customFrom = '', customTo = '', onCustomFr
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Start Date</label>
                   <div className="relative">
                     <RiCalendar2Line className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
-                      style={{ color: customFrom ? '#2563eb' : '#94a3b8' }} />
+                      style={{ color: customFrom ? '#c88000' : '#94a3b8' }} />
                     <input type="date" value={customFrom}
                       max={customTo || today}
                       onChange={(e) => onCustomFromChange(e.target.value)}
                       className="w-full h-10 pl-8 pr-2 rounded-xl border text-[12px] outline-none transition-all"
                       style={{
-                        borderColor: customFrom ? '#93c5fd' : '#e2e8f0',
-                        background:  customFrom ? '#eff6ff' : '#fff',
-                        color:       customFrom ? '#1d4ed8' : '#374151',
+                        borderColor: customFrom ? '#e5a800' : '#e2e8f0',
+                        background:  customFrom ? '#fffdf0' : '#fff',
+                        color:       customFrom ? '#9a6500' : '#374151',
                         fontWeight:  customFrom ? '600' : '400',
                       }} />
                   </div>
@@ -146,16 +146,16 @@ function PeriodBar({ value, onChange, customFrom = '', customTo = '', onCustomFr
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">End Date</label>
                   <div className="relative">
                     <RiCalendar2Line className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none z-10"
-                      style={{ color: customTo ? '#2563eb' : '#94a3b8' }} />
+                      style={{ color: customTo ? '#c88000' : '#94a3b8' }} />
                     <input type="date" value={customTo}
                       min={customFrom || undefined}
                       max={today}
                       onChange={(e) => onCustomToChange(e.target.value)}
                       className="w-full h-10 pl-8 pr-2 rounded-xl border text-[12px] outline-none transition-all"
                       style={{
-                        borderColor: customTo ? '#93c5fd' : '#e2e8f0',
-                        background:  customTo ? '#eff6ff' : '#fff',
-                        color:       customTo ? '#1d4ed8' : '#374151',
+                        borderColor: customTo ? '#e5a800' : '#e2e8f0',
+                        background:  customTo ? '#fffdf0' : '#fff',
+                        color:       customTo ? '#9a6500' : '#374151',
                         fontWeight:  customTo ? '600' : '400',
                       }} />
                   </div>
@@ -163,16 +163,15 @@ function PeriodBar({ value, onChange, customFrom = '', customTo = '', onCustomFr
               </div>
               {hasRange ? (
                 <div className="mt-2.5 flex items-center justify-between gap-2 px-3 py-2 rounded-xl"
-                  style={{ background: 'linear-gradient(135deg,#eff6ff,#ecfeff)', border: '1px solid #bfdbfe' }}>
+                  style={{ background: 'linear-gradient(135deg,#fffdf0,#fffbeb)', border: '1px solid #fde68a' }}>
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#c88000' }} />
                     <span className="text-[11px] font-semibold text-slate-700 truncate">
                       {customFrom ? fmtDate(customFrom) : 'Any start'} → {customTo ? fmtDate(customTo) : 'Today'}
                     </span>
                   </div>
                   {dayCount !== null && (
-                    <span className="shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black text-blue-700"
-                      style={{ background: '#dbeafe' }}>
+                    <span className="shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black" style={{ color: '#9a6500', background: '#fef5c8' }}>
                       {dayCount}d
                     </span>
                   )}
@@ -193,7 +192,7 @@ function StatRow({ stats }) {
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {stats.map((s) => (
         <div key={s.label} className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5"
-          style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+          style={{ boxShadow: 'var(--shadow-card)' }}>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{s.label}</p>
           <p className="text-[18px] font-black leading-none tabular-nums" style={{ color: s.color ?? '#0b1d3a' }}>
             {s.value}
@@ -220,7 +219,7 @@ function ListCard({ children, fading }) {
   return (
     <div className={cn('bg-white rounded-2xl border border-slate-100 divide-y divide-slate-50 overflow-hidden transition-opacity duration-200',
       fading && 'opacity-50')}
-      style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+      style={{ boxShadow: 'var(--shadow-card)' }}>
       {children}
     </div>
   );
@@ -389,7 +388,7 @@ function AllMoneyTab({ propertyId, txnVersion }) {
           { label: 'Transactions', value: isLoading ? '…' : totalItems,                   color: '#0b1d3a' },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5"
-            style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+            style={{ boxShadow: 'var(--shadow-card)' }}>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{s.label}</p>
             <p className="text-[18px] font-black leading-none tabular-nums" style={{ color: s.color }}>{s.value}</p>
           </div>
@@ -398,7 +397,7 @@ function AllMoneyTab({ propertyId, txnVersion }) {
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3"
-        style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        style={{ boxShadow: 'var(--shadow-card)' }}>
         <PeriodBar
           value={period}
           onChange={(v) => { setPeriod(v); if (v !== 'custom') { setCustomFrom(''); setCustomTo(''); } }}
@@ -676,11 +675,11 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className={cn('flex gap-3 transition-opacity duration-200', expFetching && !expLoading && 'opacity-60')}>
-          <div className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+          <div className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5" style={{ boxShadow: 'var(--shadow-card)' }}>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Page Spent</p>
             <p className="text-[18px] font-black leading-none tabular-nums text-red-500">−{fmtAED(totalSpent)}</p>
           </div>
-          <div className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+          <div className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5" style={{ boxShadow: 'var(--shadow-card)' }}>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Total Records</p>
             <p className="text-[18px] font-black leading-none tabular-nums text-navy-900">{totalRows}</p>
           </div>
@@ -694,7 +693,7 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
 
       {/* Filters */}
       <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3"
-        style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        style={{ boxShadow: 'var(--shadow-card)' }}>
         <PeriodBar
           value={period}
           onChange={(v) => { setPeriod(v); if (v !== 'custom') { setCustomFrom(''); setCustomTo(''); } }}
@@ -842,7 +841,7 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
           <div>
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Category *</p>
             <select value={addForm.category} onChange={(e) => setA('category', e.target.value)}
-              className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-blue-400 bg-white appearance-none cursor-pointer">
+              className="w-full h-10 pl-3 pr-8 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-blue-400 bg-white appearance-none cursor-pointer">
               {segCats.length === 0
                 ? <option value="">Loading…</option>
                 : segCats.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -854,7 +853,7 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Description *</p>
             <input value={addForm.description} onChange={(e) => setA('description', e.target.value)} required
               placeholder="e.g. Monthly grocery shop"
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -862,12 +861,12 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Amount (AED) *</p>
               <input type="number" min="0.01" step="0.01" value={addForm.amount}
                 onChange={(e) => setA('amount', e.target.value)} required placeholder="0.00"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
             </div>
             <div>
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Date</p>
               <DatePicker value={addForm.date} onChange={(v) => setA('date', v)}
-                className="w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />
+                className="w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />
             </div>
           </div>
 
@@ -875,7 +874,7 @@ function HouseExpensesTab({ propertyId, walletMap, refetchWallet, txnVersion, on
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Vendor</p>
             <input value={addForm.vendor} onChange={(e) => setA('vendor', e.target.value)}
               placeholder="e.g. Carrefour, LuLu Hypermarket"
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
           </div>
 
           <div className="flex justify-end gap-2.5 pt-1 border-t border-slate-100">
@@ -958,7 +957,7 @@ function ContractsTab({ contracts, isLoading }) {
       ]} />
 
       <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3"
-        style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        style={{ boxShadow: 'var(--shadow-card)' }}>
         <PeriodBar
           value={period}
           onChange={(v) => { setPeriod(v); if (v !== 'custom') { setCustomFrom(''); setCustomTo(''); } }}
@@ -1043,7 +1042,7 @@ function ContractsTab({ contracts, isLoading }) {
               return (
                 <Link key={c._id ?? c.id} to={`/contracts/${c._id ?? c.id}`}
                   className="bg-white rounded-2xl border border-slate-100 p-4 hover:border-slate-200 hover:shadow-sm transition-all group"
-                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <p className="text-[13px] font-bold text-slate-800 leading-snug group-hover:text-blue-700 transition-colors">
                       {c.title ?? c.name}
@@ -1139,7 +1138,7 @@ function SalariesTab({ employees, isLoading }) {
       ]} />
 
       <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3"
-        style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+        style={{ boxShadow: 'var(--shadow-card)' }}>
         <PeriodBar
           value={period}
           onChange={(v) => { setPeriod(v); if (v !== 'custom') { setCustomFrom(''); setCustomTo(''); } }}
@@ -1231,7 +1230,7 @@ function SalariesTab({ employees, isLoading }) {
               return (
                 <Link key={emp._id ?? emp.id} to={`/employees/${emp._id ?? emp.id}`}
                   className="bg-white rounded-2xl border border-slate-100 p-4 hover:border-slate-200 hover:shadow-sm transition-all group"
-                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
                       <RiTeamLine className="w-4 h-4 text-violet-600" />
@@ -1430,7 +1429,7 @@ export default function TransactionsPage() {
 
       {/* ── Tab Bar ───────────────────────────────────────────────────── */}
       <div className="flex gap-1 bg-white border border-slate-100 rounded-2xl p-1.5 overflow-x-auto"
-        style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+        style={{ boxShadow: 'var(--shadow-card)' }}>
         {TABS.map((t) => {
           const { Icon } = t;
           const active = tab === t.id;
@@ -1489,20 +1488,20 @@ export default function TransactionsPage() {
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Amount (AED) *</p>
             <input value={depForm.amount} onChange={(e) => setD('amount', e.target.value)}
               type="number" min="1" step="0.01" required placeholder="e.g. 10,000"
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Date</p>
               <DatePicker value={depForm.date} onChange={(v) => setD('date', v)}
-                className="w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />
+                className="w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />
             </div>
             <div>
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Note / Source</p>
               <input value={depForm.note} onChange={(e) => setD('note', e.target.value)}
                 placeholder="From Mr. Shah"
-                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
+                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-blue-400" />
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,7 +22,7 @@ const CUR_MON            = new Date().toISOString().slice(0, 7);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const PALETTES = [
-  ['#2563eb','#1d4ed8'], ['#16a34a','#15803d'], ['#7c3aed','#6d28d9'],
+  ['#0b1d3a','#1e3a6e'], ['#16a34a','#15803d'], ['#7c3aed','#6d28d9'],
   ['#dc2626','#b91c1c'], ['#d97706','#b45309'], ['#0891b2','#0e7490'],
   ['#db2777','#be185d'], ['#65a30d','#4d7c0f'],
 ];
@@ -138,7 +138,7 @@ function PayrollReportModal({ open, onClose, propertyId }) {
         transition={{ type:'spring', damping:28, stiffness:280 }}
         className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col pointer-events-auto overflow-hidden"
-          style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+          style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
 
           {/* Header */}
           <div className="px-6 py-5 flex items-center justify-between shrink-0"
@@ -271,7 +271,7 @@ function EmployeeCard({ emp, bdayInfo, onEdit, onDelete, onPay, isHistOpen, onTo
   return (
     <motion.div layout initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, scale:0.96 }} transition={{ duration:0.3 }}
       className="group rounded-3xl overflow-hidden bg-white flex flex-col"
-      style={{ boxShadow:'0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)' }}>
+      style={{ boxShadow:'var(--shadow-modal)' }}>
 
       <div className="relative px-5 pt-4 pb-4 overflow-hidden"
         style={{ background:'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
@@ -503,10 +503,10 @@ function EmployeeListRow({ emp, bdayInfo, onEdit, onDelete, onPay }) {
       transition={{ duration: 0.22 }}
       onSwipeRight={onEdit}
       onSwipeLeft={onDelete}
-      leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
+      leftIcon={<Pencil style={{ color: '#9a6500', width: 20, height: 20 }} />}
       leftLabel="Edit"
-      leftBg="#eff6ff"
-      leftColor="#2563eb"
+      leftBg="#fffdf0"
+      leftColor="#9a6500"
       rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
       rightLabel="Delete"
       rightBg="#fef2f2"
@@ -893,7 +893,7 @@ export default function EmployeesPage() {
               icon:AlertCircle, color: stats.unpaidThisMonth ? '#dc2626' : '#16a34a', bg: stats.unpaidThisMonth ? '#fef2f2' : '#f0fdf4' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-2xl p-4 flex flex-col gap-3"
-              style={{ boxShadow:'0 1px 8px rgba(0,0,0,0.05)', border:'1px solid #f1f5f9' }}>
+              style={{ boxShadow:'var(--shadow-card)', border:'1px solid #f1f5f9' }}>
               <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background:s.bg }}>
                 <s.icon className="w-4 h-4" style={{ color:s.color }} />
               </div>
@@ -911,7 +911,7 @@ export default function EmployeesPage() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name…"
-            className="w-full h-10 pl-10 pr-4 rounded-2xl border border-slate-200 bg-white text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all" />
+            className="w-full h-10 pl-10 pr-4 rounded-2xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all" />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
               <X className="w-3.5 h-3.5" />
@@ -925,8 +925,8 @@ export default function EmployeesPage() {
             <>
               {/* Mobile swipe list — hidden at md+ */}
               <div className="md:hidden rounded-2xl border border-slate-100 overflow-hidden bg-white divide-y divide-slate-50">
-                <p className="text-[10px] text-slate-400 text-center py-2 bg-slate-50/60 border-b border-slate-100">
-                  ← Swipe right to edit · Swipe left to delete →
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center py-2 bg-slate-50/60 border-b border-slate-50">
+                  ← Swipe to edit or delete →
                 </p>
                 <AnimatePresence mode="popLayout">
                   {employees.map((emp) => (
@@ -997,7 +997,7 @@ export default function EmployeesPage() {
               initial={{ x:'100%' }} animate={{ x:0 }} exit={{ x:'100%' }}
               transition={{ type:'spring', damping:28, stiffness:280 }}
               className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white z-50 flex flex-col"
-              style={{ boxShadow:'-8px 0 40px rgba(0,0,0,0.2)' }}>
+              style={{ boxShadow:'-8px 0 40px rgba(11,29,58,0.20)' }}>
 
               {/* ─ Header with live preview ─ */}
               <div className="relative overflow-hidden shrink-0"
@@ -1369,7 +1369,7 @@ export default function EmployeesPage() {
               transition={{ type:'spring', damping:26, stiffness:300 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl w-full max-w-sm pointer-events-auto overflow-hidden"
-                style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
 
                 <div className="px-6 py-5 flex items-center justify-between"
                   style={{ background:'linear-gradient(150deg, #0a172e, #0c1f3f)' }}>
@@ -1485,7 +1485,7 @@ export default function EmployeesPage() {
                 transition={{ type:'spring', damping:26, stiffness:320 }}
                 className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
                 <div className="bg-white rounded-3xl p-7 w-full max-w-xs pointer-events-auto text-center"
-                  style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+                  style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
 
                   {hasHistory ? (
                     <>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { FileText, Plus, Image, Download, Calendar } from 'lucide-react';
 import Button from '../../../components/ui/Button';
 import EmptyState from '../../../components/ui/EmptyState';
@@ -24,7 +24,7 @@ const MOCK_DOCS = {
 };
 
 const CAT = {
-  registration: { bg: '#eff6ff', color: '#2563eb', label: 'Registration' },
+  registration: { bg: '#e0f2fe', color: '#0891b2', label: 'Registration' },
   insurance:    { bg: '#f0fdf4', color: '#16a34a', label: 'Insurance'    },
   purchase:     { bg: '#fffbeb', color: '#d97706', label: 'Purchase'     },
   service:      { bg: '#f5f3ff', color: '#7c3aed', label: 'Service'      },
@@ -72,7 +72,7 @@ export default function DocumentsTab({ car }) {
             return (
               <div key={doc.id}
                 className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-4 hover:shadow-sm transition-all"
-                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                style={{ boxShadow: 'var(--shadow-card)' }}>
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: cat.bg }}>
                   {isImage
                     ? <Image  className="w-5 h-5" style={{ color: cat.color }} />

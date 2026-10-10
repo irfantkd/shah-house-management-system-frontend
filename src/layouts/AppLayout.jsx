@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Sidebar from '../components/layout/Sidebar';
 import Navbar  from '../components/layout/Navbar';
+import MobileBottomNav from '../components/layout/MobileBottomNav';
 import { selectIsAuthenticated } from '../store/slices/authSlice';
 import { setProperties } from '../store/slices/propertiesSlice';
 import { selectCurrentPropertyId } from '../store/slices/propertiesSlice';
@@ -86,7 +87,7 @@ export default function AppLayout() {
   const sidebarWidth = collapsed ? SIDEBAR_MINI : SIDEBAR_FULL;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-cream-50" style={{ minHeight: '100svh' }}>
       <Sidebar
         isOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
@@ -101,13 +102,15 @@ export default function AppLayout() {
           transition: 'padding-left 250ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
-        <Navbar onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6">
-          <div className="max-w-350 mx-auto">
+        <Navbar onMenuClick={() => setMobileOpen((v) => !v)} />
+        <main className="flex-1 p-4 sm:p-6 overflow-x-hidden">
+          <div className="max-w-350 mx-auto pb-24 sm:pb-0">
             <Outlet />
           </div>
         </main>
       </div>
+
+      <MobileBottomNav onMenuOpen={() => setMobileOpen((v) => !v)} />
     </div>
   );
 }

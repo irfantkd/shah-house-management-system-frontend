@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -275,7 +275,7 @@ function WarrantyCard({ asset, index }) {
       onClick={() => navigate(`/assets/${assetId}`)}
       className="cursor-pointer"
     >
-      <div className={cn('bg-white rounded-2xl border border-slate-100 border-l-4 overflow-hidden hover:shadow-md transition-shadow', borderColor)} style={{ boxShadow: 'var(--shadow-card)' }}>
+      <div className={cn('bg-white rounded-2xl border border-slate-100 border-l-4 overflow-hidden hover:shadow-(--shadow-card-hover) transition-shadow', borderColor)} style={{ boxShadow: 'var(--shadow-card)' }}>
         <div className="p-5">
           {/* Top row */}
           <div className="flex items-start gap-3 mb-4">

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+﻿import { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -50,7 +50,7 @@ function periodLabel(period, customStart, customEnd) {
   return 'All Time';
 }
 
-const INP       = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+const INP       = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 const DEP_BLANK = { amount: '', note: '', date: new Date().toISOString().split('T')[0] };
 const EDT_BLANK = { amount: '', note: '', date: '' };
 
@@ -512,9 +512,9 @@ export default function WalletDetail() {
           {[
             ...(isSalary ? [] : [{ l: 'Received', v: periodStats.deposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft }]),
             { l: isSalary ? 'Total Paid' : 'Spent', v: periodStats.spent, c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight },
-            ...(isSalary ? [] : [{ l: 'Net Balance', v: periodStats.net, c: periodStats.net >= 0 ? '#2563eb' : '#dc2626', bg: periodStats.net >= 0 ? '#eff6ff' : '#fef2f2', b: periodStats.net >= 0 ? '#bfdbfe' : '#fecaca', icon: periodStats.net >= 0 ? TrendingUp : TrendingDown }]),
+            ...(isSalary ? [] : [{ l: 'Net Balance', v: periodStats.net, c: periodStats.net >= 0 ? '#c88000' : '#dc2626', bg: periodStats.net >= 0 ? '#fffdf0' : '#fef2f2', b: periodStats.net >= 0 ? '#fde68a' : '#fecaca', icon: periodStats.net >= 0 ? TrendingUp : TrendingDown }]),
           ].map((s) => (
-            <div key={s.l} className="bg-white rounded-2xl border p-5" style={{ borderColor: s.b, boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
+            <div key={s.l} className="bg-white rounded-2xl border p-5" style={{ borderColor: s.b, boxShadow: 'var(--shadow-card)' }}>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
                 <s.icon className="w-4 h-4" style={{ color: s.c }} />
               </div>
@@ -531,7 +531,7 @@ export default function WalletDetail() {
       {/* ── Monthly breakdown chart ── */}
       {monthlyChart.length > 0 && (
         <motion.div {...fade(0.16)}>
-          <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+          <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: 'var(--shadow-card)' }}>
             <div className="flex items-center justify-between mb-5">
               <div>
                 <p className="text-[14px] font-bold text-slate-800">Monthly Overview</p>
@@ -578,7 +578,7 @@ export default function WalletDetail() {
 
       {/* ── Transaction list ── */}
       <motion.div {...fade(0.2)}>
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
           <div className="p-5 pb-3 border-b border-slate-50 flex items-center justify-between">
             <div>
               <p className="text-[14px] font-bold text-slate-800">Transactions</p>
@@ -596,6 +596,9 @@ export default function WalletDetail() {
             </div>
           ) : (
             <>
+              <p className="sm:hidden text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center py-2 border-b border-slate-50">
+                ← Swipe deposit row to edit or delete →
+              </p>
               <div className={cn('divide-y divide-slate-50 transition-opacity duration-150', listFetching && 'opacity-50 pointer-events-none')}>
                 {listTxns.map((txn) => {
                   const isDepo = txn.type === 'credit';
@@ -661,8 +664,8 @@ export default function WalletDetail() {
                       <SwipeableRow key={txnKey}
                         onSwipeRight={() => openEdit(txn)}
                         onSwipeLeft={() => setDeleteTx(txn)}
-                        leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
-                        leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                        leftIcon={<Pencil style={{ color: '#9a6500', width: 20, height: 20 }} />}
+                        leftLabel="Edit" leftBg="#fffdf0" leftColor="#9a6500"
                         rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
                         rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                       >{rowInner}</SwipeableRow>

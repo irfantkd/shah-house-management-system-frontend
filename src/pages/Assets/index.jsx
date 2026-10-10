@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
@@ -46,7 +46,7 @@ const CAT_META = {
   Garden:     { icon: RiLeafLine,         bg: '#f0fdf4', color: '#15803d', label: 'Garden'     },
   Pool:       { icon: RiContrastDropLine, bg: '#e0f2fe', color: '#0284c7', label: 'Pool'       },
   Structural: { icon: RiBuildingLine,     bg: '#f8fafc', color: '#475569', label: 'Structural' },
-  climate:    { icon: RiTempColdLine,     bg: '#eff6ff', color: '#2563eb', label: 'Climate'    },
+  climate:    { icon: RiTempColdLine,     bg: '#e0f2fe', color: '#0284c7', label: 'Climate'    },
   power:      { icon: RiLightbulbLine,    bg: '#fefce8', color: '#ca8a04', label: 'Power'      },
   Other:      { icon: RiBox3Line,         bg: '#f1f5f9', color: '#64748b', label: 'Other'      },
 };
@@ -243,7 +243,7 @@ export default function AssetsPage() {
         <div className="flex items-center gap-2">
           <button onClick={() => setBulkAssign(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-[13px] border border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:text-blue-700 hover:bg-blue-50 transition-all"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            style={{ boxShadow: 'var(--shadow-card)' }}>
             <RiAttachmentLine className="w-4 h-4" />Assign to Area
           </button>
           <Button variant="primary" icon={RiAddLine} onClick={() => setModal('add')}>Add Asset</Button>
@@ -253,13 +253,13 @@ export default function AssetsPage() {
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Assets',        value: overallTotal,                          icon: RiBox3Line,    color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe' },
+          { label: 'Total Assets',        value: overallTotal,                          icon: RiBox3Line,    color: '#c88000', bg: '#fffdf0', border: '#fde68a' },
           { label: 'Total Value',         value: `AED ${totalValue.toLocaleString()}`,  icon: RiBankCardLine,color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
           { label: 'Warranties Expiring', value: warningCount,                          icon: RiAlertLine,   color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
           { label: 'Need Service',        value: needService,                           icon: RiToolsLine,   color: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
-            className="bg-white rounded-2xl p-5 border" style={{ borderColor: s.border, boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            className="bg-white rounded-2xl p-5 border" style={{ borderColor: s.border, boxShadow: 'var(--shadow-card)' }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
               <s.icon className="w-5 h-5" style={{ color: s.color }} />
             </div>
@@ -276,7 +276,7 @@ export default function AssetsPage() {
           <p className="text-[13px] font-semibold flex-1" style={{ color: '#0b1d3a' }}>
             {unassigned} asset{unassigned !== 1 ? 's' : ''} not yet assigned to an area.
           </p>
-          <button onClick={() => setBulkAssign(true)} className="text-[12px] font-bold hover:underline" style={{ color: '#1d4ed8' }}>
+          <button onClick={() => setBulkAssign(true)} className="text-[12px] font-bold hover:underline" style={{ color: '#c88000' }}>
             Assign now →
           </button>
         </div>
@@ -288,7 +288,7 @@ export default function AssetsPage() {
           <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search assets, brand, area…"
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-[13px] placeholder-slate-400 outline-none transition-all"
-            onFocus={(e) => (e.currentTarget.style.boxShadow = '0 0 0 2px #93c5fd')}
+            onFocus={(e) => (e.currentTarget.style.boxShadow = '0 0 0 2px #e5a800')}
             onBlur={(e) => (e.currentTarget.style.boxShadow = '')} />
         </div>
         <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 gap-0.5">
@@ -352,13 +352,13 @@ export default function AssetsPage() {
 
       {/* ── Empty state ── */}
       {assets.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center" style={{ boxShadow: 'var(--shadow-card)' }}>
           <RiBox3Line className="w-12 h-12 text-slate-200 mx-auto mb-3" />
           <p className="font-semibold text-slate-400">
             {search || catFilt !== 'All' || statusFilt !== 'All' ? 'No assets match your filters' : 'No assets yet'}
           </p>
           {!(search || catFilt !== 'All' || statusFilt !== 'All') && (
-            <button onClick={() => setModal('add')} className="mt-3 text-[13px] font-semibold hover:underline" style={{ color: '#2563eb' }}>+ Add first asset</button>
+            <button onClick={() => setModal('add')} className="mt-3 text-[13px] font-semibold hover:underline" style={{ color: '#c88000' }}>+ Add first asset</button>
           )}
         </div>
       ) : (
@@ -377,11 +377,11 @@ export default function AssetsPage() {
                     initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.96 }} transition={{ delay: i * 0.04 }}
                     className="rounded-3xl overflow-hidden"
-                    style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.10)' }}
+                    style={{ boxShadow: 'var(--shadow-modal)' }}
                     onSwipeRight={() => setModal(a)}
                     onSwipeLeft={() => handleDeleteRequest(a)}
-                    leftIcon={<Edit2  style={{ color: '#2563eb', width: 20, height: 20 }} />}
-                    leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                    leftIcon={<Edit2  style={{ color: '#9a6500', width: 20, height: 20 }} />}
+                    leftLabel="Edit"    leftBg="#fffdf0"  leftColor="#9a6500"
                     rightIcon={<Trash2 style={{ color: !a.areaId ? '#dc2626' : '#94a3b8', width: 20, height: 20 }} />}
                     rightLabel="Delete" rightBg={!a.areaId ? '#fef2f2' : '#f8fafc'} rightColor={!a.areaId ? '#dc2626' : '#94a3b8'}
                   >
@@ -395,14 +395,14 @@ export default function AssetsPage() {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)', opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)', opacity: isFetching ? 0.6 : 1, transition: 'opacity 0.2s' }}>
               {assets.map((a, i) => (
                 <MotionSwipeableRow
                   key={a.id}
                   onSwipeRight={() => setModal(a)}
                   onSwipeLeft={() => handleDeleteRequest(a)}
-                  leftIcon={<Edit2  style={{ color: '#2563eb', width: 18, height: 18 }} />}
-                  leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                  leftIcon={<Edit2  style={{ color: '#9a6500', width: 18, height: 18 }} />}
+                  leftLabel="Edit"    leftBg="#fffdf0"  leftColor="#9a6500"
                   rightIcon={<Trash2 style={{ color: !a.areaId ? '#dc2626' : '#94a3b8', width: 18, height: 18 }} />}
                   rightLabel="Delete" rightBg={!a.areaId ? '#fef2f2' : '#f8fafc'} rightColor={!a.areaId ? '#dc2626' : '#94a3b8'}
                 >
@@ -473,7 +473,7 @@ function AssetCard({ asset: a, areas, onEdit, onDelete, onAssign, canDelete = tr
       {/* ══ HEADER — dark navy ══ */}
       <div
         className="relative px-5 pt-4 pb-4 overflow-hidden"
-        style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
+        style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
 
         <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:cm.color, opacity:0.85 }} />
         <div style={{ position:'absolute', top:-36, right:-36, width:130, height:130, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
@@ -659,7 +659,7 @@ function AssetRow({ asset: a, last, onEdit, onDelete, onAssign, canDelete = true
   );
 }
 
-const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 
 /* ═══ Add / Edit Asset Modal ═══ */
 function AssetModal({ open, onClose, asset, onSave, areas, isSubmitting }) {
@@ -815,7 +815,7 @@ function AssignAreaModal({ open, onClose, asset, areas, onAssign }) {
             exit={{ opacity: 0, y: -16, scale: 0.97 }} transition={{ duration: 0.18 }}
             onClick={(e) => e.stopPropagation()}
             className="bg-white rounded-3xl overflow-hidden w-full max-w-sm"
-            style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+            style={{ boxShadow: '0 24px 64px rgba(11,29,58,0.22)' }}>
 
             <div className="px-6 pt-6 pb-4 border-b border-slate-100">
               <div className="flex items-start justify-between">
@@ -857,12 +857,12 @@ function AssignAreaModal({ open, onClose, asset, areas, onAssign }) {
                       <button key={area.id} onClick={() => setSelected(area.id)}
                         className={cn('w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border text-left transition-all',
                           isActive ? 'border-blue-200 bg-blue-50' : 'border-transparent hover:bg-slate-50 hover:border-slate-200')}>
-                        <RiMapPin2Line className="w-4 h-4 shrink-0" style={{ color: isActive ? '#2563eb' : '#94a3b8' }} />
+                        <RiMapPin2Line className="w-4 h-4 shrink-0" style={{ color: isActive ? '#c88000' : '#94a3b8' }} />
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-semibold text-slate-800 truncate">{area.name}</p>
                           {area.floorName && <p className="text-[11px] text-slate-400">{area.floorName}</p>}
                         </div>
-                        {isActive && <RiCheckboxCircleLine className="w-5 h-5 shrink-0" style={{ color: '#2563eb' }} />}
+                        {isActive && <RiCheckboxCircleLine className="w-5 h-5 shrink-0" style={{ color: '#c88000' }} />}
                       </button>
                     );
                   })}
@@ -952,7 +952,7 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
             exit={{ opacity: 0, y: -20, scale: 0.97 }} transition={{ duration: 0.2 }}
             onClick={(e) => e.stopPropagation()}
             className="bg-white rounded-3xl overflow-hidden w-full max-w-lg flex flex-col"
-            style={{ boxShadow: '0 28px 80px rgba(0,0,0,0.25)', maxHeight: '90vh' }}>
+            style={{ boxShadow: '0 28px 80px rgba(11,29,58,0.25)', maxHeight: '90vh' }}>
 
             {/* ── Header ── */}
             <div className="shrink-0 px-6 pt-5 pb-4 border-b border-slate-100">
@@ -1010,7 +1010,7 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                     <input value={areaSearch} onChange={(e) => setAreaSearch(e.target.value)}
                       placeholder="Search areas…" autoFocus
                       className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50 text-[13px] placeholder-slate-400 outline-none transition-all"
-                      onFocus={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 2px #93c5fd'; }}
+                      onFocus={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 2px #e5a800'; }}
                       onBlur={(e)  => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = ''; }} />
                   </div>
                 </div>
@@ -1025,7 +1025,7 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                       <button key={area.id} onClick={() => setSelectedArea(area)}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border text-left transition-all"
                         style={isActive
-                          ? { background: '#eff6ff', borderColor: '#93c5fd' }
+                          ? { background: '#fffdf0', borderColor: '#e5a800' }
                           : { background: '#fff', borderColor: '#e2e8f0' }}
                         onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = '#f8fafc'; }}
                         onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = '#fff'; }}>
@@ -1038,7 +1038,7 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                           <p className="text-[11px] text-slate-400">{area.floorName ?? '—'} · {areaAssetCount} asset{areaAssetCount !== 1 ? 's' : ''} currently</p>
                         </div>
                         {isActive
-                          ? <RiCheckboxCircleLine className="w-5 h-5 shrink-0" style={{ color: '#2563eb' }} />
+                          ? <RiCheckboxCircleLine className="w-5 h-5 shrink-0" style={{ color: '#c88000' }} />
                           : <div className="w-5 h-5 rounded-full border-2 border-slate-300 shrink-0" />}
                       </button>
                     );
@@ -1067,12 +1067,12 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                     <input value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)}
                       placeholder="Search by name, brand, category…" autoFocus
                       className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50 text-[13px] placeholder-slate-400 outline-none transition-all"
-                      onFocus={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 2px #93c5fd'; }}
+                      onFocus={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 2px #e5a800'; }}
                       onBlur={(e)  => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.boxShadow = ''; }} />
                   </div>
                   <div className="flex items-center justify-between px-1">
                     <button onClick={toggleAll}
-                      className="text-[12px] font-bold hover:underline" style={{ color: '#2563eb' }}>
+                      className="text-[12px] font-bold hover:underline" style={{ color: '#c88000' }}>
                       {selectedIds.size === filteredAssets.length && filteredAssets.length > 0 ? 'Deselect all' : 'Select all'}
                     </button>
                     <span className="text-[11px] text-slate-400 font-medium">
@@ -1092,13 +1092,13 @@ function BulkAssignModal({ open, onClose, areas, assets, onAssign }) {
                       <button key={asset.id} onClick={() => toggleAsset(asset.id)}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border text-left transition-all"
                         style={isSelected
-                          ? { background: '#eff6ff', borderColor: '#93c5fd' }
+                          ? { background: '#fffdf0', borderColor: '#e5a800' }
                           : { background: '#fff', borderColor: '#e2e8f0' }}
                         onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
                         onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = '#fff'; }}>
 
                         <div className="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all"
-                          style={isSelected ? { background: '#2563eb', borderColor: '#2563eb' } : { borderColor: '#cbd5e1' }}>
+                          style={isSelected ? { background: '#c88000', borderColor: '#c88000' } : { borderColor: '#cbd5e1' }}>
                           {isSelected && (
                             <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
                               <polyline points="1.5,4 3.5,6.5 8.5,1.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

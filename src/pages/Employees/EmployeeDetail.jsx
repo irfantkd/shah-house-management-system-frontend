@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,7 +19,7 @@ const HIST_PAGE_SIZE = 5;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const PALETTES = [
-  ['#2563eb','#1d4ed8'], ['#16a34a','#15803d'], ['#7c3aed','#6d28d9'],
+  ['#0b1d3a','#1e3a6e'], ['#16a34a','#15803d'], ['#7c3aed','#6d28d9'],
   ['#dc2626','#b91c1c'], ['#d97706','#b45309'], ['#0891b2','#0e7490'],
   ['#db2777','#be185d'], ['#65a30d','#4d7c0f'],
 ];
@@ -276,7 +276,7 @@ export default function EmployeeDetail() {
 
         {/* ── Hero card ── */}
         <div className="rounded-3xl overflow-hidden"
-          style={{ boxShadow:'0 4px 16px rgba(0,0,0,0.07), 0 20px 60px rgba(0,0,0,0.13)' }}>
+          style={{ boxShadow:'var(--shadow-overlay)' }}>
 
           <div className="relative overflow-hidden px-6 pt-4 pb-6"
             style={{ background:'linear-gradient(150deg, #060e1e 0%, #091833 55%, #0d2147 100%)' }}>
@@ -381,7 +381,7 @@ export default function EmployeeDetail() {
             },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-2xl p-4 flex flex-col gap-3"
-              style={{ boxShadow:'0 1px 8px rgba(0,0,0,0.05)', border:'1px solid #f1f5f9' }}>
+              style={{ boxShadow:'var(--shadow-card)', border:'1px solid #f1f5f9' }}>
               <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background:s.bg }}>
                 <s.icon className="w-4 h-4" style={{ color:s.color }} />
               </div>
@@ -400,7 +400,7 @@ export default function EmployeeDetail() {
           {/* Personal details */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-3xl p-6 space-y-1"
-              style={{ boxShadow:'0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08)' }}>
+              style={{ boxShadow:'var(--shadow-modal)' }}>
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Personal Information</p>
               {emp.dateOfBirth && (
                 <InfoRow icon={Cake} label="Date of Birth" color={color}
@@ -448,7 +448,7 @@ export default function EmployeeDetail() {
           {/* Payment history */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-3xl overflow-hidden"
-              style={{ boxShadow:'0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08)' }}>
+              style={{ boxShadow:'var(--shadow-modal)' }}>
 
               {/* Header */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 flex-wrap">
@@ -499,10 +499,10 @@ export default function EmployeeDetail() {
                             setEditHistForm({ amount: String(p.amount), notes: p.notes || '', month: p.month || '' });
                           }}
                           onSwipeLeft={() => setDelHistEntry(p)}
-                          leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
+                          leftIcon={<Pencil style={{ color: '#9a6500', width: 20, height: 20 }} />}
                           leftLabel="Edit"
-                          leftBg="#eff6ff"
-                          leftColor="#2563eb"
+                          leftBg="#fffdf0"
+                          leftColor="#9a6500"
                           rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
                           rightLabel="Delete"
                           rightBg="#fef2f2"
@@ -745,7 +745,7 @@ export default function EmployeeDetail() {
               transition={{ type:'spring', damping:26, stiffness:300 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl w-full max-w-sm pointer-events-auto overflow-hidden"
-                style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
                 <div className="px-6 py-5 flex items-center justify-between"
                   style={{ background:'linear-gradient(150deg, #0a172e, #0c1f3f)' }}>
                   <div>
@@ -852,7 +852,7 @@ export default function EmployeeDetail() {
               transition={{ type:'spring', damping:26, stiffness:300 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl w-full max-w-sm pointer-events-auto overflow-hidden"
-                style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
                 <div className="px-6 py-5 flex items-center justify-between"
                   style={{ background:'linear-gradient(135deg,#d97706,#92400e)' }}>
                   <div>
@@ -924,9 +924,9 @@ export default function EmployeeDetail() {
               transition={{ type:'spring', damping:26, stiffness:300 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl w-full max-w-sm pointer-events-auto overflow-hidden"
-                style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
                 <div className="px-6 py-5 flex items-center justify-between"
-                  style={{ background:'linear-gradient(135deg,#1d4ed8,#2563eb)' }}>
+                  style={{ background:'linear-gradient(135deg,var(--brand-darkest),var(--brand-mid))' }}>
                   <div>
                     <p className="text-[16px] font-black text-white">Edit Payment Record</p>
                     <p className="text-[11px] mt-0.5 capitalize" style={{ color:'rgba(255,255,255,0.5)' }}>
@@ -968,7 +968,7 @@ export default function EmployeeDetail() {
                     </button>
                     <button type="submit" disabled={isSavingHist}
                       className="flex-1 h-11 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-60"
-                      style={{ background:'linear-gradient(135deg,#1d4ed8,#2563eb)' }}>
+                      style={{ background:'linear-gradient(135deg,var(--brand-darkest),var(--brand-mid))' }}>
                       {isSavingHist ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                       {isSavingHist ? 'Saving…' : 'Save Changes'}
                     </button>
@@ -992,7 +992,7 @@ export default function EmployeeDetail() {
               transition={{ type:'spring', damping:26, stiffness:320 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl p-7 w-full max-w-xs pointer-events-auto text-center"
-                style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
                 <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
                   <Trash2 className="w-7 h-7 text-red-500" />
                 </div>
@@ -1032,7 +1032,7 @@ export default function EmployeeDetail() {
               transition={{ type:'spring', damping:26, stiffness:320 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl p-7 w-full max-w-xs pointer-events-auto text-center"
-                style={{ boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow:'0 24px 64px rgba(11,29,58,0.22)' }}>
                 <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
                   <Trash2 className="w-7 h-7 text-red-500" />
                 </div>

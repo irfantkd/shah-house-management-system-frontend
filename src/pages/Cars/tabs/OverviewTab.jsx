@@ -1,4 +1,4 @@
-import { Car, User, Phone, FileText, Shield, Info, TrendingUp, Fuel, AlertTriangle, Clock, DollarSign } from 'lucide-react';
+﻿import { Car, User, Phone, FileText, Shield, Info, TrendingUp, Fuel, AlertTriangle, Clock, DollarSign } from 'lucide-react';
 import { useGetQuery } from '../../../api/apiSlice';
 
 const fmt     = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
@@ -16,7 +16,7 @@ function InfoRow({ label, value }) {
 
 function Card({ title, icon: Icon, iconBg = '#f8fafc', children }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+    <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: 'var(--shadow-card)' }}>
       <div className="flex items-center gap-2.5 mb-4">
         <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: iconBg }}>
           <Icon className="w-4 h-4 text-slate-600" />
@@ -65,7 +65,7 @@ export default function OverviewTab({ car }) {
             </div>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: 'Total Expenses', value: `AED ${fmt(stats.allTime?.expenses ?? 0)}`, color: '#93c5fd' },
+                { label: 'Total Expenses', value: `AED ${fmt(stats.allTime?.expenses ?? 0)}`, color: '#fde68a' },
                 { label: 'Fuel Cost',      value: `AED ${fmt(stats.allTime?.fuel ?? 0)}`,     color: '#fcd34d' },
                 { label: 'Combined Total', value: `AED ${fmt(stats.allTime?.combined ?? 0)}`, color: '#c4b5fd' },
               ].map((s) => (
@@ -81,7 +81,7 @@ export default function OverviewTab({ car }) {
           <div className="border-t border-white/8 bg-black/12 px-5 py-3 flex items-center gap-6 flex-wrap">
             <span className="text-[10px] font-bold text-white/35 uppercase tracking-widest">This Month</span>
             {[
-              { label: 'Expenses', val: stats.thisMonth?.expenses ?? 0, color: '#93c5fd' },
+              { label: 'Expenses', val: stats.thisMonth?.expenses ?? 0, color: '#fde68a' },
               { label: 'Fuel',     val: stats.thisMonth?.fuel     ?? 0, color: '#fcd34d' },
             ].map((s) => (
               <span key={s.label} className="flex items-center gap-1.5">
@@ -114,7 +114,7 @@ export default function OverviewTab({ car }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         {/* Vehicle Details */}
-        <Card title="Vehicle Details" icon={Car} iconBg="#eff6ff">
+        <Card title="Vehicle Details" icon={Car} iconBg="#fffdf0">
           <InfoRow label="Make"           value={car.make} />
           <InfoRow label="Model"          value={car.model} />
           <InfoRow label="Year"           value={car.year} />

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import {
   Fuel, Gauge, Wrench, FileBarChart, Car, TrendingUp,
@@ -27,7 +27,7 @@ const MONTHS = [
 
 const TYPE_FILTERS = [
   { k: 'all',         l: 'All',          icon: FileBarChart, color: '#0b1d3a' },
-  { k: 'expenses',    l: 'Expenses',     icon: Gauge,        color: '#2563eb' },
+  { k: 'expenses',    l: 'Expenses',     icon: Gauge,        color: '#c88000' },
   { k: 'fuel',        l: 'Fuel',         icon: Fuel,         color: '#d97706' },
   { k: 'maintenance', l: 'Maintenance',  icon: Wrench,       color: '#7c3aed' },
 ];
@@ -37,7 +37,7 @@ const SEL = 'w-full h-9 px-3 rounded-xl border border-slate-200 text-[12px] font
 // ── Summary stat card ─────────────────────────────────────────────────────────
 function StatCard({ label, value, sub, color, bg, border, icon: Icon }) {
   return (
-    <div className="bg-white rounded-2xl p-4 border" style={{ borderColor: border, boxShadow: '0 1px 10px rgba(0,0,0,0.06)' }}>
+    <div className="bg-white rounded-2xl p-4 border" style={{ borderColor: border, boxShadow: 'var(--shadow-card)' }}>
       <div className="flex items-start justify-between mb-3">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: bg }}>
           <Icon className="w-4.5 h-4.5" style={{ color }} />
@@ -74,7 +74,7 @@ function VehicleCard({ car, fleetTotal, typeFilter, rank }) {
     : car.totals.combined;
 
   const pctFleet = fleetTotal > 0 ? (displayTotal / fleetTotal) * 100 : 0;
-  const carColor = car.color || '#2563eb';
+  const carColor = car.color || '#1e3a6e';
   const carLabel = car.nickname || `${car.make} ${car.model}`;
 
   const hasRecords = (showExp && car.expenses.length > 0)
@@ -82,7 +82,7 @@ function VehicleCard({ car, fleetTotal, typeFilter, rank }) {
     || (showMnt  && car.maintenance.length > 0);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
 
       {/* ── Card header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3.5 px-5 py-4" style={{ background: 'linear-gradient(135deg, #0b1d3a 0%, #152d5e 100%)' }}>
@@ -126,14 +126,14 @@ function VehicleCard({ car, fleetTotal, typeFilter, rank }) {
       <div className={cn('grid divide-x divide-slate-100', typeFilter === 'all' ? 'grid-cols-4' : 'grid-cols-2')}>
         {typeFilter === 'all' ? (
           <>
-            <CostCell label="Expenses"    value={car.totals.expenses}    sub={`${car.totals.expenseCount} records`}      color="#2563eb" max={car.totals.combined} />
+            <CostCell label="Expenses"    value={car.totals.expenses}    sub={`${car.totals.expenseCount} records`}      color="#c88000" max={car.totals.combined} />
             <CostCell label="Fuel"        value={car.totals.fuel}        sub={`${Number(car.totals.liters).toFixed(0)}L · ${car.totals.fuelCount} fills`} color="#d97706" max={car.totals.combined} />
             <CostCell label="Maintenance" value={car.totals.maintenance} sub={`${car.totals.maintenanceCount} records`}  color="#7c3aed" max={car.totals.combined} />
             <CostCell label="Total Cost"  value={car.totals.combined}    sub={`${pctFleet.toFixed(1)}% of fleet`}        color={carColor} max={fleetTotal} />
           </>
         ) : (
           <>
-            {typeFilter === 'expenses'    && <CostCell label="Expenses"    value={car.totals.expenses}    sub={`${car.totals.expenseCount} records`}      color="#2563eb" max={fleetTotal} />}
+            {typeFilter === 'expenses'    && <CostCell label="Expenses"    value={car.totals.expenses}    sub={`${car.totals.expenseCount} records`}      color="#c88000" max={fleetTotal} />}
             {typeFilter === 'fuel'        && <CostCell label="Fuel"        value={car.totals.fuel}        sub={`${Number(car.totals.liters).toFixed(0)}L · ${car.totals.fuelCount} fills`} color="#d97706" max={fleetTotal} />}
             {typeFilter === 'maintenance' && <CostCell label="Maintenance" value={car.totals.maintenance} sub={`${car.totals.maintenanceCount} records`}  color="#7c3aed" max={fleetTotal} />}
             <CostCell label="Fleet Share" value={displayTotal} sub={`${pctFleet.toFixed(1)}% of total`} color={carColor} max={fleetTotal} />
@@ -149,9 +149,9 @@ function VehicleCard({ car, fleetTotal, typeFilter, rank }) {
           {showExp && car.expenses.length > 0 && (
             <RecordSection
               title="Expenses"
-              color="#2563eb"
-              bg="#eff6ff"
-              icon={<Gauge className="w-3.5 h-3.5" style={{ color: '#2563eb' }} />}
+              color="#c88000"
+              bg="#fffdf0"
+              icon={<Gauge className="w-3.5 h-3.5" style={{ color: '#c88000' }} />}
               total={car.totals.expenses}
               records={car.expenses.map((e) => {
                 const cfg = CAR_EXPENSE_TYPES[e.type] ?? { label: e.type || 'Expense', color: '#64748b', bg: '#f8fafc' };
@@ -161,7 +161,7 @@ function VehicleCard({ car, fleetTotal, typeFilter, rank }) {
                   secondary: e.vendor ? `@ ${e.vendor}` : '',
                   date: e.date,
                   amount: e.amount,
-                  amountColor: '#1d4ed8',
+                  amountColor: '#9a6500',
                 };
               })}
             />
@@ -370,7 +370,7 @@ export default function ReportsTab() {
     <div className="space-y-5">
 
       {/* ── Filter bar ───────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: '0 1px 10px rgba(0,0,0,0.05)' }}>
+      <div className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
         <div className="flex flex-wrap gap-3 items-end">
 
           {/* Year */}
@@ -459,7 +459,7 @@ export default function ReportsTab() {
       {/* ── Fleet summary cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {(typeF === 'all' || typeF === 'expenses') && (
-          <StatCard label="Fleet Expenses"   value={filteredTotals.expenses}    sub={`${filteredTotals.expenseCount ?? 0} expense records`}       color="#2563eb" bg="#eff6ff" border="#bfdbfe" icon={Gauge}        />
+          <StatCard label="Fleet Expenses"   value={filteredTotals.expenses}    sub={`${filteredTotals.expenseCount ?? 0} expense records`}       color="#c88000" bg="#fffdf0" border="#fde68a" icon={Gauge}        />
         )}
         {(typeF === 'all' || typeF === 'fuel') && (
           <StatCard label="Fuel Cost"        value={filteredTotals.fuel}        sub={`${Number(filteredTotals.liters ?? 0).toFixed(0)}L · ${filteredTotals.fuelCount ?? 0} fill-ups`} color="#d97706" bg="#fffbeb" border="#fde68a" icon={Fuel}         />
@@ -505,7 +505,7 @@ export default function ReportsTab() {
 
       {/* ── Monthly trend ─────────────────────────────────────────────────────── */}
       {vehicleF === 'all' && (
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
           {/* Header */}
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -516,7 +516,7 @@ export default function ReportsTab() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {(typeF === 'all' || typeF === 'expenses')    && <LegendDot color="#2563eb" label="Expenses" />}
+              {(typeF === 'all' || typeF === 'expenses')    && <LegendDot color="#c88000" label="Expenses" />}
               {(typeF === 'all' || typeF === 'fuel')        && <LegendDot color="#d97706" label="Fuel" />}
               {(typeF === 'all' || typeF === 'maintenance') && <LegendDot color="#7c3aed" label="Maintenance" />}
             </div>
@@ -543,7 +543,7 @@ export default function ReportsTab() {
                     <div className="w-full" style={{ height: h > 0 ? h : 2 }}>
                       {h > 0 ? (
                         <div className="w-full h-full rounded-t-md overflow-hidden flex flex-col justify-end">
-                          {showE && m.expenses    > 0 && <div style={{ height: `${(m.expenses    / total) * 100}%`, background: '#2563eb', minHeight: 2 }} />}
+                          {showE && m.expenses    > 0 && <div style={{ height: `${(m.expenses    / total) * 100}%`, background: '#c88000', minHeight: 2 }} />}
                           {showF && m.fuel        > 0 && <div style={{ height: `${(m.fuel        / total) * 100}%`, background: '#d97706', minHeight: 2 }} />}
                           {showM && m.maintenance > 0 && <div style={{ height: `${(m.maintenance / total) * 100}%`, background: '#7c3aed', minHeight: 2 }} />}
                         </div>
@@ -566,7 +566,7 @@ export default function ReportsTab() {
               <thead>
                 <tr className="border-y border-slate-100 bg-slate-50">
                   <th className="text-left px-5 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Month</th>
-                  {(typeF === 'all' || typeF === 'expenses')    && <th className="text-right px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: '#2563eb' }}>Expenses</th>}
+                  {(typeF === 'all' || typeF === 'expenses')    && <th className="text-right px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: '#c88000' }}>Expenses</th>}
                   {(typeF === 'all' || typeF === 'fuel')        && <th className="text-right px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: '#d97706' }}>Fuel</th>}
                   {(typeF === 'all' || typeF === 'maintenance') && <th className="text-right px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: '#7c3aed' }}>Maintenance</th>}
                   <th className="text-right px-5 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total</th>
@@ -585,7 +585,7 @@ export default function ReportsTab() {
                         {m.label} {year}
                         {isCur && <span className="ml-2 text-[9px] font-bold text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full">Current</span>}
                       </td>
-                      {showE && <td className="px-4 py-3 text-right text-[12px] font-medium" style={{ color: m.expenses > 0 ? '#2563eb' : '#e2e8f0' }}>{m.expenses > 0 ? `AED ${fmt(m.expenses)}` : '—'}</td>}
+                      {showE && <td className="px-4 py-3 text-right text-[12px] font-medium" style={{ color: m.expenses > 0 ? '#c88000' : '#e2e8f0' }}>{m.expenses > 0 ? `AED ${fmt(m.expenses)}` : '—'}</td>}
                       {showF && <td className="px-4 py-3 text-right text-[12px] font-medium" style={{ color: m.fuel > 0 ? '#d97706' : '#e2e8f0' }}>{m.fuel > 0 ? `AED ${fmt(m.fuel)}` : '—'}</td>}
                       {showM && <td className="px-4 py-3 text-right text-[12px] font-medium" style={{ color: m.maintenance > 0 ? '#7c3aed' : '#e2e8f0' }}>{m.maintenance > 0 ? `AED ${fmt(m.maintenance)}` : '—'}</td>}
                       <td className="px-5 py-3 text-right text-[12px] font-bold text-slate-900">{total > 0 ? `AED ${fmt(total)}` : <span className="text-slate-200">—</span>}</td>
@@ -595,7 +595,7 @@ export default function ReportsTab() {
                 {/* Year total row */}
                 <tr style={{ background: '#0b1d3a' }}>
                   <td className="px-5 py-3 text-[12px] font-black text-white">Year Total — {year}</td>
-                  {(typeF === 'all' || typeF === 'expenses')    && <td className="px-4 py-3 text-right text-[12px] font-black" style={{ color: '#93c5fd' }}>AED {fmt(filteredTotals.expenses)}</td>}
+                  {(typeF === 'all' || typeF === 'expenses')    && <td className="px-4 py-3 text-right text-[12px] font-black" style={{ color: '#fde68a' }}>AED {fmt(filteredTotals.expenses)}</td>}
                   {(typeF === 'all' || typeF === 'fuel')        && <td className="px-4 py-3 text-right text-[12px] font-black" style={{ color: '#fcd34d' }}>AED {fmt(filteredTotals.fuel)}</td>}
                   {(typeF === 'all' || typeF === 'maintenance') && <td className="px-4 py-3 text-right text-[12px] font-black" style={{ color: '#c4b5fd' }}>AED {fmt(filteredTotals.maintenance)}</td>}
                   <td className="px-5 py-3 text-right text-[13px] font-black text-white">AED {fmt(displayTotal)}</td>

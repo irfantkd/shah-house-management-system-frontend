@@ -1,4 +1,4 @@
-import { BarChart2, Fuel, Gauge, TrendingUp, Calendar } from 'lucide-react';
+﻿import { BarChart2, Fuel, Gauge, TrendingUp, Calendar } from 'lucide-react';
 import { useGetQuery } from '../../../api/apiSlice';
 import { CAR_EXPENSE_TYPES } from '../../../data/mockCars';
 
@@ -25,11 +25,11 @@ export default function StatsTab({ carId }) {
       {/* ── All-time stat cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          { label: 'Total Expenses', value: allTime.expenses, icon: Gauge,     color: '#2563eb', bg: '#eff6ff', sub: `${allTime.expenseCount} records` },
+          { label: 'Total Expenses', value: allTime.expenses, icon: Gauge,     color: '#c88000', bg: '#fffdf0', sub: `${allTime.expenseCount} records` },
           { label: 'Total Fuel',     value: allTime.fuel,     icon: Fuel,      color: '#d97706', bg: '#fffbeb', sub: `${fmtDec(allTime.liters, 0)}L · ${allTime.fillCount} fills` },
           { label: 'Total Spent',    value: allTime.combined, icon: BarChart2, color: '#0b1d3a', bg: '#f1f5f9', sub: 'All categories' },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl p-4 border border-slate-100" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+          <div key={s.label} className="bg-white rounded-2xl p-4 border border-slate-100" style={{ boxShadow: 'var(--shadow-card)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
               <s.icon className="w-4.5 h-4.5" style={{ color: s.color }} />
             </div>
@@ -41,7 +41,7 @@ export default function StatsTab({ carId }) {
       </div>
 
       {/* ── This month snapshot ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-slate-400" />
           <p className="text-[13px] font-bold text-slate-700">This Month</p>
@@ -53,7 +53,7 @@ export default function StatsTab({ carId }) {
         </div>
         <div className="grid grid-cols-2 divide-x divide-slate-100">
           {[
-            { label: 'Expenses', value: thisMonth.expenses, color: '#2563eb' },
+            { label: 'Expenses', value: thisMonth.expenses, color: '#c88000' },
             { label: 'Fuel',     value: thisMonth.fuel,     color: '#d97706' },
           ].map((s) => (
             <div key={s.label} className="px-5 py-4">
@@ -67,7 +67,7 @@ export default function StatsTab({ carId }) {
       </div>
 
       {/* ── Monthly trend — last 12 months ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+      <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-slate-400" />
           <p className="text-[13px] font-bold text-slate-700">Monthly History — Last 12 Months</p>
@@ -112,7 +112,7 @@ export default function StatsTab({ carId }) {
 
       {/* ── Expense breakdown by type ── */}
       {Object.keys(expenseByType).length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
           <div className="px-5 py-3.5 border-b border-slate-100">
             <p className="text-[13px] font-bold text-slate-700">Expenses by Type — All Time</p>
           </div>
@@ -150,9 +150,9 @@ export default function StatsTab({ carId }) {
           {[
             { label: 'Avg Fill Cost',  value: `AED ${fmt(allTime.avgFill)}`,        color: '#d97706' },
             { label: 'Total Fills',    value: allTime.fillCount,                    color: '#0b1d3a' },
-            { label: 'Total Liters',   value: `${fmtDec(allTime.liters, 0)}L`,      color: '#2563eb' },
+            { label: 'Total Liters',   value: `${fmtDec(allTime.liters, 0)}L`,      color: '#c88000' },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl p-4 text-center border border-slate-100" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+            <div key={s.label} className="bg-white rounded-2xl p-4 text-center border border-slate-100" style={{ boxShadow: 'var(--shadow-card)' }}>
               <p className="text-[18px] font-black leading-none mb-1" style={{ color: s.color }}>{s.value}</p>
               <p className="text-[11px] font-semibold text-slate-500">{s.label}</p>
             </div>
@@ -175,7 +175,7 @@ function MiniBarChart({ months }) {
             {total > 0 ? (
               <div className="w-full rounded-t-sm overflow-hidden" style={{ height: h }}>
                 <div className="w-full" style={{ height: `${(m.fuel / total) * 100}%`, background: '#d97706', minHeight: m.fuel > 0 ? 2 : 0 }} />
-                <div className="w-full" style={{ height: `${(m.expenses / total) * 100}%`, background: '#2563eb', minHeight: m.expenses > 0 ? 2 : 0 }} />
+                <div className="w-full" style={{ height: `${(m.expenses / total) * 100}%`, background: '#c88000', minHeight: m.expenses > 0 ? 2 : 0 }} />
               </div>
             ) : (
               <div className="w-full h-0.5 bg-slate-100 rounded" />

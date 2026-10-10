@@ -573,7 +573,7 @@ function RenewModal({ open, contract: c, onClose, onRenew }) {
           <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
           <button onClick={handleSubmit} disabled={loading}
             className="flex-1 h-10 rounded-xl text-white text-[13px] font-bold transition-all disabled:opacity-60"
-            style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
+            style={{ background: 'linear-gradient(135deg, var(--brand-darkest), var(--brand-mid))' }}>
             {loading ? 'Renewing…' : 'Renew Contract'}
           </button>
         </div>
@@ -585,7 +585,7 @@ function RenewModal({ open, contract: c, onClose, onRenew }) {
 // ─── TAB COMPONENTS ──────────────────────────────────────────────────────────
 
 const TASK_STATUS = {
-  scheduled:     { label: 'Scheduled',   bg: 'rgba(37,99,235,0.10)',  color: '#2563eb' },
+  scheduled:     { label: 'Scheduled',   bg: 'rgba(11,29,58,0.10)',   color: '#0b1d3a' },
   'in-progress': { label: 'In Progress', bg: 'rgba(217,119,6,0.12)',  color: '#d97706' },
   'on-hold':     { label: 'On Hold',     bg: 'rgba(147,51,234,0.10)', color: '#9333ea' },
   overdue:       { label: 'Overdue',     bg: 'rgba(220,38,38,0.12)',  color: '#dc2626' },
@@ -773,7 +773,7 @@ function RenewalHistoryTab({ renewals, onRenew }) {
         <p className="text-[12px] text-slate-400 mb-4">When you renew this contract, the history will appear here.</p>
         <button onClick={onRenew}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white text-[13px] font-semibold"
-          style={{ background: 'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
+          style={{ background: 'linear-gradient(135deg, var(--brand-darkest), var(--brand-mid))' }}>
           <RefreshCw className="w-4 h-4" /> Renew Contract
         </button>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
@@ -29,16 +29,16 @@ const PRIORITIES = ['critical','high','medium','low'];
 const STATUSES   = ['reported','in-progress','awaiting-parts','completed'];
 const STATUS_LABELS = { reported:'Reported', 'in-progress':'In Progress', 'awaiting-parts':'Awaiting Parts', completed:'Completed' };
 
-const PRIORITY_HEX = { critical:'#dc2626', high:'#ea580c', medium:'#2563eb', low:'#64748b' };
+const PRIORITY_HEX = { critical:'#dc2626', high:'#ea580c', medium:'#c88000', low:'#64748b' };
 const PRIORITY_BADGE = {
   critical: { bg:'rgba(220,38,38,0.18)',  color:'#fca5a5', border:'1px solid rgba(220,38,38,0.30)', label:'Critical'       },
   high:     { bg:'rgba(234,88,12,0.18)',  color:'#fdba74', border:'1px solid rgba(234,88,12,0.30)', label:'High'           },
-  medium:   { bg:'rgba(37,99,235,0.15)',  color:'#93c5fd', border:'1px solid rgba(37,99,235,0.25)', label:'Medium'         },
+  medium:   { bg:'rgba(200,128,0,0.15)',  color:'#e5a800', border:'1px solid rgba(200,128,0,0.25)', label:'Medium'         },
   low:      { bg:'rgba(100,116,139,0.15)',color:'#cbd5e1', border:'1px solid rgba(100,116,139,0.25)',label:'Low'           },
 };
 const STATUS_BADGE = {
   reported:         { bg:'rgba(217,119,6,0.14)',  color:'#fbbf24', border:'1px solid rgba(217,119,6,0.25)'   },
-  'in-progress':    { bg:'rgba(37,99,235,0.14)',  color:'#93c5fd', border:'1px solid rgba(37,99,235,0.25)'   },
+  'in-progress':    { bg:'rgba(11,29,58,0.14)',   color:'#6b95d4', border:'1px solid rgba(11,29,58,0.25)'    },
   'awaiting-parts': { bg:'rgba(147,51,234,0.14)', color:'#c4b5fd', border:'1px solid rgba(147,51,234,0.25)'  },
   completed:        { bg:'rgba(22,163,74,0.14)',  color:'#86efac', border:'1px solid rgba(22,163,74,0.25)'   },
 };
@@ -98,7 +98,7 @@ function PaginationBar({ page, pages, onPage }) {
 }
 
 function MobileRepairRow({ repair: r, onClick }) {
-  const accent  = PRIORITY_HEX[r.priority]  ?? '#2563eb';
+  const accent  = PRIORITY_HEX[r.priority]  ?? '#c88000';
   const pBadge  = PRIORITY_BADGE[r.priority] ?? PRIORITY_BADGE.medium;
   const sBadge  = STATUS_BADGE[r.status]     ?? STATUS_BADGE.reported;
   const steps   = ['reported', 'in-progress', 'awaiting-parts', 'completed'];
@@ -339,8 +339,8 @@ export default function RepairsPage() {
             </div>
           ) : (
             <>
-              <p className="text-[10px] text-slate-400 text-center py-1.5 bg-slate-50/80">
-                Swipe right to edit · Swipe left to delete (pending only)
+              <p className="sm:hidden text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center py-2 border-b border-slate-50">
+                ← Swipe row to edit or delete →
               </p>
               <AnimatePresence mode="popLayout">
                 {repairs.map((r) => {
@@ -355,8 +355,8 @@ export default function RepairsPage() {
                         exit={{ opacity: 0, x: -20 }}
                         onSwipeRight={() => setModal(r)}
                         onSwipeLeft={() => setDelTarget(r)}
-                        leftIcon={<Pencil style={{ color: '#2563eb', width: 20, height: 20 }} />}
-                        leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                        leftIcon={<Pencil style={{ color: '#9a6500', width: 20, height: 20 }} />}
+                        leftLabel="Edit" leftBg="#fffdf0" leftColor="#9a6500"
                         rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
                         rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                       >
@@ -440,7 +440,7 @@ export default function RepairsPage() {
 }
 
 function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) {
-  const accent   = PRIORITY_HEX[r.priority] ?? '#2563eb';
+  const accent   = PRIORITY_HEX[r.priority] ?? '#c88000';
   const pBadge   = PRIORITY_BADGE[r.priority] ?? PRIORITY_BADGE.medium;
   const sBadge   = STATUS_BADGE[r.status] ?? STATUS_BADGE.reported;
   const steps    = ['reported','in-progress','awaiting-parts','completed'];
@@ -450,7 +450,7 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
 
   return (
     <div className="group rounded-3xl overflow-hidden bg-white flex flex-col"
-      style={{ boxShadow:'0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.10)' }}>
+      style={{ boxShadow:'var(--shadow-modal)' }}>
 
       {/* HEADER */}
       <div className="relative px-5 pt-4 pb-4 overflow-hidden"
@@ -562,7 +562,7 @@ function RepairCard({ repair: r, companies, onEdit, onDelete, onStatusChange }) 
 
 function RepairRow({ repair: r, expanded, onToggle, onEdit, onDelete, onStatusChange }) {
   const sc = REPAIR_STATUS_CFG[r.status] ?? REPAIR_STATUS_CFG.reported;
-  const accent = PRIORITY_HEX[r.priority] ?? '#2563eb';
+  const accent = PRIORITY_HEX[r.priority] ?? '#c88000';
   const steps  = ['reported','in-progress','awaiting-parts','completed'];
 
   return (
@@ -630,7 +630,7 @@ function RepairRow({ repair: r, expanded, onToggle, onEdit, onDelete, onStatusCh
   );
 }
 
-const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 
 function RepairModal({ open, onClose, repair, companies, areas, assets, onSave, homeWallet, vehicleWallet, isSubmitting }) {
   const { register, handleSubmit, reset, watch, setValue, control, formState: { errors } } = useForm();

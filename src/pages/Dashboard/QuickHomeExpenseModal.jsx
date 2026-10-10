@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { Plus, Home, Car, Building2, Wallet, Briefcase } from 'lucide-react';
@@ -11,12 +11,12 @@ import DatePicker from '../../components/ui/DatePicker';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
-const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400';
+const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400';
 const LOW_THRESHOLD = 5000;
 const fmt = (n) => Number(n).toLocaleString('en-AE', { maximumFractionDigits: 0 });
 
 const SEGMENTS = [
-  { k: 'property',  label: 'Property & Services', Icon: RiHome4Line,       color: '#2563eb', bg: '#eff6ff' },
+  { k: 'property',  label: 'Property & Services', Icon: RiHome4Line,       color: '#c88000', bg: '#fffdf0' },
   { k: 'household', label: 'Household & Daily',   Icon: RiShoppingCart2Line, color: '#16a34a', bg: '#f0fdf4' },
 ];
 

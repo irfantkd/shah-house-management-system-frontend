@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { Plus, Wrench, Wallet, Car, Home } from 'lucide-react';
@@ -202,7 +202,7 @@ export default function QuickExpenseModal({ open, onClose }) {
   );
 }
 
-const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 
 function WalletPanel({ balance, label, deduction, isVehicle }) {
   const isNeg = balance < 0;

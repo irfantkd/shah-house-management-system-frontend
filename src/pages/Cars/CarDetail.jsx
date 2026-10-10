@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -25,7 +25,7 @@ const TABS = [
   { id: 'stats',     label: 'Stats',     icon: BarChart2 },
 ];
 
-const INP_E = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white';
+const INP_E = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[16px] sm:text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white';
 const LBL_E = 'block text-[10.5px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider';
 
 function parseMakeModelYear(input) {
@@ -187,7 +187,7 @@ export default function CarDetail() {
               <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-[0.06]"
                 style={{ background: 'radial-gradient(circle, white, transparent)', transform: 'translate(30%,-30%)' }} />
               <div className="absolute inset-x-0 top-0 h-px opacity-25"
-                style={{ background: 'linear-gradient(90deg, transparent, #93c5fd, transparent)' }} />
+                style={{ background: 'linear-gradient(90deg, transparent, #e5a800, transparent)' }} />
             </>
           )}
 
@@ -320,7 +320,7 @@ export default function CarDetail() {
 
       {/* ── Tabs (scrollable on mobile) ── */}
       <div className="flex gap-1 bg-white border border-slate-100 rounded-2xl p-1.5 overflow-x-auto"
-        style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)', scrollbarWidth: 'none' }}>
+        style={{ boxShadow: 'var(--shadow-card)', scrollbarWidth: 'none' }}>
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={cn(
@@ -482,7 +482,7 @@ export default function CarDetail() {
                     <label className={LBL_E}>Warranty Notes</label>
                     <textarea value={editForm.warrantyNotes ?? ''} onChange={(e) => setF('warrantyNotes', e.target.value)} rows={2}
                       placeholder="Coverage details, terms, etc."
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white resize-none" />
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[16px] sm:text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white resize-none" />
                   </div>
                 </Section>
 
@@ -509,7 +509,7 @@ export default function CarDetail() {
                   <label className={LBL_E}>Notes</label>
                   <textarea value={editForm.notes} onChange={(e) => setF('notes', e.target.value)} rows={3}
                     placeholder="Any additional notes…"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white resize-none" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[16px] sm:text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white resize-none" />
                 </div>
 
               </div>

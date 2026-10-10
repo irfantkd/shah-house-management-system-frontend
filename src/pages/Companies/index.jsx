@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useForm, useWatch } from 'react-hook-form';
@@ -23,13 +23,13 @@ import { cn } from '../../utils/cn';
 const PAGE_SIZE = 12;
 
 const CAT_HEX = {
-  'Climate / AC':      '#2563eb',
+  'Climate / AC':      '#0891b2',
   'Pool & Water':      '#0891b2',
   'Garden':            '#16a34a',
   'Cleaning':          '#9333ea',
   'Security / CCTV':   '#1e3a6e',
   'Electrical':        '#d97706',
-  'Plumbing':          '#1d4ed8',
+  'Plumbing':          '#0e7490',
   'Pest Control':      '#ea580c',
   'Painting':          '#e11d48',
   'Power / Generator': '#ca8a04',
@@ -327,7 +327,11 @@ export default function CompaniesPage() {
           </button>
         </div>
       ) : view === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <>
+          <p className="sm:hidden text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center -mb-1">
+            ← Swipe card to edit or delete →
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           <AnimatePresence mode="popLayout">
             {companies.map((c, i) => (
               <MotionSwipeableRow
@@ -337,13 +341,13 @@ export default function CompaniesPage() {
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ delay: i * 0.04 }}
                 className="rounded-3xl overflow-hidden"
-                style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.10)' }}
+                style={{ boxShadow: 'var(--shadow-modal)' }}
                 onSwipeRight={() => setModal(c)}
                 onSwipeLeft={() => handleDeleteRequest(c)}
                 leftIcon={<RiEditLine className="w-5 h-5 text-accent-600" />}
                 leftLabel="Edit"
-                leftBg="#eff6ff"
-                leftColor="#2563eb"
+                leftBg="#fffdf0"
+                leftColor="#9a6500"
                 rightIcon={<RiDeleteBinLine className="w-5 h-5 text-red-500" />}
                 rightLabel="Delete"
                 rightBg="#fef2f2"
@@ -358,6 +362,7 @@ export default function CompaniesPage() {
             ))}
           </AnimatePresence>
         </div>
+        </>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
           <AnimatePresence mode="popLayout">
@@ -373,8 +378,8 @@ export default function CompaniesPage() {
                 onSwipeLeft={() => handleDeleteRequest(c)}
                 leftIcon={<RiEditLine className="w-5 h-5 text-accent-600" />}
                 leftLabel="Edit"
-                leftBg="#eff6ff"
-                leftColor="#2563eb"
+                leftBg="#fffdf0"
+                leftColor="#9a6500"
                 rightIcon={<RiDeleteBinLine className="w-5 h-5 text-red-500" />}
                 rightLabel="Delete"
                 rightBg="#fef2f2"

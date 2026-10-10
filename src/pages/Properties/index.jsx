@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -324,7 +324,7 @@ function PropertyCard({ property: p, isActive, isOnly, onSwitch, onEdit, onDelet
         'group rounded-3xl overflow-hidden bg-white flex flex-col h-full',
         isActive && 'ring-2 ring-navy-400/40',
       )}
-      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.08)' }}>
+      style={{ boxShadow: 'var(--shadow-modal)' }}>
 
       {/* Card header */}
       <div className="relative px-5 pt-5 pb-6 overflow-hidden"
@@ -456,7 +456,7 @@ function TextInput({ className, ...props }) {
   return (
     <input
       className={cn(
-        'w-full h-10 px-3.5 rounded-xl border border-slate-200 text-[13px] text-slate-800 placeholder-slate-300 outline-none transition-all bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400',
+        'w-full h-10 px-3.5 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 placeholder-slate-300 outline-none transition-all bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400',
         className,
       )}
       {...props}
@@ -468,7 +468,7 @@ function SelectInput({ children, className, ...props }) {
   return (
     <select
       className={cn(
-        'w-full h-10 px-3.5 rounded-xl border border-slate-200 text-[13px] text-slate-800 outline-none transition-all bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 appearance-none cursor-pointer',
+        'w-full h-10 px-3.5 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 outline-none transition-all bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 appearance-none cursor-pointer',
         className,
       )}
       {...props}
@@ -582,13 +582,13 @@ function PropertyFormModal({ open, item, onClose, onSave }) {
             exit={{ opacity: 0, scale: 0.95, y: -16 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             className="w-full max-w-lg rounded-3xl overflow-hidden flex flex-col max-h-[90vh]"
-            style={{ boxShadow: '0 32px 80px rgba(0,0,0,0.4)' }}
+            style={{ boxShadow: '0 32px 80px rgba(11,29,58,0.4)' }}
             onClick={(e) => e.stopPropagation()}>
 
             {/* Modal header */}
             <div className="relative px-6 pt-5 pb-5 overflow-hidden shrink-0"
               style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg,#3b82f6,#6366f1)', opacity: 0.9 }} />
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg,#c88000,#e5a800)', opacity: 0.9 }} />
               <div style={{ position: 'absolute', bottom: -8, right: 16, fontSize: 72, color: 'rgba(255,255,255,0.04)', lineHeight: 1, userSelect: 'none' }}>
                 {watchEmoji}
               </div>
@@ -685,7 +685,7 @@ function PropertyFormModal({ open, item, onClose, onSave }) {
                           {...register('description')}
                           rows={3}
                           placeholder="Brief description of the property…"
-                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-800 placeholder-slate-300 outline-none transition-all bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 resize-none"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 placeholder-slate-300 outline-none transition-all bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 resize-none"
                         />
                       </FieldWrap>
                     </>

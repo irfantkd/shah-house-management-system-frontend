@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+﻿import { useState, useRef, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -128,7 +128,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
           'transition-transform duration-300 ease-in-out lg:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
-        style={{ background: 'linear-gradient(180deg, #0b1d3a 0%, #0f2648 100%)', boxShadow: '4px 0 24px rgb(0 0 0/0.25)' }}
+        style={{ background: 'linear-gradient(180deg, var(--brand-darkest) 0%, var(--brand-dark) 100%)', boxShadow: '4px 0 24px rgb(0 0 0/0.25)' }}
       >
         {/* ── Logo ── */}
         <div className="flex items-center justify-between px-4 h-14 border-b border-white/[0.07] shrink-0">
@@ -190,7 +190,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
                 exit={{ opacity: 0, y: -6, scale: 0.97 }}
                 transition={{ duration: 0.14 }}
                 className="absolute left-2 right-2 top-full mt-1 z-50 rounded-2xl overflow-hidden"
-                style={{ background: '#0a1f42', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px rgba(0,0,0,0.5)' }}>
+                style={{ background: 'var(--brand-dark)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 16px 40px rgba(0,0,0,0.5)' }}>
 
                 {/* Header */}
                 <div className="px-3 pt-2.5 pb-1.5 border-b border-white/[0.07]">
@@ -302,7 +302,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
         </nav>
 
         {/* ── Footer ── */}
-        <div className="border-t border-white/[0.07] shrink-0">
+        <div className="border-t border-white/[0.07] shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div className="px-2 pt-2">
             <NavLink to="/settings" onClick={onClose}
               className={({ isActive }) => cn(
@@ -322,7 +322,7 @@ export default function Sidebar({ isOpen, onClose, collapsed, onToggleCollapse }
 
           <div className={cn('flex items-center gap-3 px-4 py-3', collapsed && 'justify-center px-2')}>
             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white text-[12px] font-bold shadow"
-              style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+              style={{ background: 'linear-gradient(135deg, var(--brand-action), var(--brand-action-dark))' }}>
               {getInitials(user?.name)}
             </div>
             <AnimatePresence initial={false}>
@@ -465,13 +465,13 @@ function AddPropertyModal({ open, onClose }) {
             exit={{ opacity: 0, scale: 0.95, y: -16 }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
             className="w-full max-w-md rounded-3xl overflow-hidden"
-            style={{ boxShadow: '0 32px 80px rgba(0,0,0,0.4)' }}
+            style={{ boxShadow: '0 32px 80px rgba(11,29,58,0.4)' }}
             onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
             <div className="relative px-6 pt-5 pb-5 overflow-hidden"
-              style={{ background: 'linear-gradient(150deg, #0a172e 0%, #0c1f3f 55%, #0e2550 100%)' }}>
-              <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,#3b82f6,#6366f1)', opacity:0.9 }} />
+              style={{ background: 'linear-gradient(135deg, var(--brand-darkest) 0%, var(--brand-dark) 100%)' }}>
+              <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'linear-gradient(90deg,var(--brand-action),var(--brand-action-dark))', opacity:0.9 }} />
               <div style={{ position:'absolute', top:-40, right:-40, width:140, height:140, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.06)', pointerEvents:'none' }} />
               <PropIcon iconKey={form.emoji} className="w-24 h-24 text-white/3 pointer-events-none select-none" style={{ position:'absolute', bottom:-12, right:8 }} />
               <div className="relative flex items-center justify-between" style={{ zIndex:5 }}>
@@ -568,7 +568,7 @@ function AddPropertyModal({ open, onClose }) {
                 </button>
                 <button onClick={handleSubmit}
                   className="flex-1 h-11 rounded-2xl text-[14px] font-bold text-white transition-all"
-                  style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
+                  style={{ background: 'linear-gradient(135deg, var(--brand-darkest), var(--brand-mid))' }}>
                   Add Property
                 </button>
               </div>

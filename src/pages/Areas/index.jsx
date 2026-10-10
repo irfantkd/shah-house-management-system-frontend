@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { useForm, useWatch } from "react-hook-form";
@@ -33,10 +33,10 @@ const AREA_TYPES = [
 ];
 
 const TYPE_META = {
-  Bedroom:       { Icon: BedDouble,       grad: "linear-gradient(135deg,#1e3a8a,#312e81)", light: "#eff6ff", text: "#1d4ed8" },
-  Bathroom:      { Icon: ShowerHead,      grad: "linear-gradient(135deg,#0e7490,#1d4ed8)", light: "#ecfeff", text: "#0891b2" },
+  Bedroom:       { Icon: BedDouble,       grad: "linear-gradient(135deg,#1e3a8a,#312e81)", light: "#f0f5ff", text: "#1e3a6e" },
+  Bathroom:      { Icon: ShowerHead,      grad: "linear-gradient(135deg,#0e7490,#0891b2)", light: "#ecfeff", text: "#0891b2" },
   Kitchen:       { Icon: UtensilsCrossed, grad: "linear-gradient(135deg,#c2410c,#d97706)", light: "#fff7ed", text: "#c2410c" },
-  "Living Room": { Icon: Sofa,            grad: "linear-gradient(135deg,#1d4ed8,#0b1d3a)", light: "#eff6ff", text: "#2563eb" },
+  "Living Room": { Icon: Sofa,            grad: "linear-gradient(135deg,#1e3a6e,#0b1d3a)", light: "#fffdf0", text: "#c88000" },
   "Dining Room": { Icon: Utensils,        grad: "linear-gradient(135deg,#7c3aed,#4f46e5)", light: "#f5f3ff", text: "#7c3aed" },
   Garden:        { Icon: TreeDeciduous,   grad: "linear-gradient(135deg,#15803d,#16a34a)", light: "#f0fdf4", text: "#16a34a" },
   "Pool Area":   { Icon: Waves,           grad: "linear-gradient(135deg,#0284c7,#06b6d4)", light: "#e0f2fe", text: "#0284c7" },
@@ -52,7 +52,7 @@ const typeMeta = (t) => TYPE_META[t] ?? TYPE_META.Other;
 
 const FLOOR_COLORS = [
   { label: 'Navy',    value: '#0b1d3a' },
-  { label: 'Royal',  value: '#1d4ed8' },
+  { label: 'Royal',  value: '#1e3a6e' },
   { label: 'Teal',   value: '#0f766e' },
   { label: 'Purple', value: '#7c3aed' },
   { label: 'Green',  value: '#15803d' },
@@ -137,7 +137,7 @@ export default function AreasPage() {
 
   const statCards = [
     { label: "Total Areas",  value: areaStats.total       ?? 0, color: "#0b1d3a", bg: "#f0f5ff" },
-    { label: "Bedrooms",     value: areaStats.bedrooms    ?? 0, color: "#1d4ed8", bg: "#eff6ff" },
+    { label: "Bedrooms",     value: areaStats.bedrooms    ?? 0, color: "#1e3a6e", bg: "#f0f5ff" },
     { label: "Bathrooms",    value: areaStats.bathrooms   ?? 0, color: "#0891b2", bg: "#ecfeff" },
     { label: "Total Assets", value: areaStats.totalAssets ?? 0, color: "#16a34a", bg: "#f0fdf4" },
   ];
@@ -250,7 +250,7 @@ export default function AreasPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {statCards.map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-            className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+            className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: "var(--shadow-card)" }}>
             <p className="text-3xl font-bold leading-none mb-1.5" style={{ color: s.color }}>{s.value}</p>
             <p className="text-[12px] text-slate-400">{s.label}</p>
           </motion.div>
@@ -258,7 +258,7 @@ export default function AreasPage() {
       </div>
 
       {/* ── Floor filter bar ── */}
-      <div className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.04)" }}>
+      <div className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: "var(--shadow-card)" }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <RiBuilding2Line className="w-4 h-4 text-slate-400" />
@@ -284,7 +284,7 @@ export default function AreasPage() {
           </button>
           {floors.map((floor) => {
             const active = floorFilter === floor.id;
-            const accent = floor.color ?? "#1d4ed8";
+            const accent = floor.color ?? "#1e3a6e";
             return (
               <button key={floor.id} onClick={() => { setFloorFilter(active ? "all" : floor.id); setPage(1); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border transition-all"
@@ -313,7 +313,7 @@ export default function AreasPage() {
           <RiSearchLine className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Search rooms & areas…"
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-slate-200 bg-white text-[13px] placeholder-slate-400 outline-none transition-all"
-            onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px #93c5fd")}
+            onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px #e5a800")}
             onBlur={(e)  => (e.currentTarget.style.boxShadow = "")} />
         </div>
         <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 gap-0.5">
@@ -330,7 +330,7 @@ export default function AreasPage() {
 
       {/* ── Empty state ── */}
       {areas.length === 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 p-16 text-center" style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+        <div className="bg-white rounded-2xl border border-slate-100 p-16 text-center" style={{ boxShadow: "var(--shadow-card)" }}>
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
             <RiHome4Line className="w-8 h-8 text-slate-300" />
           </div>
@@ -369,11 +369,11 @@ export default function AreasPage() {
                         key={area.id}
                         {...fade(i * 0.04)}
                         className="rounded-3xl overflow-hidden"
-                        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.10)" }}
+                        style={{ boxShadow: "var(--shadow-modal)" }}
                         onSwipeRight={() => setModal(area)}
                         onSwipeLeft={() => handleDeleteRequest(area)}
-                        leftIcon={<Edit2  style={{ color: '#2563eb', width: 20, height: 20 }} />}
-                        leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                        leftIcon={<Edit2  style={{ color: '#9a6500', width: 20, height: 20 }} />}
+                        leftLabel="Edit"    leftBg="#fffdf0"  leftColor="#9a6500"
                         rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
                         rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                       >
@@ -383,15 +383,15 @@ export default function AreasPage() {
                   </AnimatePresence>
                 </div>
               ) : (
-                <div className="mt-3 bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+                <div className="mt-3 bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: "var(--shadow-card)" }}>
                   <ListHeader />
                   {items.map((area, i) => (
                     <MotionSwipeableRow
                       key={area.id}
                       onSwipeRight={() => setModal(area)}
                       onSwipeLeft={() => setDelTarget(area)}
-                      leftIcon={<Edit2  style={{ color: '#2563eb', width: 18, height: 18 }} />}
-                      leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                      leftIcon={<Edit2  style={{ color: '#9a6500', width: 18, height: 18 }} />}
+                      leftLabel="Edit"    leftBg="#fffdf0"  leftColor="#9a6500"
                       rightIcon={<Trash2 style={{ color: '#dc2626', width: 18, height: 18 }} />}
                       rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                     >
@@ -416,11 +416,11 @@ export default function AreasPage() {
                 key={area.id}
                 {...fade(i * 0.04)}
                 className="rounded-3xl overflow-hidden"
-                style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.10)" }}
+                style={{ boxShadow: "var(--shadow-modal)" }}
                 onSwipeRight={() => setModal(area)}
                 onSwipeLeft={() => setDelTarget(area)}
-                leftIcon={<Edit2  style={{ color: '#2563eb', width: 20, height: 20 }} />}
-                leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                leftIcon={<Edit2  style={{ color: '#9a6500', width: 20, height: 20 }} />}
+                leftLabel="Edit"    leftBg="#fffdf0"  leftColor="#9a6500"
                 rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
                 rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
               >
@@ -432,15 +432,15 @@ export default function AreasPage() {
       )}
 
       {areas.length > 0 && !showGrouped && view === "list" && (
-        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ boxShadow: "var(--shadow-card)" }}>
           <ListHeader />
           {pagedItems.map((area, i) => (
             <MotionSwipeableRow
               key={area.id}
               onSwipeRight={() => setModal(area)}
               onSwipeLeft={() => setDelTarget(area)}
-              leftIcon={<Edit2  style={{ color: '#2563eb', width: 18, height: 18 }} />}
-              leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+              leftIcon={<Edit2  style={{ color: '#9a6500', width: 18, height: 18 }} />}
+              leftLabel="Edit"    leftBg="#fffdf0"  leftColor="#9a6500"
               rightIcon={<Trash2 style={{ color: '#dc2626', width: 18, height: 18 }} />}
               rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
             >
@@ -518,7 +518,7 @@ function AreaCard({ area, onEdit, onDelete, canDelete = true }) {
       <Link to={`/areas/${area.id}`} className="block group flex-1">
 
         {/* Header */}
-        <div className="relative px-5 pt-4 pb-4 overflow-hidden" style={{ background: meta.grad }}>
+        <div className="relative px-5 pt-4 pb-4 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
           <div style={{ position:"absolute", top:0, left:0, right:0, height:3, background:"rgba(255,255,255,0.25)" }} />
           <div style={{ position:"absolute", top:-36, right:-36, width:130, height:130, borderRadius:"50%", border:"1px solid rgba(255,255,255,0.15)", pointerEvents:"none" }} />
           <div style={{ position:"absolute", top:-18, right:-18, width:80, height:80, borderRadius:"50%", border:"1px solid rgba(255,255,255,0.2)", pointerEvents:"none" }} />

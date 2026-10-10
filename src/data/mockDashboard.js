@@ -37,7 +37,7 @@ export const expiringItems = [
 
 // ── Monthly expenses ──────────────────────────────────────────────
 export const monthlyExpenses = [
-  { category: 'Maintenance',  amount: 1850, color: '#2563eb', percent: 38 },
+  { category: 'Maintenance',  amount: 1850, color: '#c88000', percent: 38 },
   { category: 'Repairs',      amount: 1200, color: '#0b1d3a', percent: 25 },
   { category: 'Cleaning',     amount: 750,  color: '#7a8ea8', percent: 15 },
   { category: 'Garden',       amount: 600,  color: '#22c55e', percent: 12 },

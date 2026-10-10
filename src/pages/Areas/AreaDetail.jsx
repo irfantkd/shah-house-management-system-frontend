@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useForm, useWatch } from 'react-hook-form';
@@ -37,10 +37,10 @@ const AREA_TYPES = [
 ];
 
 const TYPE_META = {
-  Bedroom:      { grad: 'linear-gradient(135deg,#1e3a8a,#312e81)', light: '#eff6ff', text: '#1d4ed8',  Icon: BedDouble       },
-  Bathroom:     { grad: 'linear-gradient(135deg,#0e7490,#1d4ed8)', light: '#ecfeff', text: '#0891b2',  Icon: ShowerHead      },
+  Bedroom:      { grad: 'linear-gradient(135deg,#1e3a8a,#312e81)', light: '#f0f5ff', text: '#1e3a6e',  Icon: BedDouble       },
+  Bathroom:     { grad: 'linear-gradient(135deg,#0e7490,#0891b2)', light: '#ecfeff', text: '#0891b2',  Icon: ShowerHead      },
   Kitchen:      { grad: 'linear-gradient(135deg,#c2410c,#d97706)', light: '#fff7ed', text: '#c2410c',  Icon: UtensilsCrossed },
-  'Living Room':{ grad: 'linear-gradient(135deg,#1d4ed8,#0b1d3a)', light: '#eff6ff', text: '#2563eb',  Icon: Sofa            },
+  'Living Room':{ grad: 'linear-gradient(135deg,#1e3a6e,#0b1d3a)', light: '#fffdf0', text: '#c88000',  Icon: Sofa            },
   'Dining Room':{ grad: 'linear-gradient(135deg,#7c3aed,#4f46e5)', light: '#f5f3ff', text: '#7c3aed',  Icon: Utensils        },
   Garden:       { grad: 'linear-gradient(135deg,#15803d,#16a34a)', light: '#f0fdf4', text: '#16a34a',  Icon: TreeDeciduous   },
   'Pool Area':  { grad: 'linear-gradient(135deg,#0284c7,#06b6d4)', light: '#e0f2fe', text: '#0284c7',  Icon: Waves           },
@@ -64,7 +64,7 @@ const CAT_META = {
   Garden:     { icon: RiLeafLine,         bg: '#f0fdf4', color: '#15803d', label: 'Garden'     },
   Pool:       { icon: RiContrastDropLine, bg: '#e0f2fe', color: '#0284c7', label: 'Pool'       },
   Structural: { icon: RiBuildingLine,     bg: '#f8fafc', color: '#475569', label: 'Structural' },
-  climate:    { icon: RiTempColdLine,     bg: '#eff6ff', color: '#2563eb', label: 'Climate'    },
+  climate:    { icon: RiTempColdLine,     bg: '#e0f2fe', color: '#0284c7', label: 'Climate'    },
   power:      { icon: RiLightbulbLine,    bg: '#fefce8', color: '#ca8a04', label: 'Power'      },
   Other:      { icon: RiBox3Line,         bg: '#f1f5f9', color: '#64748b', label: 'Other'      },
 };
@@ -79,7 +79,7 @@ const STATUS_META = {
 const statusMeta = (s) => STATUS_META[s] ?? STATUS_META.operational;
 
 const FLOOR_COLORS = [
-  { label: 'Navy',    value: '#0b1d3a' }, { label: 'Royal',  value: '#1d4ed8' },
+  { label: 'Navy',    value: '#0b1d3a' }, { label: 'Royal',  value: '#1e3a6e' },
   { label: 'Teal',    value: '#0f766e' }, { label: 'Purple', value: '#7c3aed' },
   { label: 'Green',   value: '#15803d' }, { label: 'Amber',  value: '#b45309' },
   { label: 'Rose',    value: '#be185d' }, { label: 'Slate',  value: '#475569' },
@@ -204,7 +204,7 @@ export default function AreaDetail() {
           className="flex items-center gap-1.5 text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors group"
         >
           <span className="w-8 h-8 rounded-xl border border-slate-200 bg-white flex items-center justify-center group-hover:border-slate-300 transition-all"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            style={{ boxShadow: 'var(--shadow-card)' }}>
             <RiArrowLeftLine className="w-4 h-4" />
           </span>
           <span className="hidden sm:block">Back to Areas</span>
@@ -214,7 +214,7 @@ export default function AreaDetail() {
           <button
             onClick={() => setEditOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-bold border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-all"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+            style={{ boxShadow: 'var(--shadow-card)' }}
           >
             <RiEditLine className="w-4 h-4" />
             <span className="hidden sm:block">Edit Area</span>
@@ -235,7 +235,7 @@ export default function AreaDetail() {
                 ? 'border-slate-200 bg-white text-red-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600'
                 : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed',
             )}
-            style={{ boxShadow: canDelete ? '0 1px 4px rgba(0,0,0,0.06)' : 'none' }}
+            style={{ boxShadow: canDelete ? 'var(--shadow-card)' : 'none' }}
           >
             <RiDeleteBinLine className="w-4 h-4" />
             <span className="hidden sm:block">Delete</span>
@@ -244,7 +244,7 @@ export default function AreaDetail() {
       </div>
 
       {/* ── Hero ── */}
-      <div className="relative rounded-3xl overflow-hidden" style={{ background: meta.grad }}>
+      <div className="relative rounded-3xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
         {/* Subtle grid overlay */}
         <div className="absolute inset-0 opacity-[0.04]"
           style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
@@ -321,7 +321,7 @@ export default function AreaDetail() {
 
       {/* ── Tab bar ── */}
       <div className="bg-white rounded-2xl border border-slate-100 p-1.5 flex items-center gap-1 overflow-x-auto"
-        style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+        style={{ boxShadow: 'var(--shadow-card)' }}>
         {[
           { id: 'overview', label: 'Overview',  icon: RiHome4Line         },
           { id: 'assets',   label: 'Assets',    icon: RiBox3Line,     badge: assetCount      },
@@ -362,7 +362,7 @@ export default function AreaDetail() {
               {/* Description */}
               {area.description && (
                 <div className="bg-white rounded-2xl border border-slate-100 p-5"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">About this area</p>
                   <p className="text-[14px] text-slate-700 leading-relaxed">{area.description}</p>
                 </div>
@@ -377,7 +377,7 @@ export default function AreaDetail() {
                   { label: 'Assets',    value: assetCount,                       color: '#16a34a', bg: '#f0fdf4'  },
                 ].map((s) => (
                   <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-5"
-                    style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                    style={{ boxShadow: 'var(--shadow-card)' }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center mb-3" style={{ background: s.bg }}>
                       <span className="text-[11px] font-black" style={{ color: s.color }}>
                         {typeof s.value === 'number' ? s.value : s.value.charAt(0)}
@@ -392,11 +392,11 @@ export default function AreaDetail() {
               {/* Quick asset preview */}
               {assetCount > 0 && (
                 <div className="bg-white rounded-2xl border border-slate-100 p-5"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <div className="flex items-center justify-between mb-4">
                     <p className="text-[14px] font-bold text-slate-800">Assets in this area</p>
                     <button onClick={() => setTab('assets')}
-                      className="flex items-center gap-1 text-[12px] font-bold hover:underline" style={{ color: '#1d4ed8' }}>
+                      className="flex items-center gap-1 text-[12px] font-bold hover:underline" style={{ color: '#c88000' }}>
                       View all <RiArrowRightLine className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -425,7 +425,7 @@ export default function AreaDetail() {
               {/* Empty state when no assets */}
               {assetCount === 0 && (
                 <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.03)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-3">
                     <RiBox3Line className="w-7 h-7 text-slate-300" />
                   </div>
@@ -493,7 +493,7 @@ export default function AreaDetail() {
               {/* Empty */}
               {filteredAssets.length === 0 && (
                 <div className="bg-white rounded-2xl border border-slate-100 p-14 text-center"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
                     <RiBox3Line className="w-7 h-7 text-slate-300" />
                   </div>
@@ -531,7 +531,7 @@ export default function AreaDetail() {
               {/* List */}
               {filteredAssets.length > 0 && assetView === 'list' && (
                 <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center text-[11px] font-bold text-slate-400 uppercase tracking-wider gap-4">
                     <span className="w-9 shrink-0" />
                     <span className="flex-1">Asset</span>
@@ -559,7 +559,7 @@ export default function AreaDetail() {
             <div className="space-y-3">
               {areaHistory.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-3">
                     <RiCalendarEventLine className="w-7 h-7 text-slate-300" />
                   </div>
@@ -574,7 +574,7 @@ export default function AreaDetail() {
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.04 }}>
                       <div className="bg-white rounded-2xl border border-slate-100 p-4 flex items-center gap-4"
-                        style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                        style={{ boxShadow: 'var(--shadow-card)' }}>
                         <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', isRepair ? 'bg-red-50' : 'bg-blue-50')}>
                           {isRepair
                             ? <RiHammerLine className="w-5 h-5 text-red-500" />
@@ -656,7 +656,7 @@ function AssetCard({ asset, onUnassign }) {
 
   return (
     <div className="group rounded-3xl overflow-hidden bg-white flex flex-col"
-      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1)' }}>
+      style={{ boxShadow: 'var(--shadow-modal)' }}>
 
       {/* Dark header */}
       <div className="relative px-5 pt-4 pb-5 overflow-hidden"
@@ -926,7 +926,7 @@ function AssignModal({ open, onClose, otherAssets, allAreas, areaName, onAssign 
           exit={{ opacity: 0, y: -20, scale: 0.97 }} transition={{ duration: 0.2 }}
           onClick={(e) => e.stopPropagation()}
           className="bg-white rounded-3xl overflow-hidden w-full max-w-lg flex flex-col"
-          style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.25)', maxHeight: '90vh' }}>
+          style={{ boxShadow: '0 24px 64px rgba(11,29,58,0.25)', maxHeight: '90vh' }}>
 
           <div className="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
             <div className="flex items-start justify-between mb-3">

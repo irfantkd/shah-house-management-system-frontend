@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom';
+﻿import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,7 +12,7 @@ import DatePicker from '../../components/ui/DatePicker';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 
 const AVATAR_COLORS = [
-  '#2563eb','#7c3aed','#059669','#dc2626',
+  '#0b1d3a','#7c3aed','#059669','#dc2626',
   '#d97706','#0891b2','#db2777','#16a34a',
 ];
 const avatarColor = (name = '') => {
@@ -117,7 +117,7 @@ export default function OwnerDetail() {
         className="max-w-xl mx-auto">
 
         <div className="rounded-3xl overflow-hidden"
-          style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.07), 0 20px 60px rgba(0,0,0,0.13)' }}>
+          style={{ boxShadow: 'var(--shadow-overlay)' }}>
 
           {/* ════════════════════════════════════════
               HERO HEADER
@@ -368,7 +368,7 @@ export default function OwnerDetail() {
               transition={{ type: 'spring', damping: 26, stiffness: 320 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-6 pointer-events-none">
               <div className="bg-white rounded-3xl p-7 w-full max-w-xs pointer-events-auto text-center"
-                style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+                style={{ boxShadow: '0 24px 64px rgba(11,29,58,0.22)' }}>
                 <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
                   <Trash2 className="w-7 h-7 text-red-500" />
                 </div>

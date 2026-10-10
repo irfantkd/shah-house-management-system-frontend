@@ -4,12 +4,12 @@ export default function Card({ children, className, hover = false, padding = tru
   return (
     <div
       className={cn(
-        'bg-white rounded-2xl border border-slate-100',
+        'bg-white rounded-2xl border',
         padding && 'p-5',
-        hover && 'hover:shadow-md transition-shadow duration-200 cursor-pointer',
+        hover && 'hover:shadow-(--shadow-card-hover) active:scale-[0.98] transition-all duration-200 cursor-pointer',
         className,
       )}
-      style={{ boxShadow: 'var(--shadow-card)' }}
+      style={{ boxShadow: 'var(--shadow-card)', borderColor: 'var(--c-card-border)' }}
       {...props}
     >
       {children}

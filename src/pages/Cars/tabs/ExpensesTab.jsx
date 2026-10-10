@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { AnimatePresence } from 'framer-motion';
@@ -141,12 +141,12 @@ export default function ExpensesTab({ carId }) {
 
       {/* Summary row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: 'var(--shadow-card)' }}>
           <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">Total Expenses</p>
           <p className="text-3xl font-bold text-slate-900 leading-none">AED {total.toLocaleString()}</p>
           <p className="text-[12px] text-slate-500 mt-1.5">{totalCount} transaction{totalCount !== 1 ? 's' : ''}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 sm:col-span-2" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 sm:col-span-2" style={{ boxShadow: 'var(--shadow-card)' }}>
           <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-3">By Category</p>
           {byType.length === 0 ? (
             <p className="text-[13px] text-slate-400">No expenses yet</p>
@@ -202,11 +202,11 @@ export default function ExpensesTab({ carId }) {
                   exit={{ opacity: 0, scale: 0.97 }}
                   transition={{ delay: i * 0.02 }}
                   className="rounded-2xl overflow-hidden"
-                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+                  style={{ boxShadow: 'var(--shadow-card)' }}
                   onSwipeRight={() => openEdit(exp)}
                   onSwipeLeft={() => setDeleteConfirm(exp)}
-                  leftIcon={<Edit2 style={{ color: '#2563eb', width: 18, height: 18 }} />}
-                  leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                  leftIcon={<Edit2 style={{ color: '#9a6500', width: 18, height: 18 }} />}
+                  leftLabel="Edit" leftBg="#fffdf0" leftColor="#9a6500"
                   rightIcon={<Trash2 style={{ color: '#dc2626', width: 18, height: 18 }} />}
                   rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                 >
@@ -427,7 +427,7 @@ function VehicleWalletPanel({ balance, deduction }) {
   );
 }
 
-const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 
 function PaginationBar({ page, pages, total, isFetching, onPage }) {
   if (pages <= 1) return null;

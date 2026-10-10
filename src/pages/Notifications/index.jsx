@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,7 +17,7 @@ import { cn } from '../../utils/cn';
 /* ── Notification type config (mirrors Navbar.jsx exactly) ─────────────────── */
 const NOTIF_CFG = {
   contract:    { icon: RiFileList3Line,   dot: '#d97706', bg: '#fffbeb', color: '#b45309', label: 'Contract'    },
-  maintenance: { icon: RiToolsLine,       dot: '#3b82f6', bg: '#eff6ff', color: '#1d4ed8', label: 'Maintenance' },
+  maintenance: { icon: RiToolsLine,       dot: '#16a34a', bg: '#f0fdf4', color: '#15803d', label: 'Maintenance' },
   repair:      { icon: RiAlertLine,       dot: '#ea580c', bg: '#fff7ed', color: '#c2410c', label: 'Repair'      },
   warranty:    { icon: RiShieldLine,      dot: '#7c3aed', bg: '#f5f3ff', color: '#6d28d9', label: 'Warranty'    },
   birthday:    { icon: RiCakeLine,        dot: '#ec4899', bg: '#fdf2f8', color: '#be185d', label: 'Birthday'    },
@@ -27,7 +27,7 @@ const NOTIF_CFG = {
   general:     { icon: RiNotificationLine,dot: '#64748b', bg: '#f8fafc', color: '#475569', label: 'General'     },
 };
 
-const PRIORITY_BORDER = { high: '#ef4444', medium: '#f59e0b', low: '#3b82f6' };
+const PRIORITY_BORDER = { high: '#ef4444', medium: '#f59e0b', low: '#94a3b8' };
 const PRIORITY_BG     = { high: '#fef2f2', medium: '#fffbeb', low: '#ffffff' };
 
 const ALL_TYPES = ['all', 'contract', 'maintenance', 'repair', 'warranty', 'car', 'employee', 'passport', 'birthday', 'general'];
@@ -300,11 +300,11 @@ export default function NotificationsPage() {
           {[
             { label: 'Unread',  value: unread,                                      color: '#dc2626', bg: '#fef2f2' },
             { label: 'Urgent',  value: highCount,                                   color: '#ea580c', bg: '#fff7ed' },
-            { label: 'Total',   value: all.length,                                  color: '#2563eb', bg: '#eff6ff' },
+            { label: 'Total',   value: all.length,                                  color: '#9a6500', bg: '#fffdf0' },
             { label: 'Types',   value: Object.keys(typeCounts).length || 0,         color: '#7c3aed', bg: '#f5f3ff' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4"
-              style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+              style={{ boxShadow: 'var(--shadow-card)' }}>
               <p className="text-2xl font-black leading-none" style={{ color: s.color }}>{s.value}</p>
               <p className="text-[11px] font-semibold text-slate-500 mt-1">{s.label}</p>
             </div>
@@ -387,7 +387,7 @@ export default function NotificationsPage() {
       {/* ── Notification list ── */}
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center"
-          style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+          style={{ boxShadow: 'var(--shadow-card)' }}>
           <RiBellLine className="w-12 h-12 text-slate-200 mx-auto mb-3" />
           <p className="font-semibold text-slate-400">
             {tab !== 'all' ? `No ${NOTIF_CFG[tab]?.label ?? tab} notifications` : 'All caught up!'}

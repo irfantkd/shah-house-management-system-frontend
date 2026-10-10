@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { MotionSwipeableRow } from "../../components/ui/SwipeableRow";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -99,7 +99,7 @@ function getCatCfg(cat, allCats = []) {
 const PRIORITY_CFG = {
   critical: { label: "Critical", hex: "#dc2626" },
   high: { label: "High", hex: "#ea580c" },
-  medium: { label: "Medium", hex: "#2563eb" },
+  medium: { label: "Medium", hex: "#c88000" },
   low: { label: "Low", hex: "#64748b" },
 };
 
@@ -107,10 +107,10 @@ const PRIORITY_CFG = {
 const STATUS_CFG = {
   scheduled: {
     label: "Scheduled",
-    hex: "#2563eb",
-    bg: "rgba(37,99,235,0.12)",
-    color: "#93c5fd",
-    border: "1px solid rgba(37,99,235,0.22)",
+    hex: "#0b1d3a",
+    bg: "rgba(11,29,58,0.10)",
+    color: "#6b95d4",
+    border: "1px solid rgba(11,29,58,0.20)",
   },
   "in-progress": {
     label: "In Progress",
@@ -204,7 +204,7 @@ function PaginationBar({ page, pages, onPage }) {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 
 const RECURRENCES = [
   "one-time",
@@ -700,7 +700,7 @@ export default function MaintenancePage() {
           {
             label: "Scheduled",
             value: stats.scheduled,
-            hex: "#2563eb",
+            hex: "#0b1d3a",
             filter: "scheduled",
           },
           {
@@ -953,8 +953,8 @@ export default function MaintenancePage() {
             </div>
           ) : (
             <>
-              <p className="text-[10px] text-slate-400 text-center py-1.5 bg-slate-50/80">
-                Swipe right to edit · Swipe left to delete (pending only)
+              <p className="sm:hidden text-[10px] text-slate-400 font-semibold uppercase tracking-widest text-center py-2 border-b border-slate-50">
+                ← Swipe row to edit or delete →
               </p>
               <AnimatePresence mode="popLayout">
                 {filtered.map((task) => {
@@ -969,8 +969,8 @@ export default function MaintenancePage() {
                         exit={{ opacity: 0, x: -20 }}
                         onSwipeRight={() => setModal(task)}
                         onSwipeLeft={() => setDelTarget(task)}
-                        leftIcon={<Pencil style={{ color: "#2563eb", width: 20, height: 20 }} />}
-                        leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                        leftIcon={<Pencil style={{ color: "#9a6500", width: 20, height: 20 }} />}
+                        leftLabel="Edit" leftBg="#fffdf0" leftColor="#9a6500"
                         rightIcon={<Trash2 style={{ color: "#dc2626", width: 20, height: 20 }} />}
                         rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                       >
@@ -1184,7 +1184,7 @@ function TaskCard({
     <div
       className="group rounded-3xl overflow-hidden bg-white flex flex-col"
       style={{
-        boxShadow: "0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.10)",
+        boxShadow: "var(--shadow-modal)",
       }}
     >
       {/* ── HEADER (click to view detail) ── */}
@@ -2036,7 +2036,7 @@ function TaskDetailModal({
 // TaskFormModal — Add / Edit
 // ─────────────────────────────────────────────────────────────────────────────
 const SEL_CLS =
-  "w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-navy-400 bg-white";
+  "w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-navy-400 bg-white";
 
 function TaskFormModal({
   open,
@@ -2876,7 +2876,7 @@ function TaskExpenseModal({
           <Field label="Expense Category">
             <select
               {...register("category")}
-              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:border-navy-400 bg-white"
+              className="w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-800 focus:outline-none focus:border-navy-400 bg-white"
             >
               {EXPENSE_CATS.map((c) => (
                 <option key={c} value={c}>

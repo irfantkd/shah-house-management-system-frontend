@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   History, Wrench, CalendarClock, Receipt, Banknote,
@@ -27,9 +27,9 @@ const KIND_CFG = {
   maintenance: {
     label:  'Maintenance',
     icon:   CalendarClock,
-    strip:  '#3b82f6',
-    badge:  { bg: '#eff6ff', text: '#1d4ed8' },
-    dot:    { bg: '#dbeafe', border: '#93c5fd' },
+    strip:  '#c88000',
+    badge:  { bg: '#fffdf0', text: '#7a5000' },
+    dot:    { bg: '#fef5c8', border: '#e5a800' },
   },
   repair: {
     label:  'Repair',
@@ -100,7 +100,7 @@ function PageSkeleton() {
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[0,1,2,3].map((i) => (
-          <div key={i} className="bg-white rounded-2xl p-5 border border-slate-100" style={{ boxShadow:'0 1px 8px rgba(0,0,0,0.05)' }}>
+          <div key={i} className="bg-white rounded-2xl p-5 border border-slate-100" style={{ boxShadow:'var(--shadow-card)' }}>
             <Skeleton className="w-10 h-10 mb-4" />
             <Skeleton className="h-7 w-20 mb-2" />
             <Skeleton className="h-3.5 w-28" />
@@ -111,7 +111,7 @@ function PageSkeleton() {
         {[0,1,2,3,4,5].map((i) => (
           <div key={i} className="flex items-start gap-4">
             <Skeleton className="w-8 h-8 rounded-full shrink-0 mt-0.5" />
-            <div className="flex-1 bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow:'0 1px 8px rgba(0,0,0,0.05)' }}>
+            <div className="flex-1 bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow:'var(--shadow-card)' }}>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-16 rounded-full" />
@@ -195,7 +195,7 @@ function EventCard({ event, index }) {
 
       {/* Card */}
       <div className="flex-1 min-w-0 bg-white rounded-2xl border border-slate-100 overflow-hidden hover:border-slate-200 hover:shadow-sm transition-all"
-        style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+        style={{ boxShadow: 'var(--shadow-card)' }}>
         {/* Colored left strip */}
         <div className="flex">
           <div className="w-1 shrink-0 rounded-l-2xl" style={{ background: cfg.strip }} />
@@ -392,7 +392,7 @@ export default function HistoryPage() {
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06 }}
                 className="bg-white rounded-2xl p-4 flex items-center gap-4 border border-slate-100"
-                style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                style={{ boxShadow: 'var(--shadow-card)' }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
                   style={{ background: s.bg }}>
                   <s.icon className="w-5 h-5" style={{ color: s.color }} />
@@ -446,7 +446,7 @@ export default function HistoryPage() {
                 placeholder="Search history…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-10 pl-9 pr-8 rounded-xl border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all"
+                className="w-full h-10 pl-9 pr-8 rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all"
               />
               {search && (
                 <button onClick={() => setSearch('')}
@@ -461,7 +461,7 @@ export default function HistoryPage() {
           <div className={cn('space-y-8 transition-opacity duration-200', isFetching ? 'opacity-50' : 'opacity-100')}>
             {grouped.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center"
-                style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                style={{ boxShadow: 'var(--shadow-card)' }}>
                 <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-4">
                   <History className="w-8 h-8 text-slate-200" strokeWidth={1.5} />
                 </div>

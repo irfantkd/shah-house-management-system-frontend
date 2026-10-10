@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
@@ -25,13 +25,13 @@ const COST_PERIODS = ['monthly', 'quarterly', 'bi-annual', 'annual', 'one-time']
 const STATUS_OPTS  = ['active', 'expiring', 'expired'];
 
 const CAT_HEX = {
-  'Climate / AC':      '#2563eb',
+  'Climate / AC':      '#0891b2',
   'Pool & Water':      '#0891b2',
   'Garden':            '#16a34a',
   'Cleaning':          '#9333ea',
   'Security / CCTV':   '#1e3a6e',
   'Electrical':        '#d97706',
-  'Plumbing':          '#1d4ed8',
+  'Plumbing':          '#0e7490',
   'Pest Control':      '#ea580c',
   'Painting':          '#e11d48',
   'Power / Generator': '#ca8a04',
@@ -371,7 +371,7 @@ function ContractCard({ contract: c, companies, allTasks, onEdit, onDelete, onPa
 
   return (
     <div className="group rounded-3xl overflow-hidden bg-white flex flex-col"
-      style={{ boxShadow:'0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(11,29,58,0.10)' }}>
+      style={{ boxShadow:'var(--shadow-modal)' }}>
 
       {/* HEADER */}
       <div className="relative px-5 pt-4 pb-4 overflow-hidden"
@@ -544,9 +544,9 @@ function ContractCard({ contract: c, companies, allTasks, onEdit, onDelete, onPa
             )}
             <button onClick={onRenew}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all"
-              style={{ background:'rgba(37,99,235,0.08)', color:'#2563eb' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background='rgba(37,99,235,0.16)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background='rgba(37,99,235,0.08)'; }}>
+              style={{ background:'rgba(200,128,0,0.08)', color:'#c88000' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background='rgba(200,128,0,0.16)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background='rgba(200,128,0,0.08)'; }}>
               <RiRefreshLine className="w-3.5 h-3.5" />Renew
             </button>
             <Link to={`/contracts/${c.id}`}
@@ -750,7 +750,7 @@ function RenewModal({ open, contract: c, onClose, onRenew }) {
           </button>
           <button onClick={handleSubmit} disabled={loading}
             className="flex-1 h-10 rounded-xl text-white text-[13px] font-bold transition-all disabled:opacity-60"
-            style={{ background:'linear-gradient(135deg, #2563eb, #1d4ed8)' }}>
+            style={{ background:'linear-gradient(135deg, var(--brand-darkest), var(--brand-mid))' }}>
             {loading ? 'Renewing…' : 'Renew Contract'}
           </button>
         </div>
@@ -817,11 +817,11 @@ function ContractModal({ open, onClose, contract: c, companies, onSave }) {
           <FormGrid>
             <Field label="Start Date" required error={errors.startDate?.message}>
               <Controller name="startDate" control={control} rules={{ required: 'Required' }}
-                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.startDate} className="w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />} />
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.startDate} className="w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />} />
             </Field>
             <Field label="End Date" required error={errors.endDate?.message}>
               <Controller name="endDate" control={control} rules={{ required: 'Required' }}
-                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.endDate} className="w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />} />
+                render={({ field }) => <DatePicker value={field.value ?? ''} onChange={field.onChange} hasError={!!errors.endDate} className="w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5" />} />
             </Field>
             <Field label="Contract Value (AED)" required error={errors.cost?.message}>
               <Input {...register('cost', { required:'Required' })} type="number" min="0" step="0.01" placeholder="0.00" />

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+﻿import { useState, useRef, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -42,9 +42,9 @@ const TYPES = {
     partyLabel: 'Issued To',
     actionLabel: 'Issued By (Shah House)',
     otherLabel: 'Received By',
-    accent: '#2563eb',
-    accentLight: '#eff6ff',
-    accentMid: '#bfdbfe',
+    accent: '#c88000',
+    accentLight: '#fffdf0',
+    accentMid: '#fde68a',
     Icon: RiSendPlane2Line,
   },
 };
@@ -74,7 +74,7 @@ function thisMonth(isoStr) {
 }
 
 /* ─── Styles ───────────────────────────────────────────────────── */
-const INPUT = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 outline-none transition-all bg-white';
+const INPUT = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[16px] sm:text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 outline-none transition-all bg-white';
 const LABEL = 'block text-[10.5px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -645,7 +645,7 @@ export default function LetterheadPage() {
                 <div className="col-span-2 pt-1 border-t border-slate-100">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-                      style={{ background: type === 'received' ? '#16a34a' : '#2563eb' }}>
+                      style={{ background: type === 'received' ? '#16a34a' : '#c88000' }}>
                       <RiCheckboxCircleLine className="w-2.5 h-2.5 text-white" />
                     </div>
                     <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -782,7 +782,7 @@ export default function LetterheadPage() {
                 </button>
               </div>
             </div>
-            <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.12)', border: '1px solid #e2e8f0' }}>
+            <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: 'var(--shadow-modal)', border: '1px solid #e2e8f0' }}>
               <LetterheadDoc cfg={cfg} docNum={docNum} date={date} reference={reference} deliveryRef={deliveryRef} receivedBy={receivedBy} party={party} items={items} notes={notes} hasPrice={hasPrice} grandTotal={grandTotal} />
             </div>
           </div>
@@ -984,7 +984,7 @@ function StatCard({ label, value, sub, color, small, Icon }) {
   };
   const p = palettes[color];
   return (
-    <div className={`bg-linear-to-br ${p.bg} rounded-2xl p-5 relative overflow-hidden`} style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}>
+    <div className={`bg-linear-to-br ${p.bg} rounded-2xl p-5 relative overflow-hidden`} style={{ boxShadow: 'var(--shadow-card-hover)' }}>
       <div className="absolute top-0 right-0 w-28 h-28 rounded-full opacity-10 translate-x-10 -translate-y-10 bg-white" />
       {Icon && <Icon className={`w-4 h-4 mb-3 opacity-60 ${p.text}`} />}
       <p className={`${small ? 'text-[16px] leading-tight' : 'text-[28px]'} font-black ${p.text} leading-none mb-1.5`}>{value}</p>
@@ -1006,8 +1006,8 @@ function HistoryCard({ record, index, onDetail, onPrint, onWhatsApp, onEdit, onD
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04, duration: 0.28 }}
-      className="bg-white rounded-2xl overflow-hidden group hover:shadow-lg transition-all duration-300 relative"
-      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.07)', border: '1px solid #f1f5f9' }}
+      className="bg-white rounded-2xl overflow-hidden group hover:shadow-(--shadow-card-hover) transition-all duration-300 relative"
+      style={{ boxShadow: 'var(--shadow-modal)', border: '1px solid #f1f5f9' }}
     >
       {/* Top accent */}
       <div style={{ height: 4, background: `linear-gradient(90deg, ${cfg.accent}, ${cfg.accent}99)` }} />
@@ -1226,7 +1226,7 @@ function DetailModal({ record, onClose, onPrint, onWhatsApp, onDelete, onEdit, p
         exit={{ opacity: 0, y: 20, scale: 0.97 }}
         transition={{ type: 'spring', stiffness: 340, damping: 32 }}
         className="bg-white rounded-2xl overflow-hidden w-full max-w-175 my-8 flex flex-col"
-        style={{ boxShadow: '0 32px 80px rgba(0,0,0,0.38)', maxHeight: '92vh' }}
+        style={{ boxShadow: '0 32px 80px rgba(11,29,58,0.38)', maxHeight: '92vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
@@ -1478,7 +1478,7 @@ function LetterheadDoc({ cfg, docNum, date, reference, deliveryRef, receivedBy, 
           <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
           <div style={{ fontSize: 8.5, color: '#94a3b8', fontWeight: 600 }}>{items.length} item{items.length !== 1 ? 's' : ''}</div>
         </div>
-        <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-card)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
               <tr style={{ background: 'linear-gradient(90deg, #0b1d3a 0%, #0f2850 100%)' }}>

@@ -16,7 +16,8 @@ createRoot(document.getElementById('root')).render(
         <BrowserRouter>
           <AppRoutes />
           <Toaster
-            position="top-right"
+            position={typeof window !== 'undefined' && window.innerWidth < 640 ? 'bottom-center' : 'top-right'}
+            containerStyle={typeof window !== 'undefined' && window.innerWidth < 640 ? { bottom: 76 } : {}}
             toastOptions={{
               duration: 3500,
               style: {
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')).render(
                 borderRadius: '12px',
                 boxShadow: '0 8px 32px rgb(0 0 0 / 0.15)',
                 border: '1px solid rgb(226 232 240)',
+                maxWidth: '90vw',
               },
               success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
               error:   { iconTheme: { primary: '#ef4444', secondary: '#fff' } },

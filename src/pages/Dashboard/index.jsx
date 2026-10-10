@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
@@ -50,7 +50,7 @@ const fadeUp = (delay = 0) => ({
 });
 
 const STATUS_CFG = {
-  scheduled:       { label: 'Scheduled',     color: '#2563eb', bg: '#eff6ff' },
+  scheduled:       { label: 'Scheduled',     color: '#0b1d3a', bg: '#f0f5fb' },
   'in-progress':   { label: 'In Progress',   color: '#d97706', bg: '#fffbeb' },
   overdue:         { label: 'Overdue',        color: '#dc2626', bg: '#fef2f2' },
   'on-hold':       { label: 'On Hold',        color: '#64748b', bg: '#f1f5f9' },
@@ -58,10 +58,10 @@ const STATUS_CFG = {
 };
 
 const TYPE_META = {
-  Bedroom:      { Icon: BedDouble,       grad: 'linear-gradient(135deg,#1e3a8a,#312e81)', text: '#1d4ed8' },
-  Bathroom:     { Icon: ShowerHead,      grad: 'linear-gradient(135deg,#0e7490,#1d4ed8)', text: '#0891b2' },
+  Bedroom:      { Icon: BedDouble,       grad: 'linear-gradient(135deg,#1e3a8a,#312e81)', text: '#1e3a6e' },
+  Bathroom:     { Icon: ShowerHead,      grad: 'linear-gradient(135deg,#0e7490,#0891b2)', text: '#0891b2' },
   Kitchen:      { Icon: UtensilsCrossed, grad: 'linear-gradient(135deg,#c2410c,#d97706)', text: '#c2410c' },
-  'Living Room':{ Icon: Sofa,            grad: 'linear-gradient(135deg,#1d4ed8,#0b1d3a)', text: '#2563eb' },
+  'Living Room':{ Icon: Sofa,            grad: 'linear-gradient(135deg,#1e3a6e,#0b1d3a)', text: '#c88000' },
   'Dining Room':{ Icon: Utensils,        grad: 'linear-gradient(135deg,#7c3aed,#4f46e5)', text: '#7c3aed' },
   Garden:       { Icon: TreeDeciduous,   grad: 'linear-gradient(135deg,#15803d,#16a34a)', text: '#16a34a' },
   'Pool Area':  { Icon: Waves,           grad: 'linear-gradient(135deg,#0284c7,#06b6d4)', text: '#0284c7' },
@@ -76,8 +76,8 @@ const TYPE_META = {
 const typeMeta = (t) => TYPE_META[t] ?? TYPE_META.Other;
 
 const EXPIRY_ICON  = { contract: RiFileList3Line, warranty: RiShieldLine, 'car-reg': RiCarLine, 'car-ins': RiAlertLine };
-const EXPIRY_COLOR = { contract: '#2563eb', warranty: '#7c3aed', 'car-reg': '#d97706', 'car-ins': '#dc2626' };
-const EXPIRY_BG    = { contract: '#eff6ff', warranty: '#f5f3ff', 'car-reg': '#fffbeb', 'car-ins': '#fef2f2' };
+const EXPIRY_COLOR = { contract: '#c88000', warranty: '#7c3aed', 'car-reg': '#d97706', 'car-ins': '#dc2626' };
+const EXPIRY_BG    = { contract: '#fffdf0', warranty: '#f5f3ff', 'car-reg': '#fffbeb', 'car-ins': '#fef2f2' };
 
 const ACT_CFG = {
   repair:      { icon: RiToolsLine,          bg: '#fff7ed', color: '#ea580c' },
@@ -102,7 +102,6 @@ export default function Dashboard() {
   const [fuelOpen,        setFuelOpen]        = useState(false);
   const [carExpenseOpen,  setCarExpenseOpen]  = useState(false);
   const [homeExpenseOpen, setHomeExpenseOpen] = useState(false);
-  const [fabOpen,         setFabOpen]         = useState(false);
 
   const { data: dash = EMPTY_DASH, isLoading, isFetching, isError, error, refetch } = useGetQuery(
     { path: '/dashboard', params: { propertyId } },
@@ -121,7 +120,7 @@ export default function Dashboard() {
 
   const grandTotal = (expenses.property ?? 0) + (expenses.household ?? 0) + (expenses.vehicle ?? 0) + (expenses.fuel ?? 0);
   const dashExpSegs = [
-    { category: 'Property & Services', amount: expenses.property ?? 0,  color: '#2563eb' },
+    { category: 'Property & Services', amount: expenses.property ?? 0,  color: '#c88000' },
     { category: 'Household & Daily',   amount: expenses.household ?? 0, color: '#16a34a' },
     { category: 'Fleet — Vehicle',     amount: expenses.vehicle ?? 0,   color: '#0b1d3a' },
     { category: 'Fleet — Fuel',        amount: expenses.fuel ?? 0,      color: '#d97706' },
@@ -156,7 +155,7 @@ export default function Dashboard() {
   const unread = dash.unreadNotifications ?? 0;
 
   return (
-    <div className="space-y-5 pb-24 sm:pb-6">
+    <div className="space-y-5">
 
       {/* ── Refetch progress bar (subtle, top-of-page) ── */}
       {isFetching && !isLoading && (
@@ -180,9 +179,9 @@ export default function Dashboard() {
           {/* BG glows */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute top-0 right-0 w-72 h-72 opacity-[0.06] rounded-full"
-              style={{ background: 'radial-gradient(circle, #93c5fd, transparent)', transform: 'translate(35%,-35%)' }} />
+              style={{ background: 'radial-gradient(circle, #e5a800, transparent)', transform: 'translate(35%,-35%)' }} />
             <div className="absolute bottom-0 left-1/3 w-56 h-56 opacity-[0.04] rounded-full"
-              style={{ background: 'radial-gradient(circle, #60a5fa, transparent)', transform: 'translate(-50%,50%)' }} />
+              style={{ background: 'radial-gradient(circle, #c88000, transparent)', transform: 'translate(-50%,50%)' }} />
           </div>
 
           {/* Content */}
@@ -196,7 +195,7 @@ export default function Dashboard() {
                 <h1 className="text-white font-bold text-xl sm:text-2xl leading-tight">
                   {getGreeting()}, {user?.name?.split(' ')[0] ?? 'Welcome'} 👋
                 </h1>
-                <p className="text-blue-200/40 text-[11px] mt-0.5 hidden sm:block">{today}</p>
+                <p className="text-blue-200/40 text-[11px] mt-0.5">{today}</p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {/* Alert badge */}
@@ -214,7 +213,11 @@ export default function Dashboard() {
             </div>
 
             {/* Quick action links — horizontal scroll on mobile */}
-            <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1 sm:flex-wrap sm:overflow-visible" style={{ scrollbarWidth: 'none' }}>
+            <div className="relative">
+            {/* Fade right — hints more items to scroll */}
+            <div className="sm:hidden absolute right-0 top-0 bottom-0 w-8 pointer-events-none z-10"
+              style={{ background: 'linear-gradient(to left, rgba(11,29,58,0.7), transparent)' }} />
+            <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1 pr-8 sm:pr-1 sm:flex-wrap sm:overflow-visible" style={{ scrollbarWidth: 'none' }}>
               {[
                 { label: 'Schedule',     icon: RiCalendarCheckLine, to: '/maintenance' },
                 { label: 'New Repair',   icon: RiHammerLine,        to: '/maintenance' },
@@ -222,7 +225,7 @@ export default function Dashboard() {
                 { label: 'Letterhead',   icon: RiUploadCloudLine,   to: '/letterhead'  },
               ].map(({ label, icon: Icon, to }) => (
                 <Link key={label} to={to}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] sm:text-[12px] font-bold text-blue-100 transition-all"
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] sm:text-[12px] font-bold text-blue-100 transition-all active:scale-95 active:opacity-80"
                   style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <Icon className="w-3.5 h-3.5 text-blue-300" />{label}
                 </Link>
@@ -232,15 +235,16 @@ export default function Dashboard() {
 
               {[
                 { label: 'Log Fuel',      icon: RiGasStationLine, color: '#fbbf24', onClick: () => setFuelOpen(true) },
-                { label: 'Fleet Expense', icon: RiCarLine,        color: '#93c5fd', onClick: () => setCarExpenseOpen(true) },
+                { label: 'Fleet Expense', icon: RiCarLine,        color: '#e5a800', onClick: () => setCarExpenseOpen(true) },
                 { label: 'Expense',       icon: RiReceiptLine,    color: '#6ee7b7', onClick: () => setHomeExpenseOpen(true) },
               ].map(({ label, icon: Icon, color, onClick }) => (
                 <button key={label} type="button" onClick={onClick}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] sm:text-[12px] font-bold transition-all"
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] sm:text-[12px] font-bold transition-all active:scale-95 active:opacity-80"
                   style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.15)', color }}>
                   <Icon className="w-3.5 h-3.5" />{label}
                 </button>
               ))}
+            </div>
             </div>
           </div>
         </div>
@@ -249,15 +253,15 @@ export default function Dashboard() {
       {/* ── KPI stats row ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Contracts',    value: stats.activeContracts ?? 0,    icon: RiFileList3Line,  color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', href: '/contracts'  },
+          { label: 'Contracts',    value: stats.activeContracts ?? 0,    icon: RiFileList3Line,  color: '#c88000', bg: '#fffdf0', border: '#fde68a', href: '/contracts'  },
           { label: 'Maintenance',  value: stats.upcomingMaintenance ?? 0, icon: RiCalendarCheckLine, color: '#d97706', bg: '#fffbeb', border: '#fde68a', href: '/maintenance' },
           { label: 'Open Repairs', value: stats.openRepairs ?? 0,        icon: RiHammerLine,     color: '#dc2626', bg: '#fef2f2', border: '#fecaca', href: '/maintenance' },
           { label: 'Staff',        value: stats.activeEmployees ?? 0,    icon: RiTeamLine,       color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', href: '/employees'  },
         ].map((s, i) => (
           <motion.div key={s.label} {...fadeUp(0.04 + i * 0.05)}>
-            <Link to={s.href}>
-              <div className="bg-white rounded-2xl p-4 sm:p-5 border hover:shadow-md transition-all duration-200 group"
-                style={{ borderColor: s.border, boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+            <Link to={s.href} className="block active:scale-[0.97] transition-transform duration-150">
+              <div className="bg-white rounded-2xl p-4 sm:p-5 border hover:shadow-(--shadow-card-hover) active:shadow-none transition-all duration-200 group"
+                style={{ borderColor: s.border, boxShadow: 'var(--shadow-card)' }}>
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
                   <s.icon className="w-4 h-4" style={{ color: s.color }} />
                 </div>
@@ -272,7 +276,7 @@ export default function Dashboard() {
       {/* ── Wallet balances ── */}
       <motion.div {...fadeUp(0.1)}>
         <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5"
-          style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+          style={{ boxShadow: 'var(--shadow-card)' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
@@ -297,7 +301,7 @@ export default function Dashboard() {
               const empty = bal <= 0;
               return (
                 <Link key={key} to={to}
-                  className="flex flex-col gap-2 p-3.5 rounded-xl border transition-all hover:shadow-sm"
+                  className="flex flex-col gap-2 p-3.5 rounded-xl border transition-all hover:shadow-sm active:scale-[0.97] active:brightness-95"
                   style={{ borderColor: empty ? '#fecaca' : low ? '#fde68a' : '#e2e8f0', background: empty ? '#fff5f5' : low ? '#fffbeb' : bg }}>
                   <div className="flex items-center justify-between">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: color }}>
@@ -487,7 +491,7 @@ export default function Dashboard() {
           {/* Property Health */}
           <motion.div {...fadeUp(0.14)}>
             <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5"
-              style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+              style={{ boxShadow: 'var(--shadow-card)' }}>
               <p className="text-[13px] font-bold text-slate-800 mb-0.5">Property Health</p>
               <p className="text-[10px] text-slate-400 mb-4">{home.name} — overall status</p>
               <div className="flex items-center justify-center mb-4">
@@ -495,7 +499,7 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { label: 'Contracts',  value: stats.activeContracts ?? 0, icon: RiFileList3Line, color: '#2563eb', bg: '#eff6ff' },
+                  { label: 'Contracts',  value: stats.activeContracts ?? 0, icon: RiFileList3Line, color: '#c88000', bg: '#fffdf0' },
                   { label: 'Staff',      value: stats.activeEmployees ?? 0, icon: RiTeamLine,     color: '#7c3aed', bg: '#f5f3ff' },
                   { label: 'Warranties', value: stats.warrantyAlerts  ?? 0, icon: RiShieldLine,   color: '#0891b2', bg: '#ecfeff' },
                   { label: 'Alerts',     value: unread,                     icon: RiBellLine,     color: '#d97706', bg: '#fffbeb' },
@@ -591,7 +595,7 @@ export default function Dashboard() {
       {cars.length > 0 && (
         <motion.div {...fadeUp(0.24)}>
           <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5"
-            style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            style={{ boxShadow: 'var(--shadow-card)' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
@@ -674,7 +678,7 @@ export default function Dashboard() {
         {/* Home info */}
         <motion.div {...fadeUp(0.26)}>
           <div className="bg-white rounded-2xl border border-slate-100 p-4"
-            style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+            style={{ boxShadow: 'var(--shadow-card)' }}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
@@ -705,7 +709,7 @@ export default function Dashboard() {
         {staff.length > 0 && (
           <motion.div {...fadeUp(0.28)}>
             <div className="bg-white rounded-2xl border border-slate-100 p-4"
-              style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+              style={{ boxShadow: 'var(--shadow-card)' }}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
@@ -739,24 +743,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ── Mobile bottom quick-action bar ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden"
-        style={{ background: 'linear-gradient(135deg,#0b1d3a,#1e3a6e)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="flex items-center justify-around px-2 py-2.5">
-          {[
-            { label: 'Log Fuel',    Icon: RiGasStationLine, color: '#fbbf24', onClick: () => setFuelOpen(true) },
-            { label: 'Fleet Exp.', Icon: RiCarLine,         color: '#93c5fd', onClick: () => setCarExpenseOpen(true) },
-            { label: 'Expense',    Icon: RiReceiptLine,     color: '#6ee7b7', onClick: () => setHomeExpenseOpen(true) },
-          ].map(({ label, Icon, color, onClick }) => (
-            <button key={label} type="button" onClick={onClick}
-              className="flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl active:bg-white/10 transition-colors">
-              <Icon className="w-5 h-5" style={{ color }} />
-              <span className="text-[9px] font-bold" style={{ color }}>{label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* ── Quick-log modals ── */}
       <QuickFuelModal        open={fuelOpen}        onClose={() => setFuelOpen(false)} />
       <QuickExpenseModal     open={carExpenseOpen}  onClose={() => setCarExpenseOpen(false)} />
@@ -768,7 +754,7 @@ export default function Dashboard() {
 function SectionCard({ title, subtitle, action, children }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5"
-      style={{ boxShadow: '0 1px 12px rgba(0,0,0,0.05)' }}>
+      style={{ boxShadow: 'var(--shadow-card)' }}>
       <div className="flex items-start justify-between mb-3">
         <div>
           <p className="text-[13px] font-bold text-slate-800 leading-tight">{title}</p>

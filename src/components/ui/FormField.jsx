@@ -1,8 +1,8 @@
-import { forwardRef } from 'react';
+﻿import { forwardRef } from 'react';
 import { RiErrorWarningLine } from 'react-icons/ri';
 import { cn } from '../../utils/cn';
 
-const base = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all disabled:bg-slate-50 disabled:cursor-not-allowed';
+const base = 'w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all disabled:bg-slate-50 disabled:cursor-not-allowed';
 
 export function Field({ label, error, required, hint, children, className }) {
   return (
@@ -100,12 +100,12 @@ export function FormActions({ onCancel, submitLabel = 'Save', loading = false, d
   return (
     <div className="flex items-center justify-end gap-3 pt-5 mt-2 border-t border-slate-100">
       <button type="button" onClick={onCancel}
-        className="h-9 px-4 rounded-xl border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-all">
+        className="h-10 sm:h-9 px-4 rounded-xl border border-slate-200 text-[13px] font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 transition-all">
         Cancel
       </button>
       <button type="submit" disabled={loading}
         className={cn(
-          'h-9 px-5 rounded-xl text-[13px] font-bold text-white transition-all flex items-center gap-2 disabled:opacity-50',
+          'h-10 sm:h-9 px-5 rounded-xl text-[13px] font-bold text-white transition-all flex items-center gap-2 disabled:opacity-50 active:scale-[0.98]',
           destructive ? 'bg-danger-600 hover:bg-danger-700' : 'bg-accent-600 hover:bg-accent-700',
         )}>
         {loading && (

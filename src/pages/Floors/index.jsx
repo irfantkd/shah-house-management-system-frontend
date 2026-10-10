@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useForm } from 'react-hook-form';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,7 +22,7 @@ import { cn } from '../../utils/cn';
 
 const FLOOR_COLORS = [
   { label: 'Navy',    value: '#0b1d3a' },
-  { label: 'Royal',  value: '#1d4ed8' },
+  { label: 'Royal',  value: '#1e3a6e' },
   { label: 'Teal',   value: '#0f766e' },
   { label: 'Purple', value: '#7c3aed' },
   { label: 'Green',  value: '#15803d' },
@@ -192,14 +192,14 @@ export default function FloorsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Total Floors',    value: totalCount,     color: '#0b1d3a', bg: '#f0f5ff', icon: RiStackLine     },
-          { label: 'Total Areas',     value: totalAreas,     color: '#1d4ed8', bg: '#eff6ff', icon: RiMapPin2Line    },
+          { label: 'Total Areas',     value: totalAreas,     color: '#c88000', bg: '#fffdf0', icon: RiMapPin2Line    },
           { label: 'Highest Level',   value: maxLevel,       color: '#0f766e', bg: '#f0fdfa', icon: RiArrowUpLine    },
           { label: 'Basement Levels', value: hasBasement ? Math.abs(minLevel) : 0, color: '#7c3aed', bg: '#f5f3ff', icon: RiArrowDownLine },
         ].map((s, i) => (
           <motion.div key={s.label}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
             className="bg-white rounded-2xl border border-slate-100 p-5 flex flex-col gap-2"
-            style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+            style={{ boxShadow: 'var(--shadow-card)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: s.bg }}>
               <s.icon className="w-4.5 h-4.5" style={{ color: s.color }} />
             </div>
@@ -213,7 +213,7 @@ export default function FloorsPage() {
 
       {/* ── Building layout diagram ── */}
       {floors.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.04)' }}>
+        <div className="bg-white rounded-2xl border border-slate-100 p-5" style={{ boxShadow: 'var(--shadow-card)' }}>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-4">Building Layout</p>
           <div className="flex flex-col gap-1.5">
             {[...floors].reverse().map((floor, i) => {
@@ -255,7 +255,7 @@ export default function FloorsPage() {
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search floors by name or description…"
-              className="w-full pl-9 pr-9 h-10 rounded-xl border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400"
+              className="w-full pl-9 pr-9 h-10 rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 focus:border-blue-400"
             />
             {search && (
               <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
@@ -263,7 +263,7 @@ export default function FloorsPage() {
               </button>
             )}
           </div>
-          <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 w-fit">
+          <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto no-scrollbar">
             {[
               { k: 'all',      l: 'All' },
               { k: 'upper',    l: 'Upper' },
@@ -283,7 +283,7 @@ export default function FloorsPage() {
       {/* ── Empty state — no floors at all ── */}
       {floors.length === 0 && (
         <div className="bg-white rounded-2xl border border-slate-100 p-16 text-center"
-          style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+          style={{ boxShadow: 'var(--shadow-card)' }}>
           <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
             <RiStackLine className="w-8 h-8 text-slate-300" />
           </div>
@@ -328,15 +328,15 @@ export default function FloorsPage() {
                   key={floor.id}
                   {...fade(i * 0.05)}
                   className="rounded-3xl overflow-hidden"
-                  style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.08)' }}
+                  style={{ boxShadow: 'var(--shadow-modal)' }}
                   onSwipeRight={() => setModal(floor)}
                   onSwipeLeft={() =>
                     canDelete
                       ? setDelTarget(floor)
                       : toast(`Remove all areas from "${floor.name}" before deleting`, { icon: '⚠️' })
                   }
-                  leftIcon={<Edit2  style={{ color: '#2563eb', width: 20, height: 20 }} />}
-                  leftLabel="Edit"    leftBg="#eff6ff"  leftColor="#2563eb"
+                  leftIcon={<Edit2  style={{ color: '#9a6500', width: 20, height: 20 }} />}
+                  leftLabel="Edit"    leftBg="#fffdf0"  leftColor="#9a6500"
                   rightIcon={<Trash2 style={{ color: '#dc2626', width: 20, height: 20 }} />}
                   rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                 >
@@ -453,7 +453,7 @@ function FloorCard({ floor, canDelete, onEdit, onDelete }) {
 
       {/* Header */}
       <div className="relative px-5 pt-5 pb-5 overflow-hidden"
-        style={{ background: `linear-gradient(150deg, ${accent}f0 0%, ${accent} 100%)` }}>
+        style={{ background: 'linear-gradient(135deg, #0b1d3a, #1e3a6e)' }}>
 
         {/* Top shine */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.3)' }} />

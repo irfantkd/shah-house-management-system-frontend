@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { AnimatePresence } from 'framer-motion';
@@ -154,7 +154,7 @@ export default function FuelTab({ carId }) {
           { label: 'Avg per Fill',  value: `AED ${avgFill.toFixed(0)}`,                    icon: TrendingUp, color: '#16a34a', bg: '#f0fdf4' },
           { label: 'Fill-ups',      value: totalCount,                                      icon: Hash,       color: '#0b1d3a', bg: '#f0f5ff' },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+          <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5" style={{ background: s.bg }}>
               <s.icon className="w-4 h-4" style={{ color: s.color }} />
             </div>
@@ -202,11 +202,11 @@ export default function FuelTab({ carId }) {
                       exit={{ opacity: 0, scale: 0.97 }}
                       transition={{ delay: i * 0.02 }}
                       className="rounded-2xl overflow-hidden"
-                      style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
+                      style={{ boxShadow: 'var(--shadow-card)' }}
                       onSwipeRight={() => openEdit(log)}
                       onSwipeLeft={() => setDeleteConfirm(log)}
-                      leftIcon={<Edit2 style={{ color: '#2563eb', width: 18, height: 18 }} />}
-                      leftLabel="Edit" leftBg="#eff6ff" leftColor="#2563eb"
+                      leftIcon={<Edit2 style={{ color: '#9a6500', width: 18, height: 18 }} />}
+                      leftLabel="Edit" leftBg="#fffdf0" leftColor="#9a6500"
                       rightIcon={<Trash2 style={{ color: '#dc2626', width: 18, height: 18 }} />}
                       rightLabel="Delete" rightBg="#fef2f2" rightColor="#dc2626"
                     >
@@ -305,7 +305,7 @@ export default function FuelTab({ carId }) {
   );
 }
 
-const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 
 function PaginationBar({ page, pages, total, isFetching, onPage }) {
   if (pages <= 1) return null;

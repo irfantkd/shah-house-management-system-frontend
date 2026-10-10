@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
@@ -43,7 +43,7 @@ const CAT_META = {
   Garden:     { icon: RiLeafLine,         bg: '#f0fdf4', color: '#15803d', label: 'Garden'     },
   Pool:       { icon: RiContrastDropLine, bg: '#e0f2fe', color: '#0284c7', label: 'Pool'       },
   Structural: { icon: RiBuildingLine,     bg: '#f8fafc', color: '#475569', label: 'Structural' },
-  climate:    { icon: RiTempColdLine,     bg: '#eff6ff', color: '#2563eb', label: 'Climate'    },
+  climate:    { icon: RiTempColdLine,     bg: '#e0f2fe', color: '#0284c7', label: 'Climate'    },
   power:      { icon: RiLightbulbLine,    bg: '#fefce8', color: '#ca8a04', label: 'Power'      },
   Other:      { icon: RiBox3Line,         bg: '#f1f5f9', color: '#64748b', label: 'Other'      },
 };
@@ -190,7 +190,7 @@ export default function AssetDetail() {
           className="flex items-center gap-1.5 text-[13px] font-bold text-slate-500 hover:text-slate-800 transition-colors group"
         >
           <span className="w-8 h-8 rounded-xl border border-slate-200 bg-white flex items-center justify-center group-hover:border-slate-300 transition-all"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+            style={{ boxShadow: 'var(--shadow-card)' }}>
             <RiArrowLeftLine className="w-4 h-4" />
           </span>
           <span className="hidden sm:block">Back to Assets</span>
@@ -200,7 +200,7 @@ export default function AssetDetail() {
           <button
             onClick={() => setEditOpen(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-bold border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition-all"
-            style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+            style={{ boxShadow: 'var(--shadow-card)' }}
           >
             <RiEditLine className="w-4 h-4" />
             <span className="hidden sm:block">Edit Asset</span>
@@ -209,7 +209,7 @@ export default function AssetDetail() {
             <button
               onClick={() => setUnassignOpen(true)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-bold border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all"
-              style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+              style={{ boxShadow: 'var(--shadow-card)' }}
             >
               <RiMapPin2Line className="w-4 h-4" />
               <span className="hidden sm:block">Unassign</span>
@@ -230,7 +230,7 @@ export default function AssetDetail() {
                 ? 'border-slate-200 bg-white text-red-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600'
                 : 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed',
             )}
-            style={{ boxShadow: canDelete ? '0 1px 4px rgba(0,0,0,0.06)' : 'none' }}
+            style={{ boxShadow: canDelete ? 'var(--shadow-card)' : 'none' }}
           >
             <RiDeleteBinLine className="w-4 h-4" />
             <span className="hidden sm:block">Delete</span>
@@ -332,7 +332,7 @@ export default function AssetDetail() {
 
       {/* ── Tab bar ── */}
       <div className="bg-white rounded-2xl border border-slate-100 p-1.5 flex items-center gap-1 overflow-x-auto"
-        style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.06)' }}>
+        style={{ boxShadow: 'var(--shadow-card)' }}>
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={cn(
@@ -381,7 +381,7 @@ export default function AssetDetail() {
 
               {asset.notes && (
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 p-5"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-3">Notes</p>
                   <p className="text-[14px] text-slate-700 leading-relaxed">{asset.notes}</p>
                 </div>
@@ -441,14 +441,14 @@ export default function AssetDetail() {
                 </p>
                 <Link to="/maintenance"
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all"
-                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <RiAddLine className="w-3.5 h-3.5" />Add Record
                 </Link>
               </div>
 
               {serviceHistory.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center"
-                  style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                  style={{ boxShadow: 'var(--shadow-card)' }}>
                   <RiHistoryLine className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                   <p className="text-[14px] font-semibold text-slate-400">No service records yet</p>
                   <p className="text-[12px] text-slate-400 mt-1">Service history will appear here after maintenance visits.</p>
@@ -461,7 +461,7 @@ export default function AssetDetail() {
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}>
                       <div className="bg-white rounded-2xl border border-slate-100 p-5"
-                        style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                        style={{ boxShadow: 'var(--shadow-card)' }}>
                         <div className="flex items-start justify-between gap-3 mb-4">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -521,7 +521,7 @@ export default function AssetDetail() {
                 ].map((s) => (
                   <div key={s.label}
                     className="bg-white rounded-2xl border p-5 text-center"
-                    style={{ borderColor: s.warn ? '#fca5a5' : '#f1f5f9', background: s.warn ? '#fef2f2' : '#fff', boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+                    style={{ borderColor: s.warn ? '#fca5a5' : '#f1f5f9', background: s.warn ? '#fef2f2' : '#fff', boxShadow: 'var(--shadow-card)' }}>
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
                       style={{ background: s.warn ? '#fee2e2' : '#f8fafc' }}>
                       {typeof s.icon === 'function'
@@ -554,7 +554,7 @@ export default function AssetDetail() {
           {/* ─── Documents ─── */}
           {tab === 'docs' && (
             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden"
-              style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+              style={{ boxShadow: 'var(--shadow-card)' }}>
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                 <div>
                   <p className="text-[15px] font-bold text-slate-800">Documents</p>
@@ -574,7 +574,7 @@ export default function AssetDetail() {
               ) : (
                 documents.map((doc) => {
                   const ext = (doc.type ?? doc.name?.split('.').pop() ?? '').toLowerCase();
-                  const extColors = { pdf: { bg: '#fef2f2', color: '#dc2626' }, jpg: { bg: '#f0f5ff', color: '#2563eb' }, png: { bg: '#f0fdf4', color: '#16a34a' } };
+                  const extColors = { pdf: { bg: '#fef2f2', color: '#dc2626' }, jpg: { bg: '#f0f5ff', color: '#1e3a6e' }, png: { bg: '#f0fdf4', color: '#16a34a' } };
                   const ec = extColors[ext] ?? { bg: '#f8fafc', color: '#64748b' };
                   return (
                     <div key={doc.id ?? doc.name} className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors group">
@@ -646,7 +646,7 @@ export default function AssetDetail() {
 function InfoCard({ title, icon: Icon, children }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-5"
-      style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+      style={{ boxShadow: 'var(--shadow-card)' }}>
       <div className="flex items-center gap-2 mb-4">
         <Icon className="w-4 h-4 text-slate-400" />
         <p className="text-[13px] font-bold text-slate-700">{title}</p>
@@ -656,7 +656,7 @@ function InfoCard({ title, icon: Icon, children }) {
   );
 }
 
-const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
+const DP_CLS = 'w-full rounded-xl border border-slate-200 bg-white text-[16px] sm:text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-accent-400 focus:border-accent-400 transition-all h-10 px-3.5';
 
 /* ══ Edit Asset Modal ══ */
 function EditAssetModal({ open, onClose, asset, areas, onSave, isSubmitting }) {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { Wrench, Plus, Trash2, AlertTriangle, Clock, CheckCircle, DollarSign, Calendar, Gauge, Edit2 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation } from '../../../api/apiSlice';
 import Button     from '../../../components/ui/Button';
@@ -44,7 +44,7 @@ const BLANK = {
   notes:          '',
 };
 
-const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
+const INPUT = 'w-full h-10 px-3 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500';
 
 export default function MaintenanceTab({ carId }) {
   const { data: records = [], refetch } = useGetQuery({ path: `/cars/${carId}/maintenance` }, { skip: !carId });
@@ -151,7 +151,7 @@ export default function MaintenanceTab({ carId }) {
             color: stats.nextDue && daysUntil(stats.nextDue.nextDueDate) < 0 ? '#e11d48' : '#16a34a',
             bg:    stats.nextDue && daysUntil(stats.nextDue.nextDueDate) < 0 ? '#fff1f2' : '#f0fdf4' },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+          <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5" style={{ background: s.bg }}>
               <s.icon className="w-4 h-4" style={{ color: s.color }} />
             </div>
@@ -212,7 +212,7 @@ export default function MaintenanceTab({ carId }) {
             const isOver = nextD !== null && nextD < 0;
             const isSoon = nextD !== null && nextD >= 0 && nextD <= 30;
             return (
-              <div key={r.id ?? r._id} className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+              <div key={r.id ?? r._id} className="bg-white rounded-2xl border border-slate-100 p-4" style={{ boxShadow: 'var(--shadow-card)' }}>
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: tc.bg }}>
                     <Wrench className="w-4 h-4" style={{ color: tc.color }} />
@@ -331,7 +331,7 @@ export default function MaintenanceTab({ carId }) {
             <label className="block text-[12px] font-semibold text-slate-600 mb-1.5">Notes <span className="font-normal text-slate-400">(optional)</span></label>
             <textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)}
               rows={2} placeholder="Any notes about the service…"
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-[16px] sm:text-[13px] text-slate-700 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-500 resize-none" />
           </div>
 
           <div className="flex justify-end gap-2.5 pt-1">
