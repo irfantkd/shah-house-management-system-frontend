@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, Pencil, Banknote, Wallet, Phone, CalendarDays, Cake,
   BadgeCheck, Trash2, Car, Home, AlertCircle, CheckCircle2, Clock,
   Globe, FileText, TrendingUp, ArrowDownLeft, RotateCcw, Users, X, AlertTriangle,
-  Save, Loader2, ShieldAlert,
+  Save, Loader2, ShieldAlert, BookOpen,
 } from 'lucide-react';
 import { useGetQuery, usePostMutation, usePutMutation, useDeleteMutation, usePatchMutation } from '../../api/apiSlice';
 import DatePicker from '../../components/ui/DatePicker';
@@ -592,7 +592,7 @@ export default function EmployeeDetail() {
             <motion.div key="edit-panel"
               initial={{ x:'100%' }} animate={{ x:0 }} exit={{ x:'100%' }}
               transition={{ type:'spring', damping:28, stiffness:280 }}
-              className="fixed right-0 top-0 h-full w-full max-w-sm bg-white z-50 flex flex-col shadow-2xl">
+              className="fixed right-0 top-0 bottom-0 w-full max-w-sm bg-white z-50 flex flex-col shadow-2xl">
 
               <div className="px-6 py-5 shrink-0 flex items-center justify-between"
                 style={{ background:'linear-gradient(150deg, #060e1e, #091833)' }}>
@@ -617,12 +617,12 @@ export default function EmployeeDetail() {
                 </div>
               </div>
 
-              <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-4" style={{ WebkitOverflowScrolling:'touch' }}>
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Full Name *</label>
                   <input value={editForm.name ?? ''} onChange={(e) => setEF('name', e.target.value)} required placeholder="Full name" className={INP} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Role *</label>
                     <select value={editForm.role ?? 'Driver'} onChange={(e) => setEF('role', e.target.value)} className={SEL}>
@@ -637,7 +637,7 @@ export default function EmployeeDetail() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Nationality</label>
                     <input value={editForm.nationality ?? ''} onChange={(e) => setEF('nationality', e.target.value)} placeholder="e.g. Pakistani" className={INP} />
@@ -647,7 +647,7 @@ export default function EmployeeDetail() {
                     <input value={editForm.phone ?? ''} onChange={(e) => setEF('phone', e.target.value)} placeholder="+971 50 000 0000" className={INP} />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Date of Birth *</label>
                     <DatePicker value={editForm.dateOfBirth ?? ''} onChange={(v) => setEF('dateOfBirth', v)} required className={INP} maxYear={new Date().getFullYear()} />
@@ -665,6 +665,8 @@ export default function EmployeeDetail() {
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Notes</label>
                   <textarea value={editForm.notes ?? ''} onChange={(e) => setEF('notes', e.target.value)} rows={3} className={`${INP} h-auto py-3 resize-none`} />
                 </div>
+
+                {/* ── Visa ── */}
                 <div className="pt-2 border-t border-slate-100">
                   <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                     <ShieldAlert className="w-3.5 h-3.5 text-red-400" /> Visa Information
@@ -683,6 +685,32 @@ export default function EmployeeDetail() {
                         if (d <= 0)  return <p className="text-[11px] text-red-600 mt-1 font-bold">Expired {Math.abs(d)}d ago</p>;
                         if (d <= 30) return <p className="text-[11px] text-amber-600 mt-1 font-bold">Expires in {d} days</p>;
                         return <p className="text-[11px] text-emerald-600 mt-1">Valid · {d} days left</p>;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Passport ── */}
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <BookOpen className="w-3.5 h-3.5 text-cyan-500" /> Passport Information
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Passport Number</label>
+                      <input value={editForm.passportNumber ?? ''} onChange={(e) => setEF('passportNumber', e.target.value)}
+                        placeholder="e.g. A12345678" className={INP} />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Passport Expiry Date</label>
+                      <DatePicker value={editForm.passportExpiry ?? ''} onChange={(v) => setEF('passportExpiry', v)}
+                        className={INP} minYear={2000} maxYear={new Date().getFullYear() + 15} />
+                      {editForm.passportExpiry && (() => {
+                        const d = visaDaysUntil(editForm.passportExpiry);
+                        if (d === null) return null;
+                        if (d <= 0)  return <p className="text-[11px] text-red-600 mt-1 font-bold">Expired {Math.abs(d)}d ago — renew immediately</p>;
+                        if (d <= 30) return <p className="text-[11px] text-amber-600 mt-1 font-bold">Expires in {d} days</p>;
+                        return <p className="text-[11px] text-emerald-600 mt-1">Valid · {d} days remaining</p>;
                       })()}
                     </div>
                   </div>

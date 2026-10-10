@@ -4,10 +4,11 @@ import { useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Cake, Phone, Mail, Pencil, Trash2,
-  BadgeCheck, X, Home,
+  BadgeCheck, X, Home, BookOpen,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useGetQuery, usePutMutation, useDeleteMutation } from '../../api/apiSlice';
+import DatePicker from '../../components/ui/DatePicker';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 
 const AVATAR_COLORS = [
@@ -38,7 +39,13 @@ const nextBday = (dob) => {
 };
 
 const INP   = 'w-full h-11 px-4 rounded-2xl border border-slate-200 bg-slate-50 text-[14px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10 transition-all';
-const BLANK = { name: '', phone: '', email: '', dateOfBirth: '', notes: '' };
+const BLANK = { name: '', phone: '', email: '', dateOfBirth: '', notes: '', passportNumber: '', passportExpiry: '' };
+
+const passportDaysUntil = (dateStr) => {
+  if (!dateStr) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.ceil((new Date(dateStr) - today) / 86400000);
+};
 
 function InfoRow({ icon: Icon, label, value, color }) {
   return (
@@ -252,7 +259,7 @@ export default function OwnerDetail() {
             <motion.div key="ed-panel"
               initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-              className="fixed right-0 top-0 h-full w-full max-w-sm bg-white z-50 flex flex-col shadow-2xl">
+              className="fixed right-0 top-0 bottom-0 w-full max-w-sm bg-white z-50 flex flex-col shadow-2xl">
 
               <div className="px-6 py-5 shrink-0 flex items-center justify-between"
                 style={{ background: 'linear-gradient(150deg, #060e1e, #091833)' }}>
@@ -279,31 +286,54 @@ export default function OwnerDetail() {
                 </div>
               </div>
 
-              <form onSubmit={handleSave} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-                {[
-                  { label: 'Full Name *',     key: 'name',        type: 'text',  placeholder: 'e.g. Mirfan Shah', required: true },
-                  { label: 'Date of Birth *', key: 'dateOfBirth', type: 'date',  placeholder: '',                 required: true },
-                  { label: 'Phone Number',    key: 'phone',       type: 'text',  placeholder: '+971 50 000 0000' },
-                  { label: 'Email Address',   key: 'email',       type: 'email', placeholder: 'email@example.com' },
-                ].map(({ label, key, type, placeholder, required }) => (
-                  <div key={key}>
-                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{label}</label>
-                    <input
-                      value={form[key] ?? ''}
-                      onChange={(e) => setF(key, e.target.value)}
-                      type={type}
-                      required={required}
-                      placeholder={placeholder}
-                      className={INP} />
-                    {key === 'dateOfBirth' && form.dateOfBirth && (
-                      <p className="text-[12px] text-slate-400 mt-1.5 ml-1">{calcAge(form.dateOfBirth)} years old</p>
-                    )}
-                  </div>
-                ))}
+              <form onSubmit={handleSave} className="flex-1 overflow-y-auto overscroll-contain px-6 py-5 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Full Name *</label>
+                  <input value={form.name ?? ''} onChange={(e) => setF('name', e.target.value)} required placeholder="e.g. Mirfan Shah" className={INP} />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Date of Birth *</label>
+                  <DatePicker value={form.dateOfBirth ?? ''} onChange={(v) => setF('dateOfBirth', v)} className={INP} maxYear={new Date().getFullYear()} />
+                  {form.dateOfBirth && <p className="text-[12px] text-slate-400 mt-1.5 ml-1">{calcAge(form.dateOfBirth)} years old</p>}
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Phone Number</label>
+                  <input value={form.phone ?? ''} onChange={(e) => setF('phone', e.target.value)} placeholder="+971 50 000 0000" className={INP} />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Email Address</label>
+                  <input value={form.email ?? ''} onChange={(e) => setF('email', e.target.value)} type="email" placeholder="email@example.com" className={INP} />
+                </div>
                 <div>
                   <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Notes</label>
                   <textarea value={form.notes ?? ''} onChange={(e) => setF('notes', e.target.value)}
                     rows={3} placeholder="Any additional notes…" className={`${INP} h-auto py-3 resize-none`} />
+                </div>
+
+                {/* ── Passport ── */}
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <BookOpen className="w-3.5 h-3.5 text-cyan-500" /> Passport Information
+                  </p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Passport Number</label>
+                      <input value={form.passportNumber ?? ''} onChange={(e) => setF('passportNumber', e.target.value)}
+                        placeholder="e.g. A12345678" className={INP} />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Passport Expiry Date</label>
+                      <DatePicker value={form.passportExpiry ?? ''} onChange={(v) => setF('passportExpiry', v)}
+                        className={INP} minYear={2000} maxYear={new Date().getFullYear() + 15} />
+                      {form.passportExpiry && (() => {
+                        const d = passportDaysUntil(form.passportExpiry);
+                        if (d === null) return null;
+                        if (d <= 0)  return <p className="text-[11px] text-red-600 mt-1 font-bold">Expired {Math.abs(d)}d ago — renew immediately</p>;
+                        if (d <= 30) return <p className="text-[11px] text-amber-600 mt-1 font-bold">Expires in {d} days</p>;
+                        return <p className="text-[11px] text-emerald-600 mt-1">Valid · {d} days remaining</p>;
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </form>
 
