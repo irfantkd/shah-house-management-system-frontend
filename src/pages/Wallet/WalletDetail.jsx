@@ -506,27 +506,6 @@ export default function WalletDetail() {
         <p className="text-[12px] text-slate-400 mt-2">{periodStats.txnCount} transactions · {pLabel}</p>
       </motion.div>
 
-      {/* ── Period stats ── */}
-      <motion.div {...fade(0.13)}>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            ...(isSalary ? [] : [{ l: 'Received', v: periodStats.deposited, c: '#16a34a', bg: '#f0fdf4', b: '#bbf7d0', icon: ArrowDownLeft }]),
-            { l: isSalary ? 'Total Paid' : 'Spent', v: periodStats.spent, c: '#dc2626', bg: '#fef2f2', b: '#fecaca', icon: ArrowUpRight },
-            ...(isSalary ? [] : [{ l: 'Net Balance', v: periodStats.net, c: periodStats.net >= 0 ? '#c88000' : '#dc2626', bg: periodStats.net >= 0 ? '#fffdf0' : '#fef2f2', b: periodStats.net >= 0 ? '#fde68a' : '#fecaca', icon: periodStats.net >= 0 ? TrendingUp : TrendingDown }]),
-          ].map((s) => (
-            <div key={s.l} className="bg-white rounded-2xl border p-5" style={{ borderColor: s.b, boxShadow: 'var(--shadow-card)' }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: s.bg }}>
-                <s.icon className="w-4 h-4" style={{ color: s.c }} />
-              </div>
-              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: s.c + '99' }}>{s.l}</p>
-              <p className="text-[22px] font-bold leading-tight mt-1" style={{ color: s.c }}>
-                {s.v < 0 ? '−' : ''}AED {fmt(Math.abs(s.v))}
-              </p>
-              <p className="text-[10px] text-slate-400 mt-1">{pLabel}</p>
-            </div>
-          ))}
-        </div>
-      </motion.div>
 
       {/* ── Monthly breakdown chart ── */}
       {monthlyChart.length > 0 && (
@@ -654,7 +633,10 @@ export default function WalletDetail() {
                         <p className={cn('text-[14px] sm:text-[15px] font-bold tabular-nums', isDepo ? 'text-emerald-600' : 'text-red-500')}>
                           {isDepo ? '+' : '−'}AED {fmt(txn.amount)}
                         </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Bal: AED {fmt(txn.balanceAfter ?? 0)}</p>
+                      </div>
+                      <div className="text-right shrink-0 pl-3 border-l border-slate-100 hidden sm:block">
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Balance</p>
+                        <p className="text-[13px] font-bold tabular-nums text-slate-700">AED {fmt(txn.balanceAfter ?? 0)}</p>
                       </div>
                     </div>
                   );

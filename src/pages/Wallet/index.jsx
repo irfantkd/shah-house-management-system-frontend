@@ -854,18 +854,12 @@ export default function WalletPage() {
                           {isCredit ? (txn.note || txn.description || 'Deposit received') : (txn.description || 'Expense deducted')}
                         </p>
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-lg"
-                            style={{ background: wCfg.bg, color: wCfg.color }}>
-                            <WIcon className="w-2.5 h-2.5 shrink-0" />
-                            {wCfg.label.replace(' Wallet', '')}
-                          </span>
                           {txn.category && txn.category !== 'Deposit' && (
                             <>
-                              <span className="text-[9px] text-slate-300">·</span>
                               <span className="text-[10px] text-slate-400 capitalize">{txn.category}</span>
+                              <span className="text-[9px] text-slate-300">·</span>
                             </>
                           )}
-                          <span className="text-[9px] text-slate-300">·</span>
                           <span className="text-[10px] text-slate-400 shrink-0">{fmtDate(txn.date)}</span>
                         </div>
                       </div>
@@ -878,12 +872,15 @@ export default function WalletPage() {
                         )}>
                           {isCredit ? '+' : '−'}AED {fmt(txn.amount)}
                         </p>
-                        {txn.balanceAfter != null && (
-                          <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 tabular-nums">
-                            Bal: {fmt(txn.balanceAfter)}
-                          </p>
-                        )}
                       </div>
+
+                      {/* Balance column */}
+                      {txn.balanceAfter != null && (
+                        <div className="text-right shrink-0 pl-3 border-l border-slate-100 hidden sm:block">
+                          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Balance</p>
+                          <p className="text-[13px] font-bold tabular-nums text-slate-700">AED {fmt(txn.balanceAfter)}</p>
+                        </div>
+                      )}
                     </motion.div>
                   );
                 })}
