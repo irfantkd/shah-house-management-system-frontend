@@ -20,7 +20,7 @@ export default function Modal({ open, onClose, title, subtitle, children, size =
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-end sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center sm:justify-center sm:p-4">
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute inset-0 bg-navy-950/60 backdrop-blur-sm"
