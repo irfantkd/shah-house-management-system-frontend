@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, ExternalLink, FileText, FileCheck, File, Download, Loader2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ExternalLink, FileText, FileCheck, File, Download, Loader2, Share2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { downloadFile } from '../../utils/downloadFile';
 
@@ -101,6 +101,23 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
                     {downloading
                       ? <Loader2 className="w-4 h-4 text-white/70 animate-spin" />
                       : <Download className="w-4 h-4 text-white/70" />}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const data = { title: item.name, text: item.name, url: item.url };
+                      if (typeof navigator.share === 'function') {
+                        try { await navigator.share(data); } catch {}
+                      } else {
+                        try {
+                          await navigator.clipboard.writeText(item.url);
+                          // toast not available here — use a brief title change
+                        } catch {}
+                        window.open(item.url, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                    className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
+                    title="Share">
+                    <Share2 className="w-4 h-4 text-white/70" />
                   </button>
                   <a href={item.url} target="_blank" rel="noopener noreferrer"
                     className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"

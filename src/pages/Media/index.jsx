@@ -4,6 +4,7 @@ import {
   Images, FileText, Car, Home, Search, ExternalLink, Eye,
   Trash2, Loader2, FolderOpen, Upload, X, Plus, FileCheck, File, Download,
   FileSignature, ChevronDown, LayoutGrid, List, Camera,
+  Share2, Copy, Check, MessageCircle, Mail,
 } from 'lucide-react';
 import { RiContractLine } from 'react-icons/ri';
 import { useSelector } from 'react-redux';
@@ -120,6 +121,7 @@ export default function MediaPage() {
   const [deleting,    setDeleting]   = useState(null);
   const [showUpload,  setShowUpload] = useState(false);
   const [viewMode,    setViewMode]   = useState('grid'); // 'grid' | 'list'
+  const [shareItem,   setShareItem]  = useState(null);   // item being shared
 
   // upload form
   const [pickedFile,      setPickedFile]      = useState(null);
@@ -252,6 +254,16 @@ export default function MediaPage() {
       toast.error(err.message || 'Delete failed');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  // ── Share ─────────────────────────────────────────────────────────────────
+  const handleShare = async (item) => {
+    const data = { title: item.name, text: `${item.name} — Shah House`, url: item.url };
+    if (typeof navigator.share === 'function') {
+      try { await navigator.share(data); } catch {}
+    } else {
+      setShareItem(item);
     }
   };
 
@@ -493,11 +505,11 @@ export default function MediaPage() {
               </div>
 
               {viewMode === 'grid' ? (
-                <MosaicGrid items={monthItems} onOpen={openLightbox} onDelete={handleDelete} deleting={deleting} />
+                <MosaicGrid items={monthItems} onOpen={openLightbox} onDelete={handleDelete} onShare={handleShare} deleting={deleting} />
               ) : (
                 <div className="space-y-2">
                   {monthItems.map((item) => (
-                    <DocRow key={item.id} item={item} onOpen={openLightbox} onDelete={handleDelete} deleting={deleting} />
+                    <DocRow key={item.id} item={item} onOpen={openLightbox} onDelete={handleDelete} onShare={handleShare} deleting={deleting} />
                   ))}
                 </div>
               )}
@@ -513,6 +525,9 @@ export default function MediaPage() {
         startIndex={lightbox.idx}
         onClose={() => setLightbox((s) => ({ ...s, open: false }))}
       />
+
+      {/* ── Share sheet ── */}
+      <ShareSheet item={shareItem} onClose={() => setShareItem(null)} />
 
       {/* ── Upload Modal ─────────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -816,7 +831,7 @@ function DocGridTile({ item }) {
 
 // ── Mosaic Grid — images + docs in same grid ──────────────────────────────────
 // Images at position i%5===0 get a 2×2 feature tile; docs are always 1×1.
-function MosaicGrid({ items, onOpen, onDelete, deleting }) {
+function MosaicGrid({ items, onOpen, onDelete, onShare, deleting }) {
   // Track a separate image counter so only images expand
   let imgIdx = -1;
   return (
@@ -873,7 +888,7 @@ function MosaicGrid({ items, onOpen, onDelete, deleting }) {
             </div>
 
             {/* Hover action buttons */}
-            <div className="absolute bottom-2 inset-x-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
+            <div className="absolute bottom-2 inset-x-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
               <button
                 className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl text-[11px] font-bold text-slate-800 bg-white/90 hover:bg-white transition-all"
                 onClick={(e) => { e.stopPropagation(); onOpen(item); }}>
@@ -881,13 +896,19 @@ function MosaicGrid({ items, onOpen, onDelete, deleting }) {
                 {isImage ? 'View' : 'Preview'}
               </button>
               <button
-                className="w-8 flex items-center justify-center rounded-xl bg-white/90 hover:bg-white text-slate-700 transition-all"
+                className="w-7 flex items-center justify-center rounded-xl bg-white/90 hover:bg-white text-slate-700 transition-all"
                 onClick={(e) => { e.stopPropagation(); downloadFile(item.url, item.name); }}
                 title="Download">
                 <Download className="w-3 h-3" />
               </button>
               <button
-                className="w-8 flex items-center justify-center rounded-xl bg-red-500/90 hover:bg-red-500 text-white transition-all disabled:opacity-50"
+                className="w-7 flex items-center justify-center rounded-xl bg-white/90 hover:bg-white text-sky-600 transition-all"
+                onClick={(e) => { e.stopPropagation(); onShare(item); }}
+                title="Share">
+                <Share2 className="w-3 h-3" />
+              </button>
+              <button
+                className="w-7 flex items-center justify-center rounded-xl bg-red-500/90 hover:bg-red-500 text-white transition-all disabled:opacity-50"
                 onClick={(e) => { e.stopPropagation(); onDelete(item); }}
                 disabled={isDel}
                 title="Delete">
@@ -902,7 +923,7 @@ function MosaicGrid({ items, onOpen, onDelete, deleting }) {
 }
 
 // ── List row (used in list-view mode for both images and docs) ────────────────
-function DocRow({ item, onOpen, onDelete, deleting }) {
+function DocRow({ item, onOpen, onDelete, onShare, deleting }) {
   const isDel = deleting === item.id;
   return (
     <motion.div
@@ -944,6 +965,11 @@ function DocRow({ item, onOpen, onDelete, deleting }) {
           title="Download">
           <Download className="w-4 h-4" />
         </button>
+        <button onClick={() => onShare(item)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-500 hover:text-sky-700 transition-all"
+          title="Share">
+          <Share2 className="w-4 h-4" />
+        </button>
         <a href={item.url} target="_blank" rel="noopener noreferrer"
           className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all"
           title="Open in tab">
@@ -956,5 +982,98 @@ function DocRow({ item, onOpen, onDelete, deleting }) {
         </button>
       </div>
     </motion.div>
+  );
+}
+
+// ── ShareSheet ────────────────────────────────────────────────────────────────
+function ShareSheet({ item, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!item) return null;
+
+  const ext     = (item.fileType ?? '').toUpperCase();
+  const isImage = ['JPG','JPEG','PNG','WEBP','GIF'].includes(ext);
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(item.url);
+      setCopied(true);
+      toast.success('Link copied!');
+      setTimeout(() => { setCopied(false); onClose(); }, 1400);
+    } catch { toast.error('Could not copy'); }
+  };
+
+  const waText    = encodeURIComponent(`${item.name}\n${item.url}`);
+  const emailSub  = encodeURIComponent(item.name);
+  const emailBody = encodeURIComponent(`Sharing: ${item.name}\n\n${item.url}`);
+
+  const OPTIONS = [
+    { label: copied ? 'Copied!' : 'Copy Link', Icon: copied ? Check : Copy,  color: '#0b1d3a', bg: '#f1f5f9', onClick: copyLink },
+    { label: 'WhatsApp',  Icon: MessageCircle, color: '#16a34a', bg: '#f0fdf4', href: `https://wa.me/?text=${waText}` },
+    { label: 'Email',     Icon: Mail,          color: '#7c3aed', bg: '#f5f3ff', href: `mailto:?subject=${emailSub}&body=${emailBody}` },
+    { label: 'Open',      Icon: ExternalLink,  color: '#0284c7', bg: '#f0f9ff', href: item.url },
+  ];
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key="share-backdrop"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+        onClick={onClose}>
+        <motion.div
+          key="share-panel"
+          initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 360, damping: 30 }}
+          className="w-full sm:max-w-xs bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden"
+          style={{ boxShadow: '0 40px 100px rgba(11,29,58,0.4)' }}
+          onClick={(e) => e.stopPropagation()}>
+
+          <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mt-3 sm:hidden" />
+
+          {/* File preview */}
+          <div className="flex items-center gap-3 px-5 pt-4 pb-3">
+            <div className="w-11 h-11 rounded-xl overflow-hidden border border-slate-100 shrink-0 bg-slate-50">
+              {isImage
+                ? <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
+                : <FileThumb fileType={item.fileType} url={item.url} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-bold text-slate-800 truncate">{item.name}</p>
+              <p className="text-[11px] text-slate-400">{ext || 'File'}{item.size ? ` · ${fmtSize(item.size)}` : ''}</p>
+            </div>
+          </div>
+
+          <div className="h-px bg-slate-100 mx-4" />
+
+          {/* Share options grid */}
+          <div className="grid grid-cols-4 gap-3 p-4">
+            {OPTIONS.map(({ label, Icon, color, bg, onClick, href }) =>
+              href ? (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer"
+                  className="flex flex-col items-center gap-2 py-3 rounded-2xl active:scale-95 transition-transform"
+                  style={{ background: bg }} onClick={onClose}>
+                  <Icon className="w-5 h-5" style={{ color }} />
+                  <span className="text-[10px] font-bold" style={{ color }}>{label}</span>
+                </a>
+              ) : (
+                <button key={label}
+                  className="flex flex-col items-center gap-2 py-3 rounded-2xl active:scale-95 transition-transform"
+                  style={{ background: bg }} onClick={onClick}>
+                  <Icon className="w-5 h-5" style={{ color }} />
+                  <span className="text-[10px] font-bold" style={{ color }}>{label}</span>
+                </button>
+              )
+            )}
+          </div>
+
+          <button onClick={onClose}
+            className="w-full py-4 text-[13px] font-semibold text-slate-400 hover:text-slate-600 transition-colors">
+            Cancel
+          </button>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
