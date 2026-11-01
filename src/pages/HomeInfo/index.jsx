@@ -2,23 +2,25 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSelector } from 'react-redux';
 import {
-  LayoutGrid, User, MapPin, Shield,
+  LayoutGrid, User, MapPin, Shield, FileText,
   BedDouble, Bath, Car, Ruler,
 } from 'lucide-react';
 import { useGetQuery } from '../../api/apiSlice';
 import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import Badge from '../../components/ui/Badge';
 import { cn } from '../../utils/cn';
-import OverviewTab  from './tabs/OverviewTab';
-import OwnerTab     from './tabs/OwnerTab';
-import AddressTab   from './tabs/AddressTab';
-import InsuranceTab from './tabs/InsuranceTab';
+import OverviewTab   from './tabs/OverviewTab';
+import OwnerTab      from './tabs/OwnerTab';
+import AddressTab    from './tabs/AddressTab';
+import InsuranceTab  from './tabs/InsuranceTab';
+import DocumentsTab  from './tabs/DocumentsTab';
 
 const TABS = [
-  { id: 'overview',  label: 'Overview',  icon: LayoutGrid },
-  { id: 'owner',     label: 'Owner',     icon: User       },
-  { id: 'address',   label: 'Address',   icon: MapPin     },
-  { id: 'insurance', label: 'Insurance', icon: Shield     },
+  { id: 'overview',   label: 'Overview',   icon: LayoutGrid },
+  { id: 'owner',      label: 'Owner',      icon: User       },
+  { id: 'address',    label: 'Address',    icon: MapPin     },
+  { id: 'insurance',  label: 'Insurance',  icon: Shield     },
+  { id: 'documents',  label: 'Documents',  icon: FileText   },
 ];
 
 const HERO_STATS = [
@@ -124,6 +126,7 @@ export default function HomeInfo() {
           {activeTab === 'owner'     && <OwnerTab     />}
           {activeTab === 'address'   && <AddressTab   />}
           {activeTab === 'insurance' && <InsuranceTab />}
+          {activeTab === 'documents' && <DocumentsTab propertyId={propertyId} />}
         </motion.div>
       </AnimatePresence>
     </motion.div>

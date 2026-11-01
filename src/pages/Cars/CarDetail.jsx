@@ -1,28 +1,33 @@
 ﻿import { useState, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Car, Edit, AlertCircle, Fuel, Gauge,
-  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, BarChart2, Loader2, Shield,
+  Camera, ChevronLeft, ChevronRight, Trash2, Plus, X, Save, BarChart2, Loader2, Shield, FileText,
 } from 'lucide-react';
 import PageLoader from '../../components/ui/PageLoader';
 import { useGetQuery, usePutMutation } from '../../api/apiSlice';
-import Badge   from '../../components/ui/Badge';
-import Button  from '../../components/ui/Button';
-import { cn }  from '../../utils/cn';
-import toast   from 'react-hot-toast';
-import OverviewTab from './tabs/OverviewTab';
-import ExpensesTab from './tabs/ExpensesTab';
-import FuelTab     from './tabs/FuelTab';
-import StatsTab    from './tabs/StatsTab';
+import { useSelector } from 'react-redux';
+import Badge        from '../../components/ui/Badge';
+import Button       from '../../components/ui/Button';
+import { cn }       from '../../utils/cn';
+import toast        from 'react-hot-toast';
+import OverviewTab  from './tabs/OverviewTab';
+import ExpensesTab  from './tabs/ExpensesTab';
+import FuelTab      from './tabs/FuelTab';
+import StatsTab     from './tabs/StatsTab';
+import DocumentsTab from './tabs/DocumentsTab';
 import { CAR_CATEGORIES } from '../../data/mockCars';
 import DatePicker from '../../components/ui/DatePicker';
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const TABS = [
-  { id: 'overview',  label: 'Overview',  icon: Car       },
-  { id: 'expenses',  label: 'Expenses',  icon: Gauge     },
-  { id: 'fuel',      label: 'Fuel Log',  icon: Fuel      },
-  { id: 'stats',     label: 'Stats',     icon: BarChart2 },
+  { id: 'overview',   label: 'Overview',   icon: Car       },
+  { id: 'expenses',   label: 'Expenses',   icon: Gauge     },
+  { id: 'fuel',       label: 'Fuel Log',   icon: Fuel      },
+  { id: 'stats',      label: 'Stats',      icon: BarChart2 },
+  { id: 'documents',  label: 'Documents',  icon: FileText  },
 ];
 
 const INP_E = 'w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[16px] sm:text-[13px] text-slate-800 placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white';
@@ -56,9 +61,10 @@ export default function CarDetail() {
   const [imgIdx,       setImgIdx]     = useState(0);
   const [showEdit,     setShowEdit]   = useState(false);
   const [editForm,     setEditForm]   = useState({});
-  const [localImages,  setLocalImages] = useState([]);
+  const [imgUploading, setImgUploading] = useState(false);
+  const token = useSelector((s) => s.auth?.token);
 
-  const { data: car, isLoading, isError } = useGetQuery({ path: `/cars/${id}` });
+  const { data: car, isLoading, isError, refetch } = useGetQuery({ path: `/cars/${id}` });
   const [updateCarMut, { isLoading: isSaving }] = usePutMutation();
 
   if (isLoading) return <PageLoader icon={Car} text="Loading vehicle…" />;
@@ -83,31 +89,53 @@ export default function CarDetail() {
   const ins     = regStatus(car.insuranceExpiry);
   const regDays = getDays(car.registrationExpiry);
   const warDays = car.warrantyExpiry ? getDays(car.warrantyExpiry) : null;
-  const backendImages = car.images ?? [];
-  const images  = [...backendImages, ...localImages];
+  // images is now [{id, url, publicId}] — map to URLs for display
+  const images    = (car.images ?? []).map((img) => (typeof img === 'string' ? img : img.url));
+  const imageObjs = car.images ?? [];
   const activeIdx = Math.min(imgIdx, Math.max(images.length - 1, 0));
   const activeImg = images[activeIdx] ?? null;
 
-  const handleUpload = (e) => {
+  const handleUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) return toast.error('Please select an image file');
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setLocalImages((prev) => [...prev, reader.result]);
-      setImgIdx(0);
-      toast.success('Photo added');
-    };
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
     e.target.value = '';
+    setImgUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${API_URL}/cars/${id}/images`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Upload failed');
+      toast.success('Photo uploaded');
+      refetch();
+    } catch (err) {
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setImgUploading(false);
+    }
   };
 
-  const handleRemove = (index, e) => {
+  const handleRemove = async (index, e) => {
     e.stopPropagation();
-    if (index < backendImages.length) { toast.error('Cannot remove synced photos here'); return; }
-    setLocalImages((prev) => prev.filter((_, i) => i !== index - backendImages.length));
-    setImgIdx(0);
-    toast.success('Photo removed');
+    const imgObj = imageObjs[index];
+    if (!imgObj?.id) return;
+    try {
+      const res = await fetch(`${API_URL}/cars/${id}/images/${imgObj.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Delete failed');
+      toast.success('Photo removed');
+      setImgIdx(0);
+      refetch();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete photo');
+    }
   };
 
   const prevImg = () => setImgIdx((i) => (i - 1 + images.length) % images.length);
@@ -211,11 +239,13 @@ export default function CarDetail() {
             </div>
           )}
 
-          <button onClick={() => fileRef.current?.click()}
+          <button onClick={() => !imgUploading && fileRef.current?.click()}
             className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/35 hover:bg-black/55 border border-white/20 backdrop-blur-sm transition-all">
-            <Camera className="w-3.5 h-3.5 text-white" />
+            {imgUploading
+              ? <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+              : <Camera className="w-3.5 h-3.5 text-white" />}
             <span className="text-[11px] font-semibold text-white">
-              {images.length === 0 ? 'Add Photo' : 'Add More'}
+              {imgUploading ? 'Uploading…' : images.length === 0 ? 'Add Photo' : 'Add More'}
             </span>
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
@@ -309,10 +339,12 @@ export default function CarDetail() {
                 </button>
               </div>
             ))}
-            <button onClick={() => fileRef.current?.click()}
+            <button onClick={() => !imgUploading && fileRef.current?.click()}
               className="shrink-0 w-20 h-14 rounded-xl border-2 border-dashed border-slate-200 hover:border-accent-400 hover:bg-accent-50 flex flex-col items-center justify-center gap-0.5 transition-all group">
-              <Plus className="w-4 h-4 text-slate-300 group-hover:text-accent-500" />
-              <span className="text-[9px] text-slate-300 group-hover:text-accent-500 font-semibold">Add</span>
+              {imgUploading
+                ? <Loader2 className="w-4 h-4 text-accent-500 animate-spin" />
+                : <Plus className="w-4 h-4 text-slate-300 group-hover:text-accent-500" />}
+              <span className="text-[9px] text-slate-300 group-hover:text-accent-500 font-semibold">{imgUploading ? '…' : 'Add'}</span>
             </button>
           </div>
         </motion.div>
@@ -336,10 +368,11 @@ export default function CarDetail() {
 
       {/* ── Tab Content ── */}
       <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-        {tab === 'overview'  && <OverviewTab car={car} />}
-        {tab === 'expenses'  && <ExpensesTab carId={car.id} />}
-        {tab === 'fuel'      && <FuelTab     carId={car.id} />}
-        {tab === 'stats'     && <StatsTab    carId={car.id} />}
+        {tab === 'overview'   && <OverviewTab  car={car} />}
+        {tab === 'expenses'   && <ExpensesTab  carId={car.id} />}
+        {tab === 'fuel'       && <FuelTab      carId={car.id} />}
+        {tab === 'stats'      && <StatsTab     carId={car.id} />}
+        {tab === 'documents'  && <DocumentsTab car={car} />}
       </motion.div>
 
       {/* ── Edit Vehicle Modal (comprehensive) ── */}
