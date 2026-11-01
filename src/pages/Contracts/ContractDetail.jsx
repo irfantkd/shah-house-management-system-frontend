@@ -1,11 +1,15 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useEffect, useState, useRef } from 'react';
 import { useParams, Navigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, FileText, Building2, Calendar, DollarSign, RefreshCw,
   CheckCircle2, AlertTriangle, XCircle, Bell, CheckCheck,
   Download, Eye, Trash2, Phone, Mail, MessageCircle, Clock, Wrench, Settings2,
+  Upload, Loader2, X, Plus, ImageIcon,
 } from 'lucide-react';
+import { compressImage } from '../../utils/compressImage';
+import { downloadFile } from '../../utils/downloadFile';
+import ImageLightbox from '../../components/ui/ImageLightbox';
 import DatePicker from '../../components/ui/DatePicker';
 import { useSelector } from 'react-redux';
 import {
@@ -350,7 +354,7 @@ export default function ContractDetail() {
             {activeTab === 2 && <PaymentHistoryTab payments={contract.paymentHistory ?? []} totalPaid={contract.totalPaid ?? 0} payStatus={payStatus} onPay={() => setShowPay(true)} />}
             {activeTab === 3 && <RenewalHistoryTab renewals={contract.renewalHistory ?? []} onRenew={() => setShowRenew(true)} />}
             {activeTab === 4 && <TasksTab tasks={contractTasks} />}
-            {activeTab === 5 && <DocumentsTab docs={contract.documents ?? []} />}
+            {activeTab === 5 && <DocumentsTab docs={contract.documents ?? []} contractId={contract.id} refetch={refetchContract} />}
             {activeTab === 6 && <CompanyTab company={company} />}
           </motion.div>
         </AnimatePresence>
@@ -901,37 +905,335 @@ function TasksTab({ tasks }) {
   );
 }
 
-function DocumentsTab({ docs }) {
-  const FC = { pdf: 'bg-danger-50 text-danger-600', xlsx: 'bg-success-50 text-success-600', docx: 'bg-accent-50 text-accent-600' };
-  if (docs.length === 0) {
-    return (
-      <div className="text-center py-10">
-        <FileText className="w-10 h-10 text-slate-200 mx-auto mb-2" />
-        <p className="text-[13px] text-slate-400">No documents uploaded.</p>
-        <button className="mt-3 text-[13px] text-accent-600 font-semibold hover:underline">+ Upload document</button>
-      </div>
-    );
-  }
+function DocumentsTab({ docs, contractId, refetch }) {
+  const API   = import.meta.env.VITE_API_URL ?? '';
+  const token = useSelector(s => s.auth?.token);
+  const fileInputRef = useRef(null);
+
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading,  setUploading]  = useState(false);
+  const [deleting,   setDeleting]   = useState(null);
+  const [form, setForm] = useState({ name: '', category: 'contract' });
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [lb, setLb] = useState({ open: false, items: [], idx: 0 });
+
+  const CATS = ['contract','amendment','invoice','insurance','permit','photo','other'];
+  const IMG_EXTS = ['jpg','jpeg','png','webp','gif'];
+  const isImg = (ft) => IMG_EXTS.includes((ft ?? '').toLowerCase());
+
+  const images   = docs.filter(d => isImg(d.fileType));
+  const docFiles = docs.filter(d => !isImg(d.fileType));
+
+  const openLightbox = (doc) => {
+    const items = docs.map(d => ({ url: d.url, name: d.name, fileType: d.fileType }));
+    const idx   = docs.findIndex(d => (d._id ?? d.id) === (doc._id ?? doc.id));
+    setLb({ open: true, items, idx: Math.max(0, idx) });
+  };
+
+  const handleFilePick = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const compressed = await compressImage(f);
+    setFile(compressed);
+    if (!form.name) setForm(v => ({ ...v, name: f.name.replace(/\.[^.]+$/, '') }));
+    if (f.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setPreview(ev.target.result);
+      reader.readAsDataURL(compressed);
+    } else {
+      setPreview(null);
+    }
+  };
+
+  const resetUpload = () => {
+    setShowUpload(false);
+    setFile(null);
+    setPreview(null);
+    setForm({ name: '', category: 'contract' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleUpload = async () => {
+    if (!file)            return toast.error('Please select a file');
+    if (!form.name.trim()) return toast.error('Please enter a document name');
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file, file.name);
+      fd.append('name', form.name.trim());
+      fd.append('category', form.category);
+      const res = await fetch(`${API}/api/contracts/${contractId}/documents`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Upload failed');
+      toast.success('Document uploaded');
+      resetUpload();
+      refetch();
+    } catch (err) {
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (doc) => {
+    const docId = doc._id ?? doc.id;
+    setDeleting(docId);
+    try {
+      const res = await fetch(`${API}/api/contracts/${contractId}/documents/${docId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Delete failed');
+      toast.success('Document deleted');
+      refetch();
+    } catch (err) {
+      toast.error(err.message || 'Delete failed');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const fmtSize = (bytes) => {
+    if (!bytes) return '';
+    return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const EXT_COLOR = {
+    pdf:  'bg-danger-50 text-danger-600',
+    xlsx: 'bg-success-50 text-success-600',
+    xls:  'bg-success-50 text-success-600',
+    docx: 'bg-accent-50 text-accent-600',
+    doc:  'bg-accent-50 text-accent-600',
+  };
+
   return (
-    <div className="space-y-2">
-      {docs.map((doc, i) => {
-        const fc = FC[doc.type] ?? 'bg-slate-50 text-slate-500';
-        return (
-          <div key={i} className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all group">
-            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold uppercase', fc)}>{doc.type}</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-slate-800 truncate">{doc.name}</p>
-              <p className="text-[11px] text-slate-400">{doc.size} · {fmtShort(doc.uploaded)}</p>
-            </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-accent-600 hover:bg-accent-50 transition-all"><Eye className="w-3.5 h-3.5" /></button>
-              <button className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-success-600 hover:bg-success-50 transition-all"><Download className="w-3.5 h-3.5" /></button>
-              <button className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-danger-500 hover:bg-danger-50 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
-            </div>
+    <div className="space-y-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <p className="text-[13px] font-semibold text-slate-600 uppercase tracking-wider">
+          {docs.length} {docs.length === 1 ? 'Document' : 'Documents'}
+        </p>
+        <button
+          onClick={() => setShowUpload(true)}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-accent-600 hover:bg-accent-700 text-white text-[13px] font-semibold transition-all shadow-sm">
+          <Upload className="w-3.5 h-3.5" />
+          Upload
+        </button>
+      </div>
+
+      {/* Empty state */}
+      {docs.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+            <FileText className="w-7 h-7 text-slate-300" />
           </div>
-        );
-      })}
-      <button className="mt-2 w-full py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-[13px] text-slate-400 font-medium hover:border-accent-300 hover:text-accent-500 transition-all">+ Upload Document</button>
+          <p className="text-[14px] font-medium text-slate-500">No documents yet</p>
+          <p className="text-[12px] text-slate-400 mt-1">Upload contracts, invoices, permits and more</p>
+        </div>
+      )}
+
+      {/* ── Image grid ── */}
+      {images.length > 0 && (
+        <div>
+          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Photos</p>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {images.map((doc) => {
+              const docId = doc._id ?? doc.id;
+              return (
+                <div key={docId} className="relative aspect-square rounded-xl overflow-hidden group bg-slate-100">
+                  <img src={doc.url} alt={doc.name} className="w-full h-full object-cover" loading="lazy" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => openLightbox(doc)}
+                      className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/40 flex items-center justify-center backdrop-blur-sm transition-all"
+                      title="View">
+                      <Eye className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={() => downloadFile(doc.url, doc.name)}
+                      className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/40 flex items-center justify-center backdrop-blur-sm transition-all"
+                      title="Download">
+                      <Download className="w-4 h-4 text-white" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(doc)}
+                      disabled={deleting === docId}
+                      className="w-8 h-8 rounded-xl bg-danger-500/70 hover:bg-danger-500 flex items-center justify-center backdrop-blur-sm transition-all disabled:opacity-50"
+                      title="Delete">
+                      {deleting === docId
+                        ? <Loader2 className="w-4 h-4 text-white animate-spin" />
+                        : <Trash2 className="w-4 h-4 text-white" />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Document list ── */}
+      {docFiles.length > 0 && (
+        <div>
+          {images.length > 0 && <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 mt-4">Files</p>}
+          <div className="space-y-2">
+            {docFiles.map((doc) => {
+              const docId  = doc._id ?? doc.id;
+              const extClr = EXT_COLOR[(doc.fileType ?? '').toLowerCase()] ?? 'bg-slate-100 text-slate-500';
+              return (
+                <div key={docId}
+                  className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all group">
+                  <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold uppercase', extClr)}>
+                    {(doc.fileType ?? 'file').slice(0, 4)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-slate-800 truncate">{doc.name}</p>
+                    <p className="text-[11px] text-slate-400 capitalize">
+                      {doc.category ?? 'other'}{doc.size ? ` · ${fmtSize(doc.size)}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => openLightbox(doc)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-accent-600 hover:bg-accent-50 transition-all"
+                      title="View">
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => downloadFile(doc.url, doc.name)}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-success-600 hover:bg-success-50 transition-all"
+                      title="Download">
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(doc)}
+                      disabled={deleting === docId}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-danger-500 hover:bg-danger-50 transition-all disabled:opacity-50"
+                      title="Delete">
+                      {deleting === docId
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <Trash2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Lightbox ── */}
+      <ImageLightbox
+        open={lb.open}
+        items={lb.items}
+        startIndex={lb.idx}
+        onClose={() => setLb(v => ({ ...v, open: false }))}
+      />
+
+      {/* ── Upload modal ── */}
+      <AnimatePresence>
+        {showUpload && (
+          <motion.div
+            key="upload-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) resetUpload(); }}>
+            <motion.div
+              key="upload-panel"
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 30 }}
+              className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <p className="text-[15px] font-bold text-slate-800">Upload Document</p>
+                <button onClick={resetUpload} className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-all">
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {/* File picker */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className={cn(
+                    'relative rounded-xl border-2 border-dashed cursor-pointer transition-all overflow-hidden',
+                    file ? 'border-accent-300 bg-accent-50' : 'border-slate-200 hover:border-accent-300 hover:bg-accent-50/40',
+                  )}>
+                  <input ref={fileInputRef} type="file" className="hidden" onChange={handleFilePick}
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" />
+                  {preview ? (
+                    <img src={preview} alt="preview" className="w-full h-40 object-contain" />
+                  ) : file ? (
+                    <div className="flex flex-col items-center justify-center py-8 gap-2">
+                      <FileText className="w-10 h-10 text-accent-400" />
+                      <p className="text-[13px] font-medium text-accent-700 truncate max-w-[220px]">{file.name}</p>
+                      <p className="text-[11px] text-accent-500">{fmtSize(file.size)}</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 gap-2">
+                      <Plus className="w-10 h-10 text-slate-300" />
+                      <p className="text-[13px] text-slate-400">Click to choose a file</p>
+                      <p className="text-[11px] text-slate-300">PDF, Word, Excel, Images — max 20 MB</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Name */}
+                <div>
+                  <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">Document Name</label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm(v => ({ ...v, name: e.target.value }))}
+                    placeholder="e.g. Signed Contract 2024"
+                    className="mt-1.5 w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-[13px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-accent-400 focus:border-transparent transition-all" />
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">Category</label>
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {CATS.map(cat => (
+                      <button key={cat}
+                        onClick={() => setForm(v => ({ ...v, category: cat }))}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg text-[12px] font-semibold capitalize transition-all',
+                          form.category === cat
+                            ? 'bg-accent-600 text-white'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+                        )}>
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={resetUpload}
+                    className="flex-1 py-3 rounded-xl border border-slate-200 text-[13px] font-semibold text-slate-500 hover:bg-slate-50 transition-all">
+                    Cancel
+                  </button>
+                  <button onClick={handleUpload} disabled={uploading || !file}
+                    className="flex-1 py-3 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-[13px] font-bold transition-all flex items-center justify-center gap-2">
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploading ? 'Uploading…' : 'Upload'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
