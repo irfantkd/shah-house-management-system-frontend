@@ -104,16 +104,31 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
                   </button>
                   <button
                     onClick={async () => {
-                      const data = { title: item.name, text: item.name, url: item.url };
+                      const MIME_MAP = {
+                        JPG: 'image/jpeg', JPEG: 'image/jpeg', PNG: 'image/png',
+                        WEBP: 'image/webp', GIF: 'image/gif', PDF: 'application/pdf',
+                      };
+                      const ext      = (item.fileType ?? '').toUpperCase();
+                      const mimeType = MIME_MAP[ext] || 'application/octet-stream';
+                      const safeName = item.name?.includes('.') ? item.name : `${item.name || 'file'}.${ext.toLowerCase()}`;
+
                       if (typeof navigator.share === 'function') {
-                        try { await navigator.share(data); } catch {}
-                      } else {
                         try {
-                          await navigator.clipboard.writeText(item.url);
-                          // toast not available here — use a brief title change
-                        } catch {}
-                        window.open(item.url, '_blank', 'noopener,noreferrer');
+                          const blob = await fetch(item.url).then((r) => r.blob());
+                          const file = new File([blob], safeName, { type: mimeType });
+                          if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+                            await navigator.share({ files: [file], title: item.name });
+                            return;
+                          }
+                          await navigator.share({ title: item.name, url: item.url });
+                          return;
+                        } catch (err) {
+                          if (err?.name === 'AbortError') return;
+                        }
                       }
+                      // Desktop: copy link + open
+                      try { await navigator.clipboard.writeText(item.url); } catch {}
+                      window.open(item.url, '_blank', 'noopener,noreferrer');
                     }}
                     className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
                     title="Share">

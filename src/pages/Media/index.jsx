@@ -259,12 +259,32 @@ export default function MediaPage() {
 
   // ── Share ─────────────────────────────────────────────────────────────────
   const handleShare = async (item) => {
-    const data = { title: item.name, text: `${item.name} — Shah House`, url: item.url };
+    const MIME_MAP = {
+      JPG: 'image/jpeg', JPEG: 'image/jpeg', PNG: 'image/png',
+      WEBP: 'image/webp', GIF: 'image/gif', PDF: 'application/pdf',
+    };
+    const ext      = (item.fileType ?? '').toUpperCase();
+    const mimeType = MIME_MAP[ext] || 'application/octet-stream';
+    const safeName = item.name?.includes('.') ? item.name : `${item.name || 'file'}.${ext.toLowerCase()}`;
+
+    // Try sharing the actual file blob (Web Share API Level 2)
     if (typeof navigator.share === 'function') {
-      try { await navigator.share(data); } catch {}
-    } else {
-      setShareItem(item);
+      try {
+        const blob = await fetch(item.url).then((r) => r.blob());
+        const file = new File([blob], safeName, { type: mimeType });
+        if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: item.name });
+          return;
+        }
+        // Fallback: share URL only (file sharing not supported by browser/OS)
+        await navigator.share({ title: item.name, url: item.url });
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return; // user cancelled — no fallback needed
+      }
     }
+    // Desktop fallback: show ShareSheet
+    setShareItem(item);
   };
 
   // ── Upload ────────────────────────────────────────────────────────────────
