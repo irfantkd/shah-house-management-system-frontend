@@ -216,22 +216,23 @@ export default function MediaPage() {
   const imageItems = filtered.filter((m) => m.kind === 'image');
   const docItems   = filtered.filter((m) => m.kind === 'doc');
 
-  // Group images by month for event gallery
-  const imagesByMonth = useMemo(() => {
+  // Group ALL items by month for unified event gallery
+  const itemsByMonth = useMemo(() => {
     const groups = new Map();
-    imageItems.forEach((img) => {
-      const key = fmtMonth(img.createdAt);
+    filtered.forEach((item) => {
+      const key = fmtMonth(item.createdAt);
       if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(img);
+      groups.get(key).push(item);
     });
     return [...groups.entries()];
-  }, [imageItems]);
+  }, [filtered]);
 
+  // Lightbox covers all filtered items — images show photo, PDFs show iframe
   const openLightbox = (item) => {
-    const idx = imageItems.findIndex((m) => m.id === item.id);
+    const idx = filtered.findIndex((m) => m.id === item.id);
     setLightbox({
       open: true,
-      items: imageItems.map((m) => ({ url: m.url, name: m.name, fileType: m.fileType })),
+      items: filtered.map((m) => ({ url: m.url, name: m.name, fileType: m.fileType })),
       idx: Math.max(idx, 0),
     });
   };
@@ -471,57 +472,37 @@ export default function MediaPage() {
           description={<span>Click <strong>Upload</strong> to add photos and documents.</span>} />
       )}
 
-      {/* ── Event Gallery (Images) ────────────────────────────────────────── */}
-      {!isLoading && imageItems.length > 0 && (
+      {/* ── Unified Event Gallery (images + docs in same grid) ──────────── */}
+      {!isLoading && filtered.length > 0 && (
         <div className="space-y-6">
-          {imagesByMonth.map(([month, monthImages]) => (
+          {itemsByMonth.map(([month, monthItems]) => (
             <div key={month}>
-              {/* Month divider */}
               <div className="flex items-center gap-3 mb-3">
                 <div className="flex items-center gap-2">
                   <Camera className="w-4 h-4 text-slate-400" />
                   <p className="text-[13px] font-bold text-slate-600">{month}</p>
                   <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                    {monthImages.length}
+                    {monthItems.length}
+                  </span>
+                  <span className="text-[10px] text-slate-300">
+                    {monthItems.filter(m => m.kind === 'image').length} photos ·{' '}
+                    {monthItems.filter(m => m.kind === 'doc').length} docs
                   </span>
                 </div>
                 <div className="flex-1 h-px bg-slate-100" />
               </div>
 
-              {/* Mosaic grid — first image of first group is large */}
               {viewMode === 'grid' ? (
-                <MosaicGrid items={monthImages} onOpen={openLightbox} onDelete={handleDelete} deleting={deleting} />
+                <MosaicGrid items={monthItems} onOpen={openLightbox} onDelete={handleDelete} deleting={deleting} />
               ) : (
                 <div className="space-y-2">
-                  {monthImages.map((item) => (
-                    <DocRow key={item.id} item={item} onOpen={openLightbox} onDelete={handleDelete} deleting={deleting} isImage />
+                  {monthItems.map((item) => (
+                    <DocRow key={item.id} item={item} onOpen={openLightbox} onDelete={handleDelete} deleting={deleting} />
                   ))}
                 </div>
               )}
             </div>
           ))}
-        </div>
-      )}
-
-      {/* ── Documents ────────────────────────────────────────────────────── */}
-      {!isLoading && docItems.length > 0 && (
-        <div>
-          {imageItems.length > 0 && <div className="h-2" />}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-slate-400" />
-              <p className="text-[13px] font-bold text-slate-600">Documents</p>
-              <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                {docItems.length}
-              </span>
-            </div>
-            <div className="flex-1 h-px bg-slate-100" />
-          </div>
-          <div className="space-y-2">
-            {docItems.map((item) => (
-              <DocRow key={item.id} item={item} onOpen={null} onDelete={handleDelete} deleting={deleting} isImage={false} />
-            ))}
-          </div>
         </div>
       )}
 
@@ -749,31 +730,81 @@ export default function MediaPage() {
   );
 }
 
-// ── Mosaic Grid ───────────────────────────────────────────────────────────────
-// Uses a CSS grid where every 5th image (index % 5 === 0) spans 2 columns.
-function MosaicGrid({ items, onOpen, onDelete, deleting }) {
+// ── Doc grid tile — styled file-type card ─────────────────────────────────────
+const DOC_TYPE_CFG = {
+  PDF:  { bg: '#fff1f2', iconBg: '#fecdd3', color: '#e11d48', label: 'PDF',  Icon: FileCheck },
+  DOC:  { bg: '#eff6ff', iconBg: '#bfdbfe', color: '#2563eb', label: 'DOC',  Icon: FileText  },
+  DOCX: { bg: '#eff6ff', iconBg: '#bfdbfe', color: '#2563eb', label: 'DOC',  Icon: FileText  },
+  XLS:  { bg: '#f0fdf4', iconBg: '#bbf7d0', color: '#16a34a', label: 'XLS',  Icon: File      },
+  XLSX: { bg: '#f0fdf4', iconBg: '#bbf7d0', color: '#16a34a', label: 'XLS',  Icon: File      },
+};
+function DocGridTile({ fileType }) {
+  const ext = (fileType ?? '').toUpperCase();
+  const { bg, iconBg, color, label, Icon } = DOC_TYPE_CFG[ext] ?? {
+    bg: '#f8fafc', iconBg: '#e2e8f0', color: '#64748b', label: ext || 'FILE', Icon: FileText,
+  };
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 auto-rows-[120px] sm:auto-rows-[140px]">
-      {items.map((item, i) => {
-        const isDel = deleting === item.id;
-        const big   = i % 5 === 0; // first in each row of 5 is a feature tile
+    <div className="w-full h-full flex flex-col items-center justify-center gap-2" style={{ background: bg }}>
+      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shadow-sm"
+        style={{ background: iconBg }}>
+        <Icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color }} />
+      </div>
+      <span className="text-[10px] sm:text-[11px] font-black tracking-[0.15em]" style={{ color }}>{label}</span>
+    </div>
+  );
+}
+
+// ── Mosaic Grid — images + docs in same grid ──────────────────────────────────
+// Images at position i%5===0 get a 2×2 feature tile; docs are always 1×1.
+function MosaicGrid({ items, onOpen, onDelete, deleting }) {
+  // Track a separate image counter so only images expand
+  let imgIdx = -1;
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 auto-rows-[110px] sm:auto-rows-[130px]">
+      {items.map((item) => {
+        const isDel  = deleting === item.id;
+        const isImage = item.kind === 'image';
+        if (isImage) imgIdx++;
+        const big = isImage && imgIdx % 5 === 0;
+
         return (
           <div key={item.id}
             className={cn(
-              'relative group rounded-2xl overflow-hidden bg-slate-100 cursor-pointer',
+              'relative group rounded-2xl overflow-hidden cursor-pointer transition-shadow hover:shadow-lg',
               big ? 'col-span-2 row-span-2' : 'col-span-1 row-span-1',
+              isImage ? 'bg-slate-100' : 'border border-slate-100',
             )}
             onClick={() => onOpen(item)}>
-            <img
-              src={item.url}
-              alt={item.name}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-              loading="lazy"
-            />
-            {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
 
-            {/* Source badge — always visible on big, hover on small */}
+            {/* ── Image tile ── */}
+            {isImage && (
+              <>
+                <img src={item.url} alt={item.name}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                {big && (
+                  <p className="absolute bottom-0 inset-x-0 px-3 py-2 text-[11px] font-semibold text-white truncate group-hover:opacity-0 transition-opacity"
+                    style={{ background: 'linear-gradient(transparent,rgba(0,0,0,0.7))' }}>
+                    {item.name}
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* ── Doc tile ── */}
+            {!isImage && (
+              <>
+                <DocGridTile fileType={item.fileType} />
+                {/* File name overlay at bottom */}
+                <div className="absolute bottom-0 inset-x-0 px-2 py-1.5 group-hover:opacity-0 transition-opacity"
+                  style={{ background: 'linear-gradient(transparent,rgba(0,0,0,0.55))' }}>
+                  <p className="text-[9px] sm:text-[10px] font-semibold text-white truncate leading-tight">{item.name}</p>
+                </div>
+              </>
+            )}
+
+            {/* Source badge */}
             <div className={cn(
               'absolute top-2 left-2 transition-opacity duration-200',
               big ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
@@ -781,12 +812,13 @@ function MosaicGrid({ items, onOpen, onDelete, deleting }) {
               <SourceBadge source={item.source} sourceName={item.sourceName} />
             </div>
 
-            {/* Action buttons */}
+            {/* Hover action buttons */}
             <div className="absolute bottom-2 inset-x-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-y-1 group-hover:translate-y-0">
               <button
                 className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-xl text-[11px] font-bold text-slate-800 bg-white/90 hover:bg-white transition-all"
                 onClick={(e) => { e.stopPropagation(); onOpen(item); }}>
-                <Eye className="w-3 h-3" /> View
+                <Eye className="w-3 h-3" />
+                {isImage ? 'View' : 'Preview'}
               </button>
               <button
                 className="w-8 flex items-center justify-center rounded-xl bg-white/90 hover:bg-white text-slate-700 transition-all"
@@ -802,14 +834,6 @@ function MosaicGrid({ items, onOpen, onDelete, deleting }) {
                 {isDel ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
               </button>
             </div>
-
-            {/* Name on bottom (when not hovered) */}
-            {big && (
-              <p className="absolute bottom-0 inset-x-0 px-3 py-2 text-[11px] font-semibold text-white truncate group-hover:opacity-0 transition-opacity"
-                style={{ background: 'linear-gradient(transparent,rgba(0,0,0,0.7))' }}>
-                {item.name}
-              </p>
-            )}
           </div>
         );
       })}
@@ -817,8 +841,8 @@ function MosaicGrid({ items, onOpen, onDelete, deleting }) {
   );
 }
 
-// ── Document / Image list row ─────────────────────────────────────────────────
-function DocRow({ item, onOpen, onDelete, deleting, isImage }) {
+// ── List row (used in list-view mode for both images and docs) ────────────────
+function DocRow({ item, onOpen, onDelete, deleting }) {
   const isDel = deleting === item.id;
   return (
     <motion.div
@@ -848,15 +872,13 @@ function DocRow({ item, onOpen, onDelete, deleting, isImage }) {
         )}
       </div>
 
-      {/* Actions — always visible on mobile, no hover needed */}
+      {/* Actions — always visible (no hover needed on mobile) */}
       <div className="flex items-center gap-1 shrink-0">
-        {(isImage || isPdf(item.fileType)) && onOpen && (
-          <button onClick={() => onOpen(item)}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all"
-            title="View">
-            <Eye className="w-4 h-4" />
-          </button>
-        )}
+        <button onClick={() => onOpen(item)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all"
+          title={item.kind === 'image' ? 'View' : 'Preview'}>
+          <Eye className="w-4 h-4" />
+        </button>
         <button onClick={() => downloadFile(item.url, item.name)}
           className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all"
           title="Download">
@@ -864,7 +886,7 @@ function DocRow({ item, onOpen, onDelete, deleting, isImage }) {
         </button>
         <a href={item.url} target="_blank" rel="noopener noreferrer"
           className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all"
-          title="Open">
+          title="Open in tab">
           <ExternalLink className="w-4 h-4" />
         </a>
         <button onClick={() => onDelete(item)} disabled={isDel}
