@@ -730,26 +730,86 @@ export default function MediaPage() {
   );
 }
 
-// ── Doc grid tile — styled file-type card ─────────────────────────────────────
+// ── PDF thumbnail URL from Cloudinary ─────────────────────────────────────────
+// Cloudinary can render any page of a PDF as an image. For PDFs uploaded as
+// resource_type:'image', this just adds a transformation. For legacy 'raw'
+// uploads it also swaps the delivery type. Falls back gracefully on error.
+function getPdfThumbnail(url) {
+  if (!url) return null;
+  // Swap /raw/upload/ → /image/upload/ then inject transformation
+  const base = url.replace('/raw/upload/', '/image/upload/');
+  const marker = '/upload/';
+  const idx = base.indexOf(marker);
+  if (idx === -1) return null;
+  return base.slice(0, idx + marker.length) + 'f_jpg,w_400,q_75,pg_1/' + base.slice(idx + marker.length);
+}
+
+// ── Doc-type config ────────────────────────────────────────────────────────────
 const DOC_TYPE_CFG = {
-  PDF:  { bg: '#fff1f2', iconBg: '#fecdd3', color: '#e11d48', label: 'PDF',  Icon: FileCheck },
-  DOC:  { bg: '#eff6ff', iconBg: '#bfdbfe', color: '#2563eb', label: 'DOC',  Icon: FileText  },
-  DOCX: { bg: '#eff6ff', iconBg: '#bfdbfe', color: '#2563eb', label: 'DOC',  Icon: FileText  },
-  XLS:  { bg: '#f0fdf4', iconBg: '#bbf7d0', color: '#16a34a', label: 'XLS',  Icon: File      },
-  XLSX: { bg: '#f0fdf4', iconBg: '#bbf7d0', color: '#16a34a', label: 'XLS',  Icon: File      },
+  PDF:  { color: '#e11d48', light: '#fee2e2', border: '#fecdd3', Icon: FileCheck, label: 'PDF'  },
+  DOC:  { color: '#2563eb', light: '#dbeafe', border: '#bfdbfe', Icon: FileText,  label: 'DOC'  },
+  DOCX: { color: '#2563eb', light: '#dbeafe', border: '#bfdbfe', Icon: FileText,  label: 'DOC'  },
+  XLS:  { color: '#16a34a', light: '#dcfce7', border: '#bbf7d0', Icon: File,      label: 'XLS'  },
+  XLSX: { color: '#16a34a', light: '#dcfce7', border: '#bbf7d0', Icon: File,      label: 'XLS'  },
 };
-function DocGridTile({ fileType }) {
-  const ext = (fileType ?? '').toUpperCase();
-  const { bg, iconBg, color, label, Icon } = DOC_TYPE_CFG[ext] ?? {
-    bg: '#f8fafc', iconBg: '#e2e8f0', color: '#64748b', label: ext || 'FILE', Icon: FileText,
-  };
+
+// ── WhatsApp-style document tile ───────────────────────────────────────────────
+function DocGridTile({ item }) {
+  const ext = (item.fileType ?? '').toUpperCase();
+  const { color = '#64748b', light = '#f1f5f9', border = '#e2e8f0', Icon = FileText, label = ext || 'FILE' } =
+    DOC_TYPE_CFG[ext] ?? {};
+
+  const [thumbErr, setThumbErr] = useState(false);
+  const thumb = ext === 'PDF' ? getPdfThumbnail(item.url) : null;
+  const showThumb = !!thumb && !thumbErr;
+
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center gap-2" style={{ background: bg }}>
-      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shadow-sm"
-        style={{ background: iconBg }}>
-        <Icon className="w-5 h-5 sm:w-6 sm:h-6" style={{ color }} />
+    <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: '#fff', border: `1px solid ${border}` }}>
+      {/* ── Preview area (top) ── */}
+      <div className="flex-1 relative overflow-hidden min-h-0" style={{ background: light }}>
+        {showThumb ? (
+          <img
+            src={thumb}
+            alt={item.name}
+            className="w-full h-full object-cover object-top"
+            onError={() => setThumbErr(true)}
+            loading="lazy"
+          />
+        ) : (
+          /* Simulated document lines — looks like a paper page */
+          <div className="w-full h-full flex flex-col justify-center px-2 sm:px-3 gap-1 sm:gap-1.5">
+            {[100, 72, 88, 62, 94, 55, 80, 67].map((w, i) => (
+              <div key={i} className="rounded-full"
+                style={{ height: 4, width: `${w}%`, background: color + '28' }} />
+            ))}
+          </div>
+        )}
+
+        {/* File-type badge pinned top-left */}
+        <div className="absolute top-1.5 left-1.5">
+          <span
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black text-white shadow-sm"
+            style={{ background: color }}>
+            <Icon className="w-2.5 h-2.5" />
+            {label}
+          </span>
+        </div>
       </div>
-      <span className="text-[10px] sm:text-[11px] font-black tracking-[0.15em]" style={{ color }}>{label}</span>
+
+      {/* ── Footer strip (WhatsApp style) ── */}
+      <div className="flex items-center gap-1.5 px-2 py-1.5 bg-white shrink-0"
+        style={{ borderTop: `1px solid ${border}` }}>
+        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: light }}>
+          <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5" style={{ color }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[9px] sm:text-[10px] font-semibold text-slate-700 truncate leading-tight">{item.name}</p>
+          <p className="text-[8px] sm:text-[9px] text-slate-400 leading-tight">
+            {label}{item.size ? ` · ${fmtSize(item.size)}` : ''}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -760,7 +820,7 @@ function MosaicGrid({ items, onOpen, onDelete, deleting }) {
   // Track a separate image counter so only images expand
   let imgIdx = -1;
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 auto-rows-[110px] sm:auto-rows-[130px]">
+    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-2 auto-rows-[140px] sm:auto-rows-[160px]">
       {items.map((item) => {
         const isDel  = deleting === item.id;
         const isImage = item.kind === 'image';
@@ -795,7 +855,7 @@ function MosaicGrid({ items, onOpen, onDelete, deleting }) {
             {/* ── Doc tile ── */}
             {!isImage && (
               <>
-                <DocGridTile fileType={item.fileType} />
+                <DocGridTile item={item} />
                 {/* File name overlay at bottom */}
                 <div className="absolute bottom-0 inset-x-0 px-2 py-1.5 group-hover:opacity-0 transition-opacity"
                   style={{ background: 'linear-gradient(transparent,rgba(0,0,0,0.55))' }}>
