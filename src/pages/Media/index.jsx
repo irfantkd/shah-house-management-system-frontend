@@ -14,6 +14,7 @@ import ImageLightbox from '../../components/ui/ImageLightbox';
 import EmptyState from '../../components/ui/EmptyState';
 import { compressImage } from '../../utils/compressImage';
 import { downloadFile } from '../../utils/downloadFile';
+import { shareMedia } from '../../utils/shareMedia';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
@@ -261,32 +262,12 @@ export default function MediaPage() {
   const handleShare = async (item) => {
     if (sharingId) return;
     setSharingId(item.id);
-    const MIME_MAP = {
-      JPG: 'image/jpeg', JPEG: 'image/jpeg', PNG: 'image/png',
-      WEBP: 'image/webp', GIF: 'image/gif', PDF: 'application/pdf',
-    };
-    const ext      = (item.fileType ?? '').toUpperCase();
-    const mimeType = MIME_MAP[ext] || 'application/octet-stream';
-    const safeName = item.name?.includes('.') ? item.name : `${item.name || 'file'}.${ext.toLowerCase()}`;
     try {
-      if (typeof navigator.share === 'function') {
-        // Silently fetch actual file then share natively
-        const blob = await fetch(item.url, { mode: 'cors' }).then((r) => r.blob());
-        const file = new File([blob], safeName, { type: mimeType });
-        if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: item.name });
-          return;
-        }
-        // File sharing not supported — share URL
-        await navigator.share({ title: item.name, url: item.url });
-        return;
-      }
-      // Desktop: copy link to clipboard
-      await navigator.clipboard.writeText(item.url);
-      toast.success('Link copied to clipboard');
+      const result = await shareMedia(item);
+      if (result === 'copied') toast.success('Link copied to clipboard');
     } catch (err) {
-      if (err?.name === 'AbortError') return; // user cancelled
-      // Share or fetch failed — copy link as fallback
+      if (err?.name === 'AbortError') return; // user dismissed share sheet
+      // Last resort: copy link
       try {
         await navigator.clipboard.writeText(item.url);
         toast.success('Link copied to clipboard');

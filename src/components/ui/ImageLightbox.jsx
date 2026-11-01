@@ -4,31 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, ChevronRight, ExternalLink, FileText, FileCheck, File, Download, Loader2, Share2, Check } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { downloadFile } from '../../utils/downloadFile';
-
-const MIME_MAP = {
-  JPG: 'image/jpeg', JPEG: 'image/jpeg', PNG: 'image/png',
-  WEBP: 'image/webp', GIF: 'image/gif', PDF: 'application/pdf',
-};
-
-async function shareItem(item) {
-  const ext      = (item.fileType ?? '').toUpperCase();
-  const mimeType = MIME_MAP[ext] || 'application/octet-stream';
-  const safeName = item.name?.includes('.') ? item.name : `${item.name || 'file'}.${ext.toLowerCase()}`;
-
-  if (typeof navigator.share === 'function') {
-    const blob = await fetch(item.url, { mode: 'cors' }).then((r) => r.blob());
-    const file = new File([blob], safeName, { type: mimeType });
-    if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: item.name });
-      return 'shared';
-    }
-    await navigator.share({ title: item.name, url: item.url });
-    return 'shared';
-  }
-  // Desktop: copy link to clipboard
-  await navigator.clipboard.writeText(item.url);
-  return 'copied';
-}
+import { shareMedia } from '../../utils/shareMedia';
 
 const IMAGE_EXTS  = ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF'];
 const VIEWER_EXTS = ['PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'PPT', 'PPTX'];
@@ -136,7 +112,7 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
                       if (shareState === 'loading') return;
                       setShareState('loading');
                       try {
-                        const result = await shareItem(item);
+                        const result = await shareMedia(item);
                         if (result === 'copied') {
                           setShareState('done');
                           setTimeout(() => setShareState('idle'), 1800);
@@ -144,11 +120,9 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
                           setShareState('idle');
                         }
                       } catch (err) {
-                        if (err?.name !== 'AbortError') {
-                          try { await navigator.clipboard.writeText(item.url); setShareState('done'); setTimeout(() => setShareState('idle'), 1800); } catch { setShareState('idle'); }
-                        } else {
-                          setShareState('idle');
-                        }
+                        if (err?.name === 'AbortError') { setShareState('idle'); return; }
+                        // Any other failure — copy link as last resort
+                        try { await navigator.clipboard.writeText(item.url); setShareState('done'); setTimeout(() => setShareState('idle'), 1800); } catch { setShareState('idle'); }
                       }
                     }}
                     className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all disabled:opacity-60"
