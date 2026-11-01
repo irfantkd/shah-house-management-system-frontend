@@ -41,6 +41,7 @@ const LetterheadPage     = lazy(() => import('../pages/Letterhead'));
 const TransactionsPage   = lazy(() => import('../pages/Transactions'));
 const PropertiesPage   = lazy(() => import('../pages/Properties'));
 const UsersPage        = lazy(() => import('../pages/Users'));
+const MediaPage        = lazy(() => import('../pages/Media'));
 
 function PublicRoute({ children }) {
   const isAuth = useSelector(selectIsAuthenticated);
@@ -71,6 +72,7 @@ export default function AppRoutes() {
             <Route path="assets/:id" element={<AssetDetail />} />
             <Route path="cars"       element={<CarsPage />}    />
             <Route path="cars/:id"   element={<CarDetail />}   />
+            <Route path="media"      element={<MediaPage />}   />
 
             {/* Operations */}
             <Route path="companies"     element={<CompaniesPage />}  />

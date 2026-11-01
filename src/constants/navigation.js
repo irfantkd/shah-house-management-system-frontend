@@ -22,6 +22,7 @@ import {
   RiShieldUserLine,
   RiStackLine,
   RiExchangeLine,
+  RiImageLine,
 } from 'react-icons/ri';
 
 export const NAV_GROUPS = [
@@ -40,6 +41,7 @@ export const NAV_GROUPS = [
       { label: 'Areas & Rooms',    icon: RiMapPin2Line,   path: '/areas'      },
       { label: 'Assets',           icon: RiBox3Line,      path: '/assets'     },
       { label: 'Fleet / Cars',     icon: RiCarLine,       path: '/cars'       },
+      { label: 'Media Library',    icon: RiImageLine,     path: '/media'      },
     ],
   },
   {
