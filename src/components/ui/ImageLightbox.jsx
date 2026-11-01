@@ -1,13 +1,32 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, ExternalLink, ZoomIn, Download, Loader2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ExternalLink, FileText, FileCheck, File, Download, Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { downloadFile } from '../../utils/downloadFile';
 
-const IMAGE_EXTS = ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF'];
-const isImg = (ft) => IMAGE_EXTS.includes((ft ?? '').toUpperCase());
-const isPdf = (ft) => (ft ?? '').toUpperCase() === 'PDF';
+const IMAGE_EXTS  = ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF'];
+const VIEWER_EXTS = ['PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'PPT', 'PPTX'];
+const isImg       = (ft) => IMAGE_EXTS.includes((ft ?? '').toUpperCase());
+const isViewable  = (ft) => VIEWER_EXTS.includes((ft ?? '').toUpperCase());
+
+// Styled icon for document fallback tiles
+const DOC_ICON_CFG = {
+  PDF:  { Icon: FileCheck, color: '#e11d48', bg: '#fff1f2' },
+  DOC:  { Icon: FileText,  color: '#2563eb', bg: '#eff6ff' },
+  DOCX: { Icon: FileText,  color: '#2563eb', bg: '#eff6ff' },
+  XLS:  { Icon: File,      color: '#16a34a', bg: '#f0fdf4' },
+  XLSX: { Icon: File,      color: '#16a34a', bg: '#f0fdf4' },
+};
+function DocIcon({ fileType }) {
+  const ext = (fileType ?? '').toUpperCase();
+  const { Icon = FileText, color = '#64748b', bg = '#f8fafc' } = DOC_ICON_CFG[ext] ?? {};
+  return (
+    <div className="w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg" style={{ background: bg }}>
+      <Icon className="w-10 h-10" style={{ color }} />
+    </div>
+  );
+}
 
 /* items: [{ url, name, fileType }], startIndex, onClose, open */
 export default function ImageLightbox({ items = [], startIndex = 0, onClose, open }) {
@@ -115,6 +134,7 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
                 transition={{ duration: 0.14 }}
                 className="flex items-center justify-center w-full h-full max-w-5xl mx-auto px-14">
 
+                {/* ── Image ── */}
                 {isImg(item?.fileType) && (
                   <img src={item.url} alt={item.name}
                     className="max-w-full max-h-full object-contain rounded-2xl select-none"
@@ -122,27 +142,36 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
                     draggable={false} />
                 )}
 
-                {isPdf(item?.fileType) && (
-                  <div className="w-full rounded-2xl overflow-hidden border border-white/10"
-                    style={{ height: 'calc(100vh - 148px)' }}>
-                    <iframe src={item.url} title={item.name} className="w-full h-full bg-white" />
-                  </div>
+                {/* ── PDF / Office doc via Google Docs Viewer ── */}
+                {!isImg(item?.fileType) && isViewable(item?.fileType) && (
+                  <DocViewerFrame url={item.url} name={item.name} />
                 )}
 
-                {!isImg(item?.fileType) && !isPdf(item?.fileType) && (
-                  <div className="flex flex-col items-center gap-6 p-12 text-center">
-                    <div className="w-24 h-24 rounded-3xl bg-white/10 flex items-center justify-center">
-                      <ZoomIn className="w-12 h-12 text-white/40" />
-                    </div>
+                {/* ── Unsupported type fallback ── */}
+                {!isImg(item?.fileType) && !isViewable(item?.fileType) && (
+                  <div className="flex flex-col items-center gap-5 p-10 text-center">
+                    <DocIcon fileType={item?.fileType} />
                     <div>
-                      <p className="text-white font-bold text-[18px] mb-1">{item?.name}</p>
-                      <p className="text-white/40 text-[13px] mb-6">
-                        {item?.fileType?.toUpperCase() ?? 'File'} — preview not available
+                      <p className="text-white font-bold text-[17px] mb-1">{item?.name}</p>
+                      <p className="text-white/40 text-[13px] mb-5">
+                        {(item?.fileType ?? 'File').toUpperCase()} — no preview available
                       </p>
-                      <a href={item?.url} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-semibold text-[14px] transition-all">
-                        <ExternalLink className="w-4 h-4" /> Open File
-                      </a>
+                      <div className="flex items-center justify-center gap-3">
+                        <button
+                          onClick={async () => {
+                            setDownloading(true);
+                            await downloadFile(item.url, item.name || 'download');
+                            setDownloading(false);
+                          }}
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-semibold text-[13px] transition-all">
+                          {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                          Download
+                        </button>
+                        <a href={item?.url} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-semibold text-[13px] transition-all">
+                          <ExternalLink className="w-4 h-4" /> Open
+                        </a>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -169,11 +198,18 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
                     )}>
                     {isImg(it.fileType)
                       ? <img src={it.url} alt={it.name} className="w-full h-full object-cover" />
-                      : <div className="w-full h-full bg-white/15 flex items-center justify-center">
-                          <span className="text-white text-[9px] font-bold leading-none text-center px-1">
-                            {(it.fileType ?? 'FILE').toUpperCase()}
-                          </span>
-                        </div>
+                      : (() => {
+                          const ext = (it.fileType ?? '').toUpperCase();
+                          const { Icon = FileText, color = '#94a3b8', bg = 'rgba(255,255,255,0.1)' } =
+                            DOC_ICON_CFG[ext] ?? {};
+                          return (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-0.5"
+                              style={{ background: bg }}>
+                              <Icon className="w-4 h-4" style={{ color }} />
+                              <span className="text-[7px] font-black" style={{ color }}>{ext || 'FILE'}</span>
+                            </div>
+                          );
+                        })()
                     }
                   </button>
                 ))}
@@ -184,5 +220,59 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
       )}
     </AnimatePresence>,
     document.body,
+  );
+}
+
+// ── DocViewerFrame ────────────────────────────────────────────────────────────
+// Uses Google Docs Viewer to embed PDFs, Word and Excel files in-browser.
+// Shows a spinner while loading; shows a "can't load" fallback with download +
+// open buttons if the viewer reports an error.
+function DocViewerFrame({ url, name }) {
+  const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
+  const viewerSrc = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+
+  return (
+    <div className="w-full rounded-2xl overflow-hidden border border-white/10 relative"
+      style={{ height: 'calc(100vh - 148px)' }}>
+
+      {/* Loading overlay */}
+      {status === 'loading' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-900/80 z-10">
+          <Loader2 className="w-8 h-8 text-white/50 animate-spin" />
+          <p className="text-white/40 text-[12px]">Loading preview…</p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {status === 'error' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#0f1a2e] z-10 p-8 text-center">
+          <DocIcon fileType={url.split('.').pop()} />
+          <div>
+            <p className="text-white font-bold text-[16px] mb-1">{name}</p>
+            <p className="text-white/40 text-[12px] mb-5">Preview could not load — use the buttons below</p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => downloadFile(url, name)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-semibold text-[13px] transition-all">
+                <Download className="w-4 h-4" /> Download
+              </button>
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-semibold text-[13px] transition-all">
+                <ExternalLink className="w-4 h-4" /> Open in Tab
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <iframe
+        key={url}
+        src={viewerSrc}
+        title={name}
+        className="w-full h-full bg-white"
+        onLoad={() => setStatus('ok')}
+        onError={() => setStatus('error')}
+      />
+    </div>
   );
 }
