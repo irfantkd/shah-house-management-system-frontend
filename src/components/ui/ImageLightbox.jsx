@@ -1,9 +1,34 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, ExternalLink, FileText, FileCheck, File, Download, Loader2, Share2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ExternalLink, FileText, FileCheck, File, Download, Loader2, Share2, Check } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { downloadFile } from '../../utils/downloadFile';
+
+const MIME_MAP = {
+  JPG: 'image/jpeg', JPEG: 'image/jpeg', PNG: 'image/png',
+  WEBP: 'image/webp', GIF: 'image/gif', PDF: 'application/pdf',
+};
+
+async function shareItem(item) {
+  const ext      = (item.fileType ?? '').toUpperCase();
+  const mimeType = MIME_MAP[ext] || 'application/octet-stream';
+  const safeName = item.name?.includes('.') ? item.name : `${item.name || 'file'}.${ext.toLowerCase()}`;
+
+  if (typeof navigator.share === 'function') {
+    const blob = await fetch(item.url, { mode: 'cors' }).then((r) => r.blob());
+    const file = new File([blob], safeName, { type: mimeType });
+    if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: item.name });
+      return 'shared';
+    }
+    await navigator.share({ title: item.name, url: item.url });
+    return 'shared';
+  }
+  // Desktop: copy link to clipboard
+  await navigator.clipboard.writeText(item.url);
+  return 'copied';
+}
 
 const IMAGE_EXTS  = ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF'];
 const VIEWER_EXTS = ['PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'PPT', 'PPTX'];
@@ -32,6 +57,7 @@ function DocIcon({ fileType }) {
 export default function ImageLightbox({ items = [], startIndex = 0, onClose, open }) {
   const [activeIdx,    setActiveIdx]    = useState(startIndex);
   const [downloading,  setDownloading]  = useState(false);
+  const [shareState,   setShareState]   = useState('idle'); // 'idle' | 'loading' | 'done'
   const touchStart = useRef(null);
   const total = items.length;
   const item  = items[activeIdx] ?? items[0];
@@ -41,6 +67,8 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
 
   // Sync index when lightbox (re-)opens
   useEffect(() => { if (open) setActiveIdx(startIndex); }, [open, startIndex]);
+  // Reset share state on item change
+  useEffect(() => { setShareState('idle'); }, [activeIdx]);
 
   // Keyboard
   useEffect(() => {
@@ -103,36 +131,31 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
                       : <Download className="w-4 h-4 text-white/70" />}
                   </button>
                   <button
+                    disabled={shareState === 'loading'}
                     onClick={async () => {
-                      const MIME_MAP = {
-                        JPG: 'image/jpeg', JPEG: 'image/jpeg', PNG: 'image/png',
-                        WEBP: 'image/webp', GIF: 'image/gif', PDF: 'application/pdf',
-                      };
-                      const ext      = (item.fileType ?? '').toUpperCase();
-                      const mimeType = MIME_MAP[ext] || 'application/octet-stream';
-                      const safeName = item.name?.includes('.') ? item.name : `${item.name || 'file'}.${ext.toLowerCase()}`;
-
-                      if (typeof navigator.share === 'function') {
-                        try {
-                          const blob = await fetch(item.url).then((r) => r.blob());
-                          const file = new File([blob], safeName, { type: mimeType });
-                          if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-                            await navigator.share({ files: [file], title: item.name });
-                            return;
-                          }
-                          await navigator.share({ title: item.name, url: item.url });
-                          return;
-                        } catch (err) {
-                          if (err?.name === 'AbortError') return;
+                      if (shareState === 'loading') return;
+                      setShareState('loading');
+                      try {
+                        const result = await shareItem(item);
+                        if (result === 'copied') {
+                          setShareState('done');
+                          setTimeout(() => setShareState('idle'), 1800);
+                        } else {
+                          setShareState('idle');
+                        }
+                      } catch (err) {
+                        if (err?.name !== 'AbortError') {
+                          try { await navigator.clipboard.writeText(item.url); setShareState('done'); setTimeout(() => setShareState('idle'), 1800); } catch { setShareState('idle'); }
+                        } else {
+                          setShareState('idle');
                         }
                       }
-                      // Desktop: copy link + open
-                      try { await navigator.clipboard.writeText(item.url); } catch {}
-                      window.open(item.url, '_blank', 'noopener,noreferrer');
                     }}
-                    className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
-                    title="Share">
-                    <Share2 className="w-4 h-4 text-white/70" />
+                    className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all disabled:opacity-60"
+                    title={shareState === 'done' ? 'Link copied!' : 'Share'}>
+                    {shareState === 'loading' && <Loader2 className="w-4 h-4 text-white/70 animate-spin" />}
+                    {shareState === 'done'    && <Check   className="w-4 h-4 text-emerald-400" />}
+                    {shareState === 'idle'    && <Share2  className="w-4 h-4 text-white/70" />}
                   </button>
                   <a href={item.url} target="_blank" rel="noopener noreferrer"
                     className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
