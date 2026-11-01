@@ -2,7 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Images, FileText, Car, Home, Search, ExternalLink, Eye,
-  Trash2, Loader2, FolderOpen, Upload, X, Plus, FileCheck, File,
+  Trash2, Loader2, FolderOpen, Upload, X, Plus, FileCheck, File, Download,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { useGetQuery } from '../../api/apiSlice';
@@ -10,6 +10,7 @@ import { selectCurrentPropertyId } from '../../store/slices/propertiesSlice';
 import ImageLightbox from '../../components/ui/ImageLightbox';
 import EmptyState from '../../components/ui/EmptyState';
 import { compressImage } from '../../utils/compressImage';
+import { downloadFile } from '../../utils/downloadFile';
 import { cn } from '../../utils/cn';
 import toast from 'react-hot-toast';
 
@@ -348,6 +349,10 @@ export default function MediaPage() {
                       onClick={(e) => { e.stopPropagation(); openLightbox(item); }}>
                       <Eye className="w-3 h-3" /> View
                     </button>
+                    <button onClick={(e) => { e.stopPropagation(); downloadFile(item.url, item.name); }}
+                      className="w-8 flex items-center justify-center rounded-xl bg-white/90 hover:bg-white text-slate-700">
+                      <Download className="w-3 h-3" />
+                    </button>
                     <button onClick={(e) => { e.stopPropagation(); handleDelete(item); }} disabled={isDel}
                       className="w-8 flex items-center justify-center rounded-xl bg-red-500/90 hover:bg-red-500 text-white disabled:opacity-50">
                       {isDel ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
@@ -402,6 +407,11 @@ export default function MediaPage() {
                         <Eye className="w-3.5 h-3.5" /><span className="hidden sm:inline">View</span>
                       </button>
                     )}
+                    <button onClick={() => downloadFile(item.url, item.name)}
+                      className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-all"
+                      title="Download">
+                      <Download className="w-4 h-4" />
+                    </button>
                     <a href={item.url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[12px] font-semibold text-slate-600 transition-all">
                       <ExternalLink className="w-3.5 h-3.5" /><span className="hidden sm:inline">Open</span>

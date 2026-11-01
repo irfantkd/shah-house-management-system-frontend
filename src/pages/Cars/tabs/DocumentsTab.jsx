@@ -1,8 +1,9 @@
 ﻿import { useRef, useState } from 'react';
-import { FileText, ExternalLink, Calendar, Upload, Trash2, Loader2, Plus, X, FileCheck, File, Eye } from 'lucide-react';
+import { FileText, ExternalLink, Calendar, Upload, Trash2, Loader2, Plus, X, FileCheck, File, Eye, Download } from 'lucide-react';
 import EmptyState from '../../../components/ui/EmptyState';
 import ImageLightbox from '../../../components/ui/ImageLightbox';
 import { compressImage } from '../../../utils/compressImage';
+import { downloadFile } from '../../../utils/downloadFile';
 import { cn } from '../../../utils/cn';
 import { useGetQuery } from '../../../api/apiSlice';
 import { useSelector } from 'react-redux';
@@ -252,6 +253,10 @@ export default function DocumentsTab({ car }) {
                         onClick={(e) => { e.stopPropagation(); openLightbox(doc); }}>
                         <Eye className="w-3 h-3" /> View
                       </button>
+                      <button onClick={(e) => { e.stopPropagation(); downloadFile(doc.url, doc.name); }}
+                        className="w-8 flex items-center justify-center rounded-lg bg-white/90 hover:bg-white text-slate-700">
+                        <Download className="w-3 h-3" />
+                      </button>
                       <button onClick={(e) => { e.stopPropagation(); handleDelete(doc); }} disabled={isDel}
                         className="w-8 flex items-center justify-center rounded-lg bg-red-500/90 hover:bg-red-500 text-white disabled:opacity-50">
                         {isDel ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
@@ -305,6 +310,11 @@ export default function DocumentsTab({ car }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => downloadFile(doc.url, doc.name)}
+                      className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-all"
+                      title="Download">
+                      <Download className="w-4 h-4" />
+                    </button>
                     <a href={doc.url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[12px] font-semibold text-slate-600 transition-all">
                       <ExternalLink className="w-3.5 h-3.5" />

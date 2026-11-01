@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, ExternalLink, ZoomIn } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ExternalLink, ZoomIn, Download, Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { downloadFile } from '../../utils/downloadFile';
 
 const IMAGE_EXTS = ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF'];
 const isImg = (ft) => IMAGE_EXTS.includes((ft ?? '').toUpperCase());
@@ -10,7 +11,8 @@ const isPdf = (ft) => (ft ?? '').toUpperCase() === 'PDF';
 
 /* items: [{ url, name, fileType }], startIndex, onClose, open */
 export default function ImageLightbox({ items = [], startIndex = 0, onClose, open }) {
-  const [activeIdx, setActiveIdx] = useState(startIndex);
+  const [activeIdx,    setActiveIdx]    = useState(startIndex);
+  const [downloading,  setDownloading]  = useState(false);
   const touchStart = useRef(null);
   const total = items.length;
   const item  = items[activeIdx] ?? items[0];
@@ -67,10 +69,26 @@ export default function ImageLightbox({ items = [], startIndex = 0, onClose, ope
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-3">
               {item?.url && (
-                <a href={item.url} target="_blank" rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
-                  <ExternalLink className="w-4 h-4 text-white/70" />
-                </a>
+                <>
+                  <button
+                    onClick={async () => {
+                      setDownloading(true);
+                      await downloadFile(item.url, item.name || 'download');
+                      setDownloading(false);
+                    }}
+                    disabled={downloading}
+                    className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all disabled:opacity-50"
+                    title="Download">
+                    {downloading
+                      ? <Loader2 className="w-4 h-4 text-white/70 animate-spin" />
+                      : <Download className="w-4 h-4 text-white/70" />}
+                  </button>
+                  <a href={item.url} target="_blank" rel="noopener noreferrer"
+                    className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
+                    title="Open in new tab">
+                    <ExternalLink className="w-4 h-4 text-white/70" />
+                  </a>
+                </>
               )}
               <button onClick={onClose}
                 className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
